@@ -1,51 +1,11 @@
 {
-  "_aide": "Modèles téléchargés. actif=false pour en suspendre un. type : 'groupes' (fichiers par groupe d'échéances), 'echeances' (un fichier par échéance) ou 'fichier' (un seul NetCDF pour tout le run, WW3). pas_sortie : 1 ou 3 heures. vagues : modèle de vagues associé par défaut dans l'appli. min_echeances : en dessous, le run est jugé incomplet et ignoré.",
-  "arome": {
-    "nom": "AROME 0,025°", "actif": true,
-    "api": "DPPaquetAROME", "modele": "AROME", "produit": "productARO",
-    "grille": "0.025", "paquets": ["SP1", "SP2"], "type": "groupes",
-    "pas_sortie": 1, "parametres": "atmo", "vagues": "mfwam_fr", "min_echeances": 50
-  },
-  "aromeifs": {
-    "nom": "AROME-IFS 0,025°", "actif": true,
-    "api": "DPPaquetAROMEIFS", "modele": "AROMEIFS", "produit": "productAROIFS",
-    "grille": "0.025", "paquets": ["SP1", "SP2"], "type": "groupes",
-    "pas_sortie": 1, "parametres": "atmo", "vagues": null, "min_echeances": 50
-  },
-  "arpege": {
-    "nom": "ARPEGE Europe 0,1°", "actif": true,
-    "api": "DPPaquetARPEGE", "modele": "ARPEGE", "produit": "productARP",
-    "grille": "0.1", "paquets": ["SP1", "SP2"], "type": "groupes",
-    "pas_sortie": 3, "parametres": "atmo", "vagues": "mfwam_glob", "min_echeances": 34
-  },
-  "mfwam_fr": {
-    "nom": "MFWAM 0,025° (forcé par AROME)", "actif": true,
-    "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM",
-    "grille": "0.025", "paquets": ["SP1"], "type": "echeances",
-    "pas_sortie": 1, "parametres": "vagues", "min_echeances": 45
-  },
-  "mfwam_glob": {
-    "nom": "MFWAM 0,1° global (forcé par ARPEGE)", "actif": true,
-    "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM",
-    "grille": "0.1", "paquets": ["SP1"], "type": "echeances",
-    "pas_sortie": 3, "parametres": "vagues", "min_echeances": 30
-  },
-  "ww3_atl": {
-    "nom": "WW3 Atlantique-Manche (forcé par ARPEGE)", "actif": true,
-    "api": "DPPaquetWAVESMODELS", "modele": "WW3-WARP", "produit": "productWWARP",
-    "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc",
-    "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40
-  },
-  "ww3_med": {
-    "nom": "WW3 Méditerranée (forcé par ARPEGE)", "actif": false,
-    "api": "DPPaquetWAVESMODELS", "modele": "WW3-MARP", "produit": "productWMARP",
-    "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc",
-    "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40
-  },
-  "ww3_med_aro": {
-    "nom": "WW3 Méditerranée (forcé par AROME)", "actif": true,
-    "api": "DPPaquetWAVESMODELS", "modele": "WW3-MARO", "produit": "productWMARO",
-    "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc",
-    "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40
-  }
+  "_aide": "Modèles téléchargés. actif=false pour en suspendre un. type : 'groupes' (fichiers par groupe d'échéances), 'echeances' (un fichier par échéance) ou 'fichier' (un seul NetCDF pour tout le run, WW3). pas_sortie : 1 ou 3 heures. tuiles : domaine [sud, nord, ouest, est] en degrés entiers, découpé en tuiles de 1°, et résolution des tuiles. vagues : modèles de vagues proposés par défaut dans l'appli (le premier qui couvre la zone affichée). force_par : modèle atmosphérique qui fournit le vent d'un modèle de vagues. min_echeances : en dessous, le run est jugé incomplet et ignoré.",
+  "arome": {"nom": "AROME", "actif": true, "api": "DPPaquetAROME", "modele": "AROME", "produit": "productARO", "grille": "0.025", "paquets": ["SP1", "SP2"], "type": "groupes", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 50, "vagues": ["mfwam_fr", "ww3_med_aro"], "tuiles": {"domaine": [41, 52, -8, 10], "res": 0.05}},
+  "aromeifs": {"nom": "AROME-IFS", "actif": true, "api": "DPPaquetAROMEIFS", "modele": "AROMEIFS", "produit": "productAROIFS", "grille": "0.025", "paquets": ["SP1", "SP2"], "type": "groupes", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 50, "vagues": [], "tuiles": {"domaine": [41, 52, -8, 10], "res": 0.05}},
+  "arpege": {"nom": "ARPEGE Europe", "actif": true, "api": "DPPaquetARPEGE", "modele": "ARPEGE", "produit": "productARP", "grille": "0.1", "paquets": ["SP1", "SP2"], "type": "groupes", "pas_sortie": 3, "parametres": "atmo", "min_echeances": 34, "vagues": ["ww3_atl", "mfwam_glob"], "tuiles": {"domaine": [35, 66, -30, 15], "res": 0.1}},
+  "mfwam_fr": {"nom": "MFWAM France (vent AROME)", "actif": true, "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM", "grille": "0.025", "paquets": ["SP1"], "type": "echeances", "pas_sortie": 1, "parametres": "vagues", "min_echeances": 45, "force_par": "arome", "tuiles": {"domaine": [41, 52, -8, 10], "res": 0.05}},
+  "mfwam_glob": {"nom": "MFWAM global (vent ARPEGE)", "actif": true, "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM", "grille": "0.1", "paquets": ["SP1"], "type": "echeances", "pas_sortie": 3, "parametres": "vagues", "min_echeances": 30, "force_par": "arpege", "tuiles": {"domaine": [35, 66, -30, 15], "res": 0.1}},
+  "ww3_atl": {"nom": "WW3 Atlantique-Manche (vent ARPEGE)", "actif": true, "api": "DPPaquetWAVESMODELS", "modele": "WW3-WARP", "produit": "productWWARP", "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc", "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40, "force_par": "arpege", "tuiles": {"domaine": [43, 53, -7, 5], "res": 0.05}},
+  "ww3_med": {"nom": "WW3 Méditerranée (vent ARPEGE)", "actif": false, "api": "DPPaquetWAVESMODELS", "modele": "WW3-MARP", "produit": "productWMARP", "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc", "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40, "force_par": "arpege", "tuiles": {"domaine": [40, 45, 3, 12], "res": 0.05}},
+  "ww3_med_aro": {"nom": "WW3 Méditerranée (vent AROME)", "actif": true, "api": "DPPaquetWAVESMODELS", "modele": "WW3-MARO", "produit": "productWMARO", "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc", "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40, "force_par": "arome", "tuiles": {"domaine": [40, 45, 3, 12], "res": 0.05}}
 }
