@@ -115,6 +115,7 @@ jobs:
         if: steps.pub.outputs.maj != ''
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release view dernier >/dev/null 2>&1 || \
             gh release create dernier --title "Derniers runs" --notes "Mis à jour automatiquement. Données Météo-France (licence Etalab)."
