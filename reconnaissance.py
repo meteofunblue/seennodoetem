@@ -104,7 +104,9 @@ for nom in choix:
                   f"échéances {ip.get('echeances', [])[:12]}{' …' if len(ip.get('echeances', [])) > 12 else ''}", flush=True)
         # un exemple par grille : premier paquet, première échéance
         if telecharger and ig["paquets"]:
-            p, ip = next(iter(ig["paquets"].items()))
+            # premier paquet qui a effectivement des runs (WW3 annonce un paquet « WW3 » vide)
+            p, ip = next(((k, v) for k, v in ig["paquets"].items() if v.get("runs")),
+                         next(iter(ig["paquets"].items())))
             essais = (ip.get("echeances") or [])[:1] + ECH_REPLI.get(nom, ["000H", "00H"])
             if ip.get("runs"):
                 run = ip["runs"][-1]
@@ -125,7 +127,7 @@ for nom in choix:
                             for bloc in r.iter_content(1 << 20):
                                 f.write(bloc)
                                 n += len(bloc)
-                                if n > TAILLE_MAX:
+                                if n > (TAILLE_MAX * 5 if fmt == "nc" else TAILLE_MAX):  # un NetCDF tronqué est illisible
                                     print("    (exemple tronqué à 400 Mo)")
                                     break
                         ig["exemple"] = {"fichier": os.path.basename(chemin), "run": run, "echeance": ech,
