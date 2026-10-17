@@ -67,7 +67,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libeccodes-dev
-          pip install -q eccodes numpy requests
+          pip install -q eccodes numpy requests netCDF4
       - name: Télécharger et convertir ${{ matrix.modele }}
         id: conv
         run: python convertir.py --modele "${{ matrix.modele }}" --sortie publie --deja "${{ matrix.deja }}"
