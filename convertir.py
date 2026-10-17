@@ -235,9 +235,12 @@ def lire_maillage(chemin, params, zones, modele, run, ouvrir=None):
     for zn, z in zones.items():
         if z.get("modeles") and modele not in z["modeles"]:
             continue
-        if z["s"] < lat_n.min() - 0.05 or z["n"] > lat_n.max() + 0.05 or \
-           z["o"] < lon_n.min() - 0.05 or z["e"] > lon_n.max() + 0.05:
-            print(f"  zone {zn} hors du domaine du modèle : ignorée")
+        # zone gardée si l'emprise du maillage en couvre au moins 80 % (le reste reste vide)
+        dy = max(0.0, min(z["n"], lat_n.max()) - max(z["s"], lat_n.min()))
+        dx = max(0.0, min(z["e"], lon_n.max()) - max(z["o"], lon_n.min()))
+        couvert = dx * dy / ((z["n"] - z["s"]) * (z["e"] - z["o"]))
+        if couvert < 0.8:
+            print(f"  zone {zn} hors du domaine du modèle ({100 * couvert:.0f} % couverts) : ignorée")
             continue
         lats, lons, res = grille_zone(z)
         plat, plon = [a.ravel() for a in np.meshgrid(lats, lons, indexing="ij")]
