@@ -55,7 +55,30 @@ P_VAGUES = [
     dict(cle=(0, 2, 1, "heightAboveGround", "instant"), niveau=10, nom="wind_speed_10m",     conv=lambda v: v * KT, ech=0.1, off=0, unite="kt"),
     dict(cle=(0, 2, 0, "heightAboveGround", "instant"), niveau=10, nom="wind_direction_10m", conv=lambda v: v,      ech=1,   off=0, unite="°"),
 ]
-JEUX = {"atmo": P_ATMO, "vagues": P_VAGUES}
+# WW3 (NetCDF sur maillage triangulaire). Partition 0 = mer du vent, 1 = houle primaire, 2 = houle secondaire.
+# src : variable(s) NetCDF, la première trouvée est prise ; facultatif=True : ignoré si absent du fichier.
+# genre : "scalaire", "direction" (interpolée par composantes), "hauteur_part" (0 m là où la mer existe sans cette
+# partition), "vent_vitesse" / "vent_direction" (depuis uwnd, vwnd).
+P_WW3 = [
+    dict(src=["hs"],      genre="scalaire",  nom="wave_height",               ech=0.01, off=0, unite="m"),
+    dict(src=["dir"],     genre="direction", nom="wave_direction",            ech=1,    off=0, unite="°"),
+    dict(src=["t0m1", "t02", "t01"], genre="scalaire", nom="wave_period",     ech=0.1,  off=0, unite="s", facultatif=True),
+    dict(src=["ptp", "fp"], genre="scalaire", nom="wave_peak_period",         ech=0.1,  off=0, unite="s"),
+    dict(src=["phs0"],    genre="hauteur_part", nom="wind_wave_height",        ech=0.01, off=0, unite="m"),
+    dict(src=["pdir0"],   genre="direction", nom="wind_wave_direction",       ech=1,    off=0, unite="°"),
+    dict(src=["pt0m10"],  genre="scalaire",  nom="wind_wave_period",          ech=0.1,  off=0, unite="s"),
+    dict(src=["hsts"],    genre="scalaire",  nom="swell_wave_height",         ech=0.01, off=0, unite="m", facultatif=True),
+    dict(src=["phs1"],    genre="hauteur_part", nom="primary_swell_height",    ech=0.01, off=0, unite="m"),
+    dict(src=["pdir1"],   genre="direction", nom="primary_swell_direction",   ech=1,    off=0, unite="°"),
+    dict(src=["pt0m11"],  genre="scalaire",  nom="primary_swell_period",      ech=0.1,  off=0, unite="s"),
+    dict(src=["ptp1"],    genre="scalaire",  nom="primary_swell_peak_period", ech=0.1,  off=0, unite="s", facultatif=True),
+    dict(src=["phs2"],    genre="hauteur_part", nom="secondary_swell_height",  ech=0.01, off=0, unite="m"),
+    dict(src=["pdir2"],   genre="direction", nom="secondary_swell_direction", ech=1,    off=0, unite="°"),
+    dict(src=["pt0m12"],  genre="scalaire",  nom="secondary_swell_period",    ech=0.1,  off=0, unite="s"),
+    dict(src=["uwnd", "vwnd"], genre="vent_vitesse",   nom="wind_speed_10m",     ech=0.1, off=0, unite="kt", facultatif=True),
+    dict(src=["uwnd", "vwnd"], genre="vent_direction", nom="wind_direction_10m", ech=1,   off=0, unite="°",  facultatif=True),
+]
+JEUX = {"atmo": P_ATMO, "vagues": P_VAGUES, "ww3": P_WW3}
 
 
 def index_params(liste):
@@ -121,6 +144,152 @@ def valeur_horaire(p, morceaux, h):
     return None
 
 
+# ------------------------------------------------------------------ WW3 : maillage triangulaire -> grille régulière
+def grille_zone(z):
+    """Grille régulière de la zone, alignée sur les multiples de la résolution."""
+    res = z["res"]
+    lats = np.arange(np.ceil(z["s"] / res - 1e-6), np.floor(z["n"] / res + 1e-6) + 1) * res
+    lons = np.arange(np.ceil(z["o"] / res - 1e-6), np.floor(z["e"] / res + 1e-6) + 1) * res
+    return np.round(lats, 6), np.round(lons, 6), res
+
+
+def poids_barycentriques(lon_n, lat_n, tri, plon, plat):
+    """Pour chaque point (plon, plat) : 3 nœuds du triangle qui le contient et poids. Hors maillage : nœuds -1."""
+    n = len(plon)
+    noeuds = np.full((n, 3), -1, dtype=np.int64)
+    poids = np.zeros((n, 3), dtype=np.float64)
+    # triangles qui recoupent l'emprise des points (le reste du maillage est ignoré)
+    tx, ty = lon_n[tri], lat_n[tri]
+    xmin, xmax, ymin, ymax = tx.min(1), tx.max(1), ty.min(1), ty.max(1)
+    garde = (xmax >= plon.min()) & (xmin <= plon.max()) & (ymax >= plat.min()) & (ymin <= plat.max())
+    tri, tx, ty = tri[garde], tx[garde], ty[garde]
+    xmin, xmax, ymin, ymax = xmin[garde], xmax[garde], ymin[garde], ymax[garde]
+    x1, y1, x2, y2, x3, y3 = tx[:, 0], ty[:, 0], tx[:, 1], ty[:, 1], tx[:, 2], ty[:, 2]
+    det = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+    det = np.where(det == 0, np.nan, det)
+    eps = 1e-9
+    for i in range(n):
+        x, y = plon[i], plat[i]
+        c = np.where((xmin <= x + eps) & (xmax >= x - eps) & (ymin <= y + eps) & (ymax >= y - eps))[0]
+        if not len(c):
+            continue
+        l1 = ((y2[c] - y3[c]) * (x - x3[c]) + (x3[c] - x2[c]) * (y - y3[c])) / det[c]
+        l2 = ((y3[c] - y1[c]) * (x - x3[c]) + (x1[c] - x3[c]) * (y - y3[c])) / det[c]
+        l3 = 1 - l1 - l2
+        ok = np.where((l1 >= -1e-7) & (l2 >= -1e-7) & (l3 >= -1e-7))[0]
+        if len(ok):
+            j = ok[0]
+            noeuds[i] = tri[c[j]]
+            poids[i] = (l1[j], l2[j], l3[j])
+    return noeuds, poids
+
+
+def interpoler(valeurs, noeuds, poids):
+    """valeurs (temps, nœuds) -> (temps, points). Les nœuds sans valeur sont écartés et les poids renormalisés."""
+    dedans = noeuds[:, 0] >= 0
+    idx = np.where(dedans[:, None], noeuds, 0)
+    v = valeurs[:, idx]                                   # temps, points, 3
+    w = np.broadcast_to(poids, v.shape).copy()
+    w[~np.isfinite(v)] = 0
+    v = np.where(np.isfinite(v), v, 0)
+    somme = w.sum(-1)
+    out = np.where(somme > 1e-6, (v * w).sum(-1) / np.where(somme > 1e-6, somme, 1), np.nan)
+    out[:, ~dedans] = np.nan
+    return out.astype(np.float32)
+
+
+def lire_variable(ds, nom):
+    """Variable NetCDF (temps, nœuds) en float avec NaN pour les valeurs manquantes (facteur d'échelle appliqué)."""
+    v = ds.variables[nom]
+    v.set_auto_maskandscale(True)
+    a = v[:]
+    return np.ma.filled(np.ma.asarray(a).astype(np.float64), np.nan)
+
+
+def lire_maillage(chemin, params, zones, modele, run, ouvrir=None):
+    """Lit un fichier WW3 et renvoie (sel, champs_zone) au même format que la lecture GRIB."""
+    if ouvrir is None:
+        import netCDF4
+        ouvrir = lambda c: netCDF4.Dataset(c)
+    ds = ouvrir(chemin)
+    noms_nc = list(ds.variables)
+    print(f"  variables du fichier : {', '.join(noms_nc)}", flush=True)
+    lon_n = np.asarray(ds.variables["longitude"][:], dtype=np.float64)
+    lat_n = np.asarray(ds.variables["latitude"][:], dtype=np.float64)
+    lon_n = (lon_n + 180) % 360 - 180
+    tri = np.asarray(ds.variables["tri"][:], dtype=np.int64)
+    if tri.min() >= 1:          # numérotation Fortran (à partir de 1)
+        tri = tri - 1
+    print(f"  maillage : {len(lon_n)} nœuds, {len(tri)} triangles, "
+          f"lat {lat_n.min():.2f}…{lat_n.max():.2f}, lon {lon_n.min():.2f}…{lon_n.max():.2f}", flush=True)
+
+    # échéances en heures depuis le run (temps en jours depuis 1990-01-01)
+    t_run = datetime.strptime(run, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    origine = datetime(1990, 1, 1, tzinfo=timezone.utc)
+    jours = np.asarray(ds.variables["time"][:], dtype=np.float64)
+    heures = [int(round((origine + timedelta(days=float(d)) - t_run).total_seconds() / 3600)) for d in jours]
+    print(f"  {len(heures)} échéances : {heures[0]} h à {heures[-1]} h", flush=True)
+
+    # zones couvertes par l'emprise du maillage, et poids d'interpolation
+    sel, interp = {}, {}
+    for zn, z in zones.items():
+        if z.get("modeles") and modele not in z["modeles"]:
+            continue
+        if z["s"] < lat_n.min() - 0.05 or z["n"] > lat_n.max() + 0.05 or \
+           z["o"] < lon_n.min() - 0.05 or z["e"] > lon_n.max() + 0.05:
+            print(f"  zone {zn} hors du domaine du modèle : ignorée")
+            continue
+        lats, lons, res = grille_zone(z)
+        plat, plon = [a.ravel() for a in np.meshgrid(lats, lons, indexing="ij")]
+        t0 = time.time()
+        noeuds, poids = poids_barycentriques(lon_n, lat_n, tri, plon, plat)
+        part = 100 * (noeuds[:, 0] >= 0).mean()
+        print(f"  zone {zn} : {len(lats)}×{len(lons)} points, {part:.0f} % en mer ({time.time()-t0:.1f} s)", flush=True)
+        if part < 5:
+            continue
+        sel[zn] = (range(len(lats)), range(len(lons)), lats, lons, res)
+        interp[zn] = (noeuds, poids, len(lats), len(lons))
+
+    champs_zone = {zn: {} for zn in sel}
+    cache = {}
+
+    def brut(nom):
+        if nom not in cache:
+            cache[nom] = lire_variable(ds, nom)
+        return cache[nom]
+
+    hs = brut("hs") if "hs" in noms_nc else None
+    for p in params:
+        dispo = [s for s in p["src"] if s in noms_nc]
+        if p["genre"].startswith("vent"):
+            dispo = p["src"] if all(s in noms_nc for s in p["src"]) else []
+        if not dispo:
+            if not p.get("facultatif"):
+                print(f"  {p['nom']} : variable {'/'.join(p['src'])} absente du fichier")
+            continue
+        for zn, (noeuds, poids, ny, nx) in interp.items():
+            if p["genre"] == "direction":
+                a = np.radians(brut(dispo[0]))
+                cube = np.degrees(np.arctan2(interpoler(np.sin(a), noeuds, poids),
+                                             interpoler(np.cos(a), noeuds, poids))) % 360
+            elif p["genre"].startswith("vent"):
+                u, v = interpoler(brut("uwnd"), noeuds, poids), interpoler(brut("vwnd"), noeuds, poids)
+                cube = np.hypot(u, v) * KT if p["genre"] == "vent_vitesse" else np.degrees(np.arctan2(-u, -v)) % 360
+            else:
+                b = brut(dispo[0])
+                if p["genre"] == "hauteur_part" and hs is not None:
+                    b = np.where(np.isfinite(hs) & ~np.isfinite(b), 0.0, b)   # mer présente, partition absente
+                cube = interpoler(b, noeuds, poids)
+            cube = cube.reshape(len(heures), ny, nx)
+            for t, h in enumerate(heures):
+                champs_zone[zn].setdefault(p["nom"], {})[(None, h)] = cube[t]
+        for s_ in dispo:            # libère la mémoire (hs et le vent servent encore)
+            if s_ not in ("hs", "uwnd", "vwnd"):
+                cache.pop(s_, None)
+    ds.close()
+    return sel, champs_zone, heures
+
+
 # ------------------------------------------------------------------ zones
 def axes(grille):
     lats = grille["lat1"] + np.arange(grille["nj"]) * grille["dj"] * (1 if grille["jpos"] else -1)
@@ -163,7 +332,9 @@ def echeances_du_run(ses, base, cfg, run):
     """Liste des groupes (« 00H06H ») ou échéances (« 001H ») annoncés pour ce run."""
     r = ses.get(f"{base}/grids/{cfg['grille']}/packages/{cfg['paquets'][0]}", params={"referencetime": run})
     toks = list(dict.fromkeys(re.findall(r"\b\d{2,3}H(?:\d{2,3}H)?\b", r.text)))
-    if cfg["type"] == "groupes":
+    if cfg["type"] == "fichier":
+        toks = [t for t in toks if "999" in t]
+    elif cfg["type"] == "groupes":
         toks = [t for t in toks if t.count("H") == 2 and "999" not in t]
     else:
         toks = [t for t in toks if t.count("H") == 1]
@@ -177,7 +348,10 @@ def heures_de_sortie(heures, pas):
 def telecharger_run(ses, base, cfg, run, travail):
     """Télécharge tous les fichiers d'un run. Renvoie la liste des chemins, ou [] si le run est incomplet."""
     liste = echeances_du_run(ses, base, cfg, run)
-    if cfg["type"] == "echeances":
+    fmt = cfg.get("format", "grib2")
+    if cfg["type"] == "fichier":
+        assez = bool(liste)
+    elif cfg["type"] == "echeances":
         liste = [t for t in liste if bornes(t)[1] % cfg["pas_sortie"] == 0]
         assez = len(liste) >= cfg["min_echeances"]
     else:
@@ -189,16 +363,16 @@ def telecharger_run(ses, base, cfg, run, travail):
     fichiers = []
     for tok in liste:
         for paquet in cfg["paquets"]:
-            chemin = os.path.join(travail, f"{paquet}_{tok}.grib2")
+            chemin = os.path.join(travail, f"{paquet}_{tok}.{'nc' if fmt == 'nc' else 'grib2'}")
             t0 = time.time()
             n = telecharger_fichier(ses, f"{base}/grids/{cfg['grille']}/packages/{paquet}/{cfg['produit']}",
-                                    {"referencetime": run, "time": tok, "format": "grib2"}, chemin, f"{paquet} {tok}")
+                                    {"referencetime": run, "time": tok, "format": fmt}, chemin, f"{paquet} {tok}")
             if n <= 0:
                 print(f"  {paquet} {tok} : indisponible — run {run} abandonné pour l'instant.", flush=True)
                 for fch in fichiers:
                     os.remove(fch)
                 return []
-            if cfg["type"] == "groupes" or len(fichiers) % 10 == 0:
+            if cfg["type"] != "echeances" or len(fichiers) % 10 == 0:
                 print(f"  {paquet} {tok} : {n/1e6:.0f} Mo en {time.time()-t0:.0f} s", flush=True)
             fichiers.append(chemin)
     return fichiers
@@ -257,7 +431,7 @@ def main():
     # ---- run et fichiers
     if args.grib:
         run = args.run or "2000-01-01T00:00:00Z"
-        fichiers = sorted(glob.glob(os.path.join(args.grib, "*.grib2")))
+        fichiers = sorted(glob.glob(os.path.join(args.grib, "*.grib2")) + glob.glob(os.path.join(args.grib, "*.nc")))
     else:
         from mf_api import Session
         ses = Session()
@@ -279,6 +453,14 @@ def main():
 
     # ---- décodage au fil de l'eau
     grille, sel, champs_zone = {}, None, {}
+    if cfg["type"] == "fichier":
+        sel, champs_zone, heures = lire_maillage(fichiers[0], params, zones, args.modele, run)
+        if len(heures) < cfg["min_echeances"]:
+            print(f"Run {run} incomplet : {len(heures)} échéances.")
+            return ecrire_sortie(nouveau="non")
+        if not args.grib:
+            os.remove(fichiers[0])
+        fichiers = []
     for chemin in fichiers:
         champs = {}
         lus, ret = lire_grib(chemin, params, champs, grille)
@@ -312,7 +494,7 @@ def main():
     premiere = next(iter(sel))
     for zn, (lig, col, lats, lons, pas_deg) in sel.items():
         toutes = sorted({cle[1] for m in champs_zone[zn].values() for cle in m})
-        sorties = heures_de_sortie(toutes, cfg["pas_sortie"])
+        sorties = [h for h in heures_de_sortie(toutes, cfg["pas_sortie"]) if h >= 0]
         if not sorties:
             continue
         variables = {}
