@@ -3,18 +3,27 @@ name: Reconnaissance AROME-IFS
 # Lancement manuel uniquement : onglet Actions > Reconnaissance AROME-IFS > Run workflow
 on:
   workflow_dispatch:
+    inputs:
+      base:
+        description: "Adresse de l'API (facultatif), ex. https://public-api.meteofrance.fr/previnum/DPPaquetXXX/v1"
+        required: false
+        default: ""
+      modele:
+        description: "Nom du modèle dans le catalogue (facultatif), ex. AROME-IFS"
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
   reconnaissance:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -31,11 +40,14 @@ jobs:
           MF_APP_ID: ${{ secrets.MF_APP_ID }}
           MF_CLIENT_ID: ${{ secrets.MF_CLIENT_ID }}
           MF_CLIENT_SECRET: ${{ secrets.MF_CLIENT_SECRET }}
+          MF_BASE: ${{ inputs.base }}
+          MF_MODELE: ${{ inputs.modele }}
         run: python explorer.py
 
       - name: Inventaire des fichiers GRIB
         if: always()
         run: |
+          mkdir -p reconnaissance
           cd reconnaissance
           for f in *.grib2; do
             [ -f "$f" ] || continue
@@ -52,10 +64,11 @@ jobs:
 
       - name: Conserver le résultat (sans les gros fichiers GRIB)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: reconnaissance
           path: |
             reconnaissance/catalogue.json
             reconnaissance/inventaire.txt
+          if-no-files-found: ignore
           retention-days: 7
