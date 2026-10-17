@@ -360,22 +360,39 @@ def telecharger_run(ses, base, cfg, run, travail):
     print(f"Run {run} : {len(liste)} fichiers annoncés{'' if assez else ' (incomplet)'}", flush=True)
     if not assez:
         return []
-    fichiers = []
-    for tok in liste:
-        for paquet in cfg["paquets"]:
-            chemin = os.path.join(travail, f"{paquet}_{tok}.{'nc' if fmt == 'nc' else 'grib2'}")
-            t0 = time.time()
-            n = telecharger_fichier(ses, f"{base}/grids/{cfg['grille']}/packages/{paquet}/{cfg['produit']}",
-                                    {"referencetime": run, "time": tok, "format": fmt}, chemin, f"{paquet} {tok}")
+    taches = [(tok, paquet) for tok in liste for paquet in cfg["paquets"]]
+    url = f"{base}/grids/{cfg['grille']}/packages/{{}}/{cfg['produit']}"
+    t_debut = time.time()
+
+    def un(tache):
+        tok, paquet = tache
+        chemin = os.path.join(travail, f"{paquet}_{tok}.{'nc' if fmt == 'nc' else 'grib2'}")
+        t0 = time.time()
+        n = telecharger_fichier(ses, url.format(paquet), {"referencetime": run, "time": tok, "format": fmt},
+                                chemin, f"{paquet} {tok}")
+        return tache, chemin, n, time.time() - t0
+
+    # plusieurs téléchargements simultanés (3 par défaut), l'ordre des fichiers est conservé
+    from concurrent.futures import ThreadPoolExecutor
+    resultats, faits, abandon = {}, 0, False
+    with ThreadPoolExecutor(max_workers=cfg.get("simultanes", 3)) as pool:
+        for (tok, paquet), chemin, n, duree in pool.map(un, taches):
+            faits += 1
+            resultats[(tok, paquet)] = chemin
             if n <= 0:
-                print(f"  {paquet} {tok} : indisponible — run {run} abandonné pour l'instant.", flush=True)
-                for fch in fichiers:
-                    os.remove(fch)
-                return []
-            if cfg["type"] != "echeances" or len(fichiers) % 10 == 0:
-                print(f"  {paquet} {tok} : {n/1e6:.0f} Mo en {time.time()-t0:.0f} s", flush=True)
-            fichiers.append(chemin)
-    return fichiers
+                abandon = True
+                print(f"  {paquet} {tok} : indisponible", flush=True)
+                continue
+            if cfg["type"] != "echeances" or faits % 5 == 0 or faits == len(taches):
+                print(f"  {paquet} {tok} : {n/1e6:.0f} Mo en {duree:.0f} s ({faits}/{len(taches)}, "
+                      f"{time.time()-t_debut:.0f} s écoulées)", flush=True)
+    if abandon:
+        print(f"  run {run} abandonné pour l'instant.", flush=True)
+        for chemin in resultats.values():
+            if os.path.exists(chemin):
+                os.remove(chemin)
+        return []
+    return [resultats[t] for t in taches]
 
 
 def telecharger_fichier(ses, url, params, chemin, etiquette, essais=5):
