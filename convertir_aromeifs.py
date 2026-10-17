@@ -235,6 +235,13 @@ def main():
                     cube[t] = v
             variables[nom] = {"unite": p["unite"], "ech": p["ech"], "off": p["off"],
                               "data": encoder(cube, p["ech"], p["off"])}
+            if zn == next(iter(ZONES)):  # contrôle de vraisemblance, affiché pour la première zone
+                ok = np.isfinite(cube)
+                if ok.any():
+                    print(f"    {nom:20s} {p['unite']:5s} min {np.nanmin(cube):8.1f}  moy {np.nanmean(cube):8.1f}  "
+                          f"max {np.nanmax(cube):8.1f}  ({100 * ok.mean():.0f} % de valeurs)", flush=True)
+                else:
+                    print(f"    {nom:20s} aucune valeur", flush=True)
         doc = {
             "modele": "AROME-IFS", "source": "Météo-France (licence Etalab)", "run": run,
             "genere": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
