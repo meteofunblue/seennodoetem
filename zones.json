@@ -1,10 +1,9 @@
 {
-  "_aide": "Zones produites pour chaque modèle qui les couvre entièrement. s/n = latitudes sud/nord, o/e = longitudes ouest/est (degrés décimaux, ouest négatif). res = résolution visée en degrés (arrondie au multiple de la grille du modèle). modeles = liste facultative pour limiter la zone à certains modèles. Garder environ 3000 points par zone au maximum.",
-  "iroise":   { "nom": "Mer d'Iroise",            "s": 47.75, "n": 48.75, "o": -5.6, "e": -4.2, "res": 0.025 },
-  "bretagne": { "nom": "Bretagne",                "s": 46.9,  "n": 49.2,  "o": -6.3, "e": -1.8, "res": 0.075 },
-  "manche":   { "nom": "Manche",                  "s": 48.4,  "n": 51.2,  "o": -6.0, "e": 1.8,  "res": 0.1 },
-  "gascogne": { "nom": "Golfe de Gascogne",       "s": 43.3,  "n": 48.0,  "o": -6.5, "e": -1.0, "res": 0.1 },
-  "med":      { "nom": "Méditerranée NW / Corse", "s": 41.2,  "n": 43.8,  "o": 2.8,  "e": 10.0, "res": 0.1 },
-  "atlantique": { "nom": "Atlantique NE (transits)", "s": 40.0, "n": 66.0, "o": -30.0, "e": 5.0, "res": 0.5,
-                  "modeles": ["arpege", "mfwam_glob"] }
+  "_aide": "Zones proposées dans la liste de l'appli (raccourcis de cadrage ; les données viennent des tuiles de 1° de chaque modèle). s/n = latitudes sud/nord, o/e = longitudes ouest/est, en degrés décimaux, ouest négatif. Chacun peut aussi tracer et enregistrer ses propres zones dans l'appli.",
+  "iroise":     { "nom": "Mer d'Iroise",             "s": 47.75, "n": 48.75, "o": -5.6,  "e": -4.2 },
+  "bretagne":   { "nom": "Bretagne",                 "s": 46.9,  "n": 49.2,  "o": -6.3,  "e": -1.8 },
+  "manche":     { "nom": "Manche",                   "s": 48.4,  "n": 51.2,  "o": -6.0,  "e": 1.8 },
+  "gascogne":   { "nom": "Golfe de Gascogne",        "s": 43.3,  "n": 48.0,  "o": -6.5,  "e": -1.0 },
+  "med":        { "nom": "Méditerranée NW / Corse",  "s": 41.2,  "n": 43.8,  "o": 2.8,   "e": 10.0 },
+  "atlantique": { "nom": "Atlantique NE (transits)", "s": 40.0,  "n": 66.0,  "o": -30.0, "e": 5.0 }
 }
