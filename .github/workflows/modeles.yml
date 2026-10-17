@@ -1,0 +1,125 @@
+name: Modèles
+
+on:
+  # Toutes les heures (UTC, minute 17) : vérification rapide, conversion seulement des modèles qui ont un nouveau run.
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      modeles:
+        description: "Modèles à traiter, séparés par des virgules (vide = tous les modèles actifs). Ex. arome,mfwam_fr"
+        required: false
+        default: ""
+      forcer:
+        description: "Refaire la conversion même si le dernier run est déjà publié"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: modeles
+  cancel-in-progress: false
+
+env:
+  MF_API_KEY: ${{ secrets.MF_API_KEY }}
+  MF_CLIENT_ID: ${{ secrets.MF_CLIENT_ID }}
+  MF_CLIENT_SECRET: ${{ secrets.MF_CLIENT_SECRET }}
+  MF_APP_ID: ${{ secrets.MF_APP_ID }}
+  MF_TOKEN: ${{ secrets.MF_TOKEN }}
+
+jobs:
+  # ---- 1. Quels modèles ont un nouveau run ? (quelques secondes)
+  verifier:
+    runs-on: ubuntu-24.04
+    outputs:
+      liste: ${{ steps.v.outputs.liste }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - id: v
+        env:
+          MODELES: ${{ inputs.modeles }}
+          FORCER: ${{ inputs.forcer }}
+        run: python verifier.py
+
+  # ---- 2. Une conversion par modèle, en parallèle
+  convertir:
+    needs: verifier
+    if: needs.verifier.outputs.liste != '[]' && needs.verifier.outputs.liste != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include: ${{ fromJSON(needs.verifier.outputs.liste) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Installer ecCodes et les bibliothèques
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libeccodes-dev
+          pip install -q eccodes numpy requests
+      - name: Télécharger et convertir ${{ matrix.modele }}
+        id: conv
+        run: python convertir.py --modele "${{ matrix.modele }}" --sortie publie --deja "${{ matrix.deja }}"
+      - name: Transmettre le résultat à la publication
+        if: steps.conv.outputs.nouveau == 'oui'
+        uses: actions/upload-artifact@v5
+        with:
+          name: sortie-${{ matrix.modele }}
+          path: publie/
+          retention-days: 1
+
+  # ---- 3. Publication commune (branche data + GitHub Pages + Release « dernier »)
+  publier:
+    needs: convertir
+    if: always() && needs.convertir.result != 'skipped'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Récupérer les conversions
+        uses: actions/download-artifact@v5
+        continue-on-error: true
+        with:
+          pattern: sortie-*
+          path: artefacts
+      - name: Récupérer les données déjà publiées
+        run: |
+          git clone -q --depth 1 -b data "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data \
+            || mkdir -p data
+          rm -rf data/.git
+      - name: Fusionner et publier
+        id: pub
+        run: |
+          python publier.py --data data --artefacts artefacts
+          if [ -z "$(ls -A artefacts 2>/dev/null)" ]; then echo "Rien de nouveau à publier."; exit 0; fi
+          cd data
+          git init -q
+          git checkout -q -b data
+          git add -A
+          git -c user.name="robot" -c user.email="robot@users.noreply.github.com" commit -qm "mise à jour $(date -u +%FT%H:%MZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+      - name: Zips dans la Release « dernier »
+        if: steps.pub.outputs.maj != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view dernier >/dev/null 2>&1 || \
+            gh release create dernier --title "Derniers runs" --notes "Mis à jour automatiquement. Données Météo-France (licence Etalab)."
+          cd data
+          for m in ${{ steps.pub.outputs.maj }}; do
+            zip -qr "../$m.zip" "$m"
+            gh release upload dernier "../$m.zip" --clobber
+          done
