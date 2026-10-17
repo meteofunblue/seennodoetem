@@ -4,6 +4,10 @@ on:
   # Toutes les heures (UTC, minute 17) : vérification rapide, conversion seulement des modèles qui ont un nouveau run.
   schedule:
     - cron: "17 * * * *"
+  # Modification de l'appli ou des zones : republication du site sans reconversion.
+  push:
+    branches: [main]
+    paths: ["app/**", "zones.json"]
   workflow_dispatch:
     inputs:
       modeles:
@@ -17,6 +21,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: modeles
@@ -32,6 +38,7 @@ env:
 jobs:
   # ---- 1. Quels modèles ont un nouveau run ? (quelques secondes)
   verifier:
+    if: github.event_name != 'push'
     runs-on: ubuntu-24.04
     outputs:
       liste: ${{ steps.v.outputs.liste }}
@@ -79,11 +86,17 @@ jobs:
           path: publie/
           retention-days: 1
 
-  # ---- 3. Publication commune (branche data + GitHub Pages + Release « dernier »)
+  # ---- 3. Publication : Release « dernier » (stockage des modèles) + site GitHub Pages (appli + tuiles)
   publier:
-    needs: convertir
-    if: always() && needs.convertir.result != 'skipped'
+    needs: [verifier, convertir]
+    if: always() && (github.event_name == 'push' || needs.convertir.result == 'success' || needs.convertir.result == 'failure')
     runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -95,32 +108,32 @@ jobs:
         with:
           pattern: sortie-*
           path: artefacts
-      - name: Récupérer les données déjà publiées
+      - name: Récupérer les modèles déjà publiés (Release « dernier »)
         run: |
-          git clone -q --depth 1 -b data "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data \
-            || mkdir -p data
-          rm -rf data/.git
-      - name: Fusionner et publier
-        id: pub
-        run: |
-          python publier.py --data data --artefacts artefacts
-          if [ -z "$(ls -A artefacts 2>/dev/null)" ]; then echo "Rien de nouveau à publier."; exit 0; fi
-          cd data
-          git init -q
-          git checkout -q -b data
-          git add -A
-          git -c user.name="robot" -c user.email="robot@users.noreply.github.com" commit -qm "mise à jour $(date -u +%FT%H:%MZ)"
-          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
-      - name: Zips dans la Release « dernier »
-        if: steps.pub.outputs.maj != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
+          mkdir -p site anciens artefacts
           gh release view dernier >/dev/null 2>&1 || \
             gh release create dernier --title "Derniers runs" --notes "Mis à jour automatiquement. Données Météo-France (licence Etalab)."
-          cd data
+          gh release download dernier -p "*.zip" -D anciens --clobber || true
+          for z in anciens/*.zip; do [ -e "$z" ] && unzip -qo "$z" -d site; done
+          ls site
+      - name: Assembler le site
+        id: pub
+        run: python publier.py --site site --artefacts artefacts --app app/index.html --zones zones.json
+      - name: Ranger les nouveaux runs dans la Release
+        if: steps.pub.outputs.maj != ''
+        run: |
+          cd site
           for m in ${{ steps.pub.outputs.maj }}; do
+            rm -f "../$m.zip"
             zip -qr "../$m.zip" "$m"
             gh release upload dernier "../$m.zip" --clobber
           done
+      - name: Préparer le site
+        if: steps.pub.outputs.maj != '' || github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - name: Publier sur GitHub Pages
+        id: deploy
+        if: steps.pub.outputs.maj != '' || github.event_name == 'push'
+        uses: actions/deploy-pages@v4
