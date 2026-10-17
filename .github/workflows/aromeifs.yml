@@ -1,11 +1,9 @@
 name: AROME-IFS
 
 on:
-  # Lancement automatique toutes les 2 heures (UTC) ; le script s'arrête aussitôt si aucun nouveau run.
-  # À ACTIVER seulement avec un identifiant durable (MF_CLIENT_ID + MF_CLIENT_SECRET, MF_APP_ID ou MF_API_KEY) :
-  # retirer le « # » au début des deux lignes suivantes.
-  # schedule:
-  #   - cron: "23 */2 * * *"
+  # Vérification toutes les heures (UTC, à la minute 17) ; conversion seulement si un nouveau run est disponible.
+  schedule:
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       forcer:
@@ -24,6 +22,12 @@ jobs:
   convertir:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      MF_CLIENT_ID: ${{ secrets.MF_CLIENT_ID }}
+      MF_CLIENT_SECRET: ${{ secrets.MF_CLIENT_SECRET }}
+      MF_APP_ID: ${{ secrets.MF_APP_ID }}
+      MF_API_KEY: ${{ secrets.MF_API_KEY }}
+      MF_TOKEN: ${{ secrets.MF_TOKEN }}
     steps:
       - uses: actions/checkout@v5
 
@@ -31,29 +35,38 @@ jobs:
         with:
           python-version: "3.12"
 
+      # ---- 1. Vérification rapide (quelques secondes) ----
+      - name: Y a-t-il un nouveau run ?
+        id: verif
+        run: |
+          pip install -q requests
+          curl -fsS "https://raw.githubusercontent.com/${{ github.repository }}/data/aromeifs/run.json" -o deja.json \
+            || echo '{}' > deja.json
+          python - <<'EOF'
+          import json, os
+          from mf_api import Session
+          runs = Session().runs_disponibles("0.025", "SP1")
+          deja = json.load(open("deja.json")).get("run")
+          dernier = runs[-1] if runs else None
+          forcer = "${{ inputs.forcer }}" == "true"
+          nouveau = "oui" if dernier and (dernier != deja or forcer) else "non"
+          print(f"Dernier run disponible : {dernier} · déjà publié : {deja} · à traiter : {nouveau}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"nouveau={nouveau}\nrun={dernier}\n")
+          EOF
+
+      # ---- 2. Conversion, seulement s'il y a du nouveau ----
       - name: Installer ecCodes et les bibliothèques
+        if: steps.verif.outputs.nouveau == 'oui'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libeccodes-dev
-          pip install -q eccodes numpy requests
+          pip install -q eccodes numpy
 
-      - name: Récupérer l'état actuellement publié
-        run: |
-          curl -fsS "https://raw.githubusercontent.com/${{ github.repository }}/data/aromeifs/run.json" -o deja.json \
-            || echo '{}' > deja.json
-
-      - name: Télécharger et convertir le dernier run
+      - name: Télécharger et convertir
         id: conv
-        env:
-          MF_CLIENT_ID: ${{ secrets.MF_CLIENT_ID }}
-          MF_CLIENT_SECRET: ${{ secrets.MF_CLIENT_SECRET }}
-          MF_APP_ID: ${{ secrets.MF_APP_ID }}
-          MF_API_KEY: ${{ secrets.MF_API_KEY }}
-          MF_TOKEN: ${{ secrets.MF_TOKEN }}
-        run: |
-          OPTS="--sortie publie --deja-publie deja.json"
-          if [ "${{ inputs.forcer }}" = "true" ]; then OPTS="$OPTS --forcer"; fi
-          python convertir_aromeifs.py $OPTS
+        if: steps.verif.outputs.nouveau == 'oui'
+        run: python convertir_aromeifs.py --sortie publie --run "${{ steps.verif.outputs.run }}"
 
       - name: Publier sur la branche data (GitHub Pages)
         if: steps.conv.outputs.nouveau == 'oui'
