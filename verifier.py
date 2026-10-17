@@ -15,7 +15,9 @@ API = "https://public-api.meteofrance.fr/previnum"
 modeles = {k: v for k, v in json.load(open("modeles.json", encoding="utf-8")).items() if not k.startswith("_")}
 choix = [m.strip() for m in os.environ.get("MODELES", "").split(",") if m.strip()]
 forcer = os.environ.get("FORCER", "false") == "true"
-depot = os.environ.get("GITHUB_REPOSITORY", "")
+depot = os.environ.get("GITHUB_REPOSITORY", "/")
+proprio, nom_depot = depot.split("/", 1)
+site = f"https://{proprio.lower()}.github.io/{nom_depot}"
 
 ses = Session()
 a_traiter = []
@@ -35,9 +37,9 @@ for nom, cfg in modeles.items():
         print(f"{nom:12s} catalogue : HTTP {r.status_code}, aucun run")
         continue
     deja = ""
-    try:
-        rp = requests.get(f"https://raw.githubusercontent.com/{depot}/data/{nom}/run.json", timeout=30)
-        if rp.status_code == 200:
+    try:   # run publié sur le site (GitHub Pages) ; un ancien format sans tuiles compte comme non publié
+        rp = requests.get(f"{site}/{nom}/run.json", timeout=30, headers={"Cache-Control": "no-cache"})
+        if rp.status_code == 200 and "tuiles" in rp.json():
             deja = rp.json().get("run", "")
     except Exception:
         pass
