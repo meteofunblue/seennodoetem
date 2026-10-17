@@ -1,15 +1,11 @@
-name: Reconnaissance AROME-IFS
+name: Reconnaissance
 
-# Lancement manuel uniquement : onglet Actions > Reconnaissance AROME-IFS > Run workflow
+# Lancement manuel : onglet Actions > Reconnaissance > Run workflow
 on:
   workflow_dispatch:
     inputs:
-      base:
-        description: "Adresse de l'API (facultatif), ex. https://public-api.meteofrance.fr/previnum/DPPaquetXXX/v1"
-        required: false
-        default: ""
-      modele:
-        description: "Nom du modèle dans le catalogue (facultatif), ex. AROME-IFS"
+      modeles:
+        description: "Modèles à inventorier, séparés par des virgules (vide = tous). Ex. arpege,mfwam,ww3_atl"
         required: false
         default: ""
 
@@ -19,7 +15,7 @@ permissions:
 jobs:
   reconnaissance:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
 
@@ -30,39 +26,42 @@ jobs:
       - name: Installer les outils
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libeccodes-tools
+          sudo apt-get install -y -qq libeccodes-tools netcdf-bin
           pip install -q requests
 
-      - name: Interroger le catalogue et télécharger un exemple
+      - name: Interroger les catalogues et télécharger des exemples
         env:
-          MF_TOKEN: ${{ secrets.MF_TOKEN }}
           MF_API_KEY: ${{ secrets.MF_API_KEY }}
-          MF_APP_ID: ${{ secrets.MF_APP_ID }}
           MF_CLIENT_ID: ${{ secrets.MF_CLIENT_ID }}
           MF_CLIENT_SECRET: ${{ secrets.MF_CLIENT_SECRET }}
-          MF_BASE: ${{ inputs.base }}
-          MF_MODELE: ${{ inputs.modele }}
-        run: python explorer.py
+          MF_APP_ID: ${{ secrets.MF_APP_ID }}
+          MF_TOKEN: ${{ secrets.MF_TOKEN }}
+          MODELES: ${{ inputs.modeles }}
+        run: python reconnaissance.py
 
-      - name: Inventaire des fichiers GRIB
+      - name: Inventaire des exemples
         if: always()
         run: |
-          mkdir -p reconnaissance
-          cd reconnaissance
+          mkdir -p reconnaissance && cd reconnaissance
+          {
           for f in *.grib2; do
             [ -f "$f" ] || continue
-            echo "================ $f ================"
+            echo "================ $f ($(du -h "$f" | cut -f1)) ================"
             echo "--- Grille (premier message) ---"
             grib_get -w count=1 -p gridType,Ni,Nj,latitudeOfFirstGridPointInDegrees,longitudeOfFirstGridPointInDegrees,latitudeOfLastGridPointInDegrees,longitudeOfLastGridPointInDegrees,iDirectionIncrementInDegrees,jDirectionIncrementInDegrees,packingType,bitsPerValue "$f"
-            echo "--- Paramètres présents (nombre de messages) ---"
+            echo "--- Paramètres (nombre de messages) ---"
             grib_get -p shortName,name,units,typeOfLevel,level,stepType,discipline,parameterCategory,parameterNumber "$f" | sort | uniq -c
             echo "--- Échéances ---"
             grib_get -p stepRange "$f" | sort -n | uniq | tr '\n' ' '; echo
-            echo "--- Exemple de valeurs (premier message) ---"
-            grib_ls -w count=1 -n statistics "$f"
-          done | tee inventaire.txt
+          done
+          for f in *.nc; do
+            [ -f "$f" ] || continue
+            echo "================ $f ($(du -h "$f" | cut -f1)) ================"
+            ncdump -h "$f" | head -n 200
+          done
+          } | tee inventaire.txt
 
-      - name: Conserver le résultat (sans les gros fichiers GRIB)
+      - name: Conserver le résultat (sans les gros fichiers)
         if: always()
         uses: actions/upload-artifact@v5
         with:
