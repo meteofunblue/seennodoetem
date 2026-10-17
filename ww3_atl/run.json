@@ -1,0 +1,58 @@
+{
+ "modele": "ww3_atl",
+ "nom": "WW3 Atlantique-Manche (forcé par ARPEGE)",
+ "run": "2026-10-17T12:00:00Z",
+ "parametres": "ww3",
+ "vagues": null,
+ "pas_sortie_h": 1,
+ "genere": "2026-10-17T20:19:21Z",
+ "zones": {
+  "iroise": {
+   "nom": "Mer d'Iroise",
+   "points": 2337,
+   "pas_deg": 0.025,
+   "echeances": 57,
+   "taille_ko": 5206
+  },
+  "bretagne": {
+   "nom": "Bretagne",
+   "points": 1891,
+   "pas_deg": 0.075,
+   "echeances": 57,
+   "taille_ko": 4213
+  },
+  "manche": {
+   "nom": "Manche",
+   "points": 2291,
+   "pas_deg": 0.1,
+   "echeances": 57,
+   "taille_ko": 5103
+  },
+  "gascogne": {
+   "nom": "Golfe de Gascogne",
+   "points": 2688,
+   "pas_deg": 0.1,
+   "echeances": 57,
+   "taille_ko": 5987
+  }
+ },
+ "variables": [
+  "wave_height",
+  "wave_direction",
+  "wave_period",
+  "wave_peak_period",
+  "wind_wave_height",
+  "wind_wave_direction",
+  "wind_wave_period",
+  "swell_wave_height",
+  "primary_swell_height",
+  "primary_swell_direction",
+  "primary_swell_period",
+  "primary_swell_peak_period",
+  "secondary_swell_height",
+  "secondary_swell_direction",
+  "secondary_swell_period",
+  "wind_speed_10m",
+  "wind_direction_10m"
+ ]
+}

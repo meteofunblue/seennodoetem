@@ -1,0 +1,67 @@
+{
+ "modele": "arpege",
+ "nom": "ARPEGE Europe 0,1°",
+ "run": "2026-10-17T12:00:00Z",
+ "parametres": "atmo",
+ "vagues": "mfwam_glob",
+ "pas_sortie_h": 3,
+ "genere": "2026-10-17T19:29:30Z",
+ "zones": {
+  "iroise": {
+   "nom": "Mer d'Iroise",
+   "points": 180,
+   "pas_deg": 0.1,
+   "echeances": 35,
+   "taille_ko": 199
+  },
+  "bretagne": {
+   "nom": "Bretagne",
+   "points": 1104,
+   "pas_deg": 0.1,
+   "echeances": 35,
+   "taille_ko": 1209
+  },
+  "manche": {
+   "nom": "Manche",
+   "points": 2291,
+   "pas_deg": 0.1,
+   "echeances": 35,
+   "taille_ko": 2507
+  },
+  "gascogne": {
+   "nom": "Golfe de Gascogne",
+   "points": 2688,
+   "pas_deg": 0.1,
+   "echeances": 35,
+   "taille_ko": 2942
+  },
+  "med": {
+   "nom": "Méditerranée NW / Corse",
+   "points": 1971,
+   "pas_deg": 0.1,
+   "echeances": 35,
+   "taille_ko": 2157
+  },
+  "atlantique": {
+   "nom": "Atlantique NE (transits)",
+   "points": 3763,
+   "pas_deg": 0.5,
+   "echeances": 35,
+   "taille_ko": 4118
+  }
+ },
+ "variables": [
+  "pressure_msl",
+  "wind_speed_10m",
+  "wind_direction_10m",
+  "wind_gusts_10m",
+  "temperature_2m",
+  "dew_point_2m",
+  "precipitation",
+  "cloud_cover",
+  "cloud_cover_low",
+  "cloud_cover_mid",
+  "cloud_cover_high",
+  "cape"
+ ]
+}

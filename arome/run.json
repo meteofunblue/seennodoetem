@@ -1,0 +1,60 @@
+{
+ "modele": "arome",
+ "nom": "AROME 0,025°",
+ "run": "2026-10-17T15:00:00Z",
+ "parametres": "atmo",
+ "vagues": "mfwam_fr",
+ "pas_sortie_h": 1,
+ "genere": "2026-10-17T19:27:52Z",
+ "zones": {
+  "iroise": {
+   "nom": "Mer d'Iroise",
+   "points": 2337,
+   "pas_deg": 0.025,
+   "echeances": 52,
+   "taille_ko": 3800
+  },
+  "bretagne": {
+   "nom": "Bretagne",
+   "points": 1891,
+   "pas_deg": 0.075,
+   "echeances": 52,
+   "taille_ko": 3075
+  },
+  "manche": {
+   "nom": "Manche",
+   "points": 2291,
+   "pas_deg": 0.1,
+   "echeances": 52,
+   "taille_ko": 3725
+  },
+  "gascogne": {
+   "nom": "Golfe de Gascogne",
+   "points": 2688,
+   "pas_deg": 0.1,
+   "echeances": 52,
+   "taille_ko": 4370
+  },
+  "med": {
+   "nom": "Méditerranée NW / Corse",
+   "points": 1971,
+   "pas_deg": 0.1,
+   "echeances": 52,
+   "taille_ko": 3205
+  }
+ },
+ "variables": [
+  "pressure_msl",
+  "wind_speed_10m",
+  "wind_direction_10m",
+  "wind_gusts_10m",
+  "temperature_2m",
+  "dew_point_2m",
+  "precipitation",
+  "cloud_cover",
+  "cloud_cover_low",
+  "cloud_cover_mid",
+  "cloud_cover_high",
+  "cape"
+ ]
+}
