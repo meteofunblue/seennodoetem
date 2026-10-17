@@ -1,11 +1,12 @@
 """
-Convertisseur commun : paquets GRIB2 Météo-France -> fichiers légers par zone pour l'appli.
+Convertisseur commun : paquets Météo-France (GRIB2, NetCDF WW3) -> tuiles légères de 1° pour l'appli.
 
   python convertir.py --modele arome --sortie publie            # dernier run complet
   python convertir.py --modele arome --sortie publie --run 2026-10-17T06:00:00Z
   python convertir.py --modele arome --sortie publie --grib dossier   # test hors ligne
 
-Configuration : modeles.json (sources) et zones.json (zones). Produit <sortie>/<modele>/<zone>.json et run.json.
+Configuration : modeles.json (sources, domaine et résolution des tuiles).
+Produit <sortie>/<modele>/meta.json, run.json et t/<lat>_<lon>.bin.gz (tuiles de 1°, cf. « format » dans meta.json).
 """
 import argparse
 import base64
@@ -153,34 +154,44 @@ def grille_zone(z):
     return np.round(lats, 6), np.round(lons, 6), res
 
 
-def poids_barycentriques(lon_n, lat_n, tri, plon, plat):
-    """Pour chaque point (plon, plat) : 3 nœuds du triangle qui le contient et poids. Hors maillage : nœuds -1."""
-    n = len(plon)
-    noeuds = np.full((n, 3), -1, dtype=np.int64)
-    poids = np.zeros((n, 3), dtype=np.float64)
-    # triangles qui recoupent l'emprise des points (le reste du maillage est ignoré)
+def poids_grille(lon_n, lat_n, tri, lats, lons):
+    """Comme poids_barycentriques, mais pour tous les points d'une grille régulière (lats × lons, ordre lat puis lon),
+    en ne testant pour chaque triangle que les points de grille compris dans son emprise (rapide sur 100 000 triangles)."""
+    ny, nx = len(lats), len(lons)
+    dy, dx = lats[1] - lats[0], lons[1] - lons[0]
+    noeuds = np.full((ny * nx, 3), -1, dtype=np.int64)
+    poids = np.zeros((ny * nx, 3), dtype=np.float64)
     tx, ty = lon_n[tri], lat_n[tri]
-    xmin, xmax, ymin, ymax = tx.min(1), tx.max(1), ty.min(1), ty.max(1)
-    garde = (xmax >= plon.min()) & (xmin <= plon.max()) & (ymax >= plat.min()) & (ymin <= plat.max())
-    tri, tx, ty = tri[garde], tx[garde], ty[garde]
-    xmin, xmax, ymin, ymax = xmin[garde], xmax[garde], ymin[garde], ymax[garde]
-    x1, y1, x2, y2, x3, y3 = tx[:, 0], ty[:, 0], tx[:, 1], ty[:, 1], tx[:, 2], ty[:, 2]
-    det = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
-    det = np.where(det == 0, np.nan, det)
     eps = 1e-9
-    for i in range(n):
-        x, y = plon[i], plat[i]
-        c = np.where((xmin <= x + eps) & (xmax >= x - eps) & (ymin <= y + eps) & (ymax >= y - eps))[0]
-        if not len(c):
-            continue
-        l1 = ((y2[c] - y3[c]) * (x - x3[c]) + (x3[c] - x2[c]) * (y - y3[c])) / det[c]
-        l2 = ((y3[c] - y1[c]) * (x - x3[c]) + (x1[c] - x3[c]) * (y - y3[c])) / det[c]
-        l3 = 1 - l1 - l2
-        ok = np.where((l1 >= -1e-7) & (l2 >= -1e-7) & (l3 >= -1e-7))[0]
-        if len(ok):
-            j = ok[0]
-            noeuds[i] = tri[c[j]]
-            poids[i] = (l1[j], l2[j], l3[j])
+    i0 = np.maximum(np.ceil((ty.min(1) - lats[0]) / dy - eps).astype(np.int64), 0)
+    i1 = np.minimum(np.floor((ty.max(1) - lats[0]) / dy + eps).astype(np.int64), ny - 1)
+    j0 = np.maximum(np.ceil((tx.min(1) - lons[0]) / dx - eps).astype(np.int64), 0)
+    j1 = np.minimum(np.floor((tx.max(1) - lons[0]) / dx + eps).astype(np.int64), nx - 1)
+    ci, cj = np.maximum(i1 - i0 + 1, 0), np.maximum(j1 - j0 + 1, 0)
+    nb = ci * cj
+    garde = np.where(nb > 0)[0]
+    if not len(garde):
+        return noeuds, poids
+    nb = nb[garde]
+    k = np.repeat(garde, nb)                                   # triangle candidat
+    debut = np.repeat(np.cumsum(nb) - nb, nb)
+    o = np.arange(len(k)) - debut
+    ii = i0[k] + o // cj[k]
+    jj = j0[k] + o % cj[k]
+    x, y = lons[jj], lats[ii]
+    x1, y1, x2, y2, x3, y3 = tx[k, 0], ty[k, 0], tx[k, 1], ty[k, 1], tx[k, 2], ty[k, 2]
+    det = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3)
+    ok = det != 0
+    det = np.where(ok, det, 1)
+    l1 = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / det
+    l2 = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / det
+    l3 = 1 - l1 - l2
+    dedans = ok & (l1 >= -1e-7) & (l2 >= -1e-7) & (l3 >= -1e-7)
+    pt = (ii * nx + jj)[dedans]
+    pt_u, premier = np.unique(pt, return_index=True)          # un seul triangle par point
+    sel = np.where(dedans)[0][premier]
+    noeuds[pt_u] = tri[k[sel]]
+    poids[pt_u] = np.stack([l1[sel], l2[sel], l3[sel]], 1)
     return noeuds, poids
 
 
@@ -206,7 +217,7 @@ def lire_variable(ds, nom):
     return np.ma.filled(np.ma.asarray(a).astype(np.float64), np.nan)
 
 
-def lire_maillage(chemin, params, zones, modele, run, ouvrir=None):
+def lire_maillage(chemin, params, zones, modele, run, ouvrir=None, couverture_min=0.8):
     """Lit un fichier WW3 et renvoie (sel, champs_zone) au même format que la lecture GRIB."""
     if ouvrir is None:
         import netCDF4
@@ -239,13 +250,12 @@ def lire_maillage(chemin, params, zones, modele, run, ouvrir=None):
         dy = max(0.0, min(z["n"], lat_n.max()) - max(z["s"], lat_n.min()))
         dx = max(0.0, min(z["e"], lon_n.max()) - max(z["o"], lon_n.min()))
         couvert = dx * dy / ((z["n"] - z["s"]) * (z["e"] - z["o"]))
-        if couvert < 0.8:
+        if couvert < couverture_min:
             print(f"  zone {zn} hors du domaine du modèle ({100 * couvert:.0f} % couverts) : ignorée")
             continue
         lats, lons, res = grille_zone(z)
-        plat, plon = [a.ravel() for a in np.meshgrid(lats, lons, indexing="ij")]
         t0 = time.time()
-        noeuds, poids = poids_barycentriques(lon_n, lat_n, tri, plon, plat)
+        noeuds, poids = poids_grille(lon_n, lat_n, tri, lats, lons)
         part = 100 * (noeuds[:, 0] >= 0).mean()
         print(f"  zone {zn} : {len(lats)}×{len(lons)} points, {part:.0f} % en mer ({time.time()-t0:.1f} s)", flush=True)
         if part < 5:
@@ -448,10 +458,13 @@ def main():
     args = ap.parse_args()
 
     modeles = json.load(open("modeles.json", encoding="utf-8"))
-    zones = {k: v for k, v in json.load(open("zones.json", encoding="utf-8")).items() if not k.startswith("_")}
     cfg = modeles[args.modele]
     params = JEUX[cfg["parametres"]]
     natif = float(cfg["grille"])
+    # domaine découpé en tuiles de 1° ; bornes nord et est exclues (elles appartiennent aux tuiles voisines)
+    S_, N_, O_, E_ = cfg["tuiles"]["domaine"]
+    res = cfg["tuiles"]["res"]
+    zones = {"domaine": {"nom": "domaine", "s": S_, "n": N_ - res, "o": O_, "e": E_ - res, "res": res}}
     base = f"{API}/{cfg['api']}/v1/models/{cfg['modele']}"
     travail = tempfile.mkdtemp(prefix=args.modele + "_")
     t_debut = time.time()
@@ -482,7 +495,7 @@ def main():
     # ---- décodage au fil de l'eau
     grille, sel, champs_zone = {}, None, {}
     if cfg["type"] == "fichier":
-        sel, champs_zone, heures = lire_maillage(fichiers[0], params, zones, args.modele, run)
+        sel, champs_zone, heures = lire_maillage(fichiers[0], params, zones, args.modele, run, couverture_min=0)
         if len(heures) < cfg["min_echeances"]:
             print(f"Run {run} incomplet : {len(heures)} échéances.")
             return ecrire_sortie(nouveau="non")
@@ -501,8 +514,7 @@ def main():
                     continue
                 s = selection_zone(z, grille, natif)
                 if s is None:
-                    print(f"  zone {zn} hors du domaine du modèle : ignorée")
-                    continue
+                    sys.exit(f"Domaine des tuiles {cfg['tuiles']['domaine']} hors de la grille du modèle : corriger modeles.json.")
                 sel[zn] = s
                 champs_zone[zn] = {}
         for nom, morceaux in champs.items():
@@ -514,66 +526,91 @@ def main():
     if not sel:
         sys.exit("Aucune zone produite (aucun champ lu ou aucune zone dans le domaine).")
 
-    # ---- assemblage
+    # ---- assemblage : un cube (temps, lat, lon) par paramètre sur tout le domaine
     t_run = datetime.strptime(run, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    sortie = os.path.join(args.sortie, args.modele)
-    os.makedirs(sortie, exist_ok=True)
-    resume, noms = {}, [p["nom"] for p in params]
-    premiere = next(iter(sel))
-    for zn, (lig, col, lats, lons, pas_deg) in sel.items():
-        toutes = sorted({cle[1] for m in champs_zone[zn].values() for cle in m})
-        sorties = [h for h in heures_de_sortie(toutes, cfg["pas_sortie"]) if h >= 0]
-        if not sorties:
+    lig, col, lats, lons, pas_deg = sel["domaine"]
+    champs = champs_zone["domaine"]
+    toutes = sorted({cle[1] for m in champs.values() for cle in m})
+    sorties = [h for h in heures_de_sortie(toutes, cfg["pas_sortie"]) if h >= 0]
+    if not sorties:
+        sys.exit("Aucune échéance lue.")
+    cubes, variables = [], []
+    for p in params:
+        morceaux = champs.get(p["nom"], {})
+        if not morceaux:
             continue
-        variables = {}
-        for p in params:
-            morceaux = champs_zone[zn].get(p["nom"], {})
-            if not morceaux:
-                continue
-            cube = np.full((len(sorties), len(lig), len(col)), np.nan, dtype=np.float32)
-            for t, h in enumerate(sorties):
-                if p.get("cumul") and cfg["pas_sortie"] > 1:
-                    # cumul (somme) ou maximum sur l'intervalle depuis l'échéance de sortie précédente
-                    h0 = sorties[t - 1] if t else h - cfg["pas_sortie"]
-                    vals = [valeur_horaire(p, morceaux, hh) for hh in range(h0 + 1, h + 1)]
-                    vals = [v for v in vals if v is not None]
-                    if vals:
-                        cube[t] = np.nansum(vals, axis=0) if p["cumul"] == "somme" else np.nanmax(vals, axis=0)
-                else:
-                    v = valeur_horaire(p, morceaux, h)
-                    if v is not None:
-                        cube[t] = v
-            variables[p["nom"]] = {"unite": p["unite"], "ech": p["ech"], "off": p["off"],
-                                   "data": encoder(cube, p["ech"], p["off"])}
-            if zn == premiere:
-                ok = np.isfinite(cube)
-                txt = (f"min {np.nanmin(cube):8.1f}  moy {np.nanmean(cube):8.1f}  max {np.nanmax(cube):8.1f}  "
-                       f"({100 * ok.mean():.0f} % de valeurs)") if ok.any() else "aucune valeur"
-                print(f"    [{zn}] {p['nom']:22s} {p['unite']:5s} {txt}", flush=True)
-        doc = {
-            "modele": args.modele, "nom_modele": cfg["nom"], "source": "Météo-France (licence Etalab)", "run": run,
-            "genere": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "pas_sortie_h": cfg["pas_sortie"],
-            "zone": {"id": zn, "nom": zones[zn]["nom"], "lat0": round(float(lats[0]), 4), "lon0": round(float(lons[0]), 4),
-                     "dlat": round(pas_deg, 6), "dlon": round(pas_deg, 6), "ny": len(lig), "nx": len(col)},
-            "temps": [(t_run + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in sorties],
-            "manquant": MANQUANT, "ordre": "temps, lat (sud→nord), lon (ouest→est)", "variables": variables,
-        }
-        chemin = os.path.join(sortie, f"{zn}.json")
-        with open(chemin, "w", encoding="utf-8") as f:
-            json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
-        resume[zn] = {"nom": zones[zn]["nom"], "points": len(lig) * len(col), "pas_deg": round(pas_deg, 4),
-                      "echeances": len(sorties), "taille_ko": round(os.path.getsize(chemin) / 1024)}
-        print(f"  zone {zn} : {len(lig)}×{len(col)} points à {pas_deg:.3f}°, {len(sorties)} échéances, "
-              f"{len(variables)} paramètres, {resume[zn]['taille_ko']} Ko", flush=True)
+        cube = np.full((len(sorties), len(lig), len(col)), np.nan, dtype=np.float32)
+        for t, h in enumerate(sorties):
+            if p.get("cumul") and cfg["pas_sortie"] > 1:
+                # cumul (somme) ou maximum sur l'intervalle depuis l'échéance de sortie précédente
+                h0 = sorties[t - 1] if t else h - cfg["pas_sortie"]
+                vals = [valeur_horaire(p, morceaux, hh) for hh in range(h0 + 1, h + 1)]
+                vals = [v for v in vals if v is not None]
+                if vals:
+                    cube[t] = np.nansum(vals, axis=0) if p["cumul"] == "somme" else np.nanmax(vals, axis=0)
+            else:
+                v = valeur_horaire(p, morceaux, h)
+                if v is not None:
+                    cube[t] = v
+        ok = np.isfinite(cube)
+        txt = (f"min {np.nanmin(cube):8.1f}  moy {np.nanmean(cube):8.1f}  max {np.nanmax(cube):8.1f}  "
+               f"({100 * ok.mean():.0f} % de valeurs)") if ok.any() else "aucune valeur"
+        print(f"    [{p['nom']:25s}] {p['unite']:5s} {txt}", flush=True)
+        cubes.append(cube)
+        variables.append({"nom": p["nom"], "unite": p["unite"], "ech": p["ech"], "off": p["off"]})
+    del champs_zone, champs
+    sortie = os.path.join(args.sortie, args.modele)
+    nb_tuiles, octets = ecrire_tuiles(sortie, cubes, variables, lats, lons, pas_deg)
+    print(f"  {nb_tuiles} tuiles de 1° à {pas_deg:.3f}°, {len(sorties)} échéances, {len(variables)} paramètres, "
+          f"{octets / 1e6:.1f} Mo compressés", flush=True)
 
-    etat = {"modele": args.modele, "nom": cfg["nom"], "run": run, "parametres": cfg["parametres"],
-            "vagues": cfg.get("vagues"), "pas_sortie_h": cfg["pas_sortie"],
-            "genere": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "zones": resume, "variables": noms}
+    genere = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    meta = {
+        "modele": args.modele, "nom": cfg["nom"], "source": "Météo-France (licence Etalab)", "run": run, "genere": genere,
+        "type": "vagues" if cfg["parametres"] in ("vagues", "ww3") else "atmo",
+        "vagues": cfg.get("vagues", []), "force_par": cfg.get("force_par"), "pas_sortie_h": cfg["pas_sortie"],
+        "res": round(pas_deg, 6), "n": int(round(1 / pas_deg)), "domaine": cfg["tuiles"]["domaine"],
+        "temps": [(t_run + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in sorties],
+        "variables": variables, "tuiles": sorted(os.path.basename(f)[:-7] for f in glob.glob(os.path.join(sortie, "t", "*.bin.gz"))),
+        "format": "tuile = pour chaque variable (ordre de 'variables') un bloc int16 temps×lat(sud→nord)×lon(ouest→est), "
+                  "valeur = entier×ech+off, -32768 = manquant ; octets faibles puis octets forts de tout le fichier, puis gzip",
+    }
+    with open(os.path.join(sortie, "meta.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, separators=(",", ":"))
+    etat = {k: meta[k] for k in ("modele", "nom", "run", "genere", "type", "vagues", "force_par", "pas_sortie_h", "res", "domaine")}
+    etat.update(tuiles=nb_tuiles, echeances=len(sorties), taille_mo=round(octets / 1e6, 1), variables=[v["nom"] for v in variables])
     with open(os.path.join(sortie, "run.json"), "w", encoding="utf-8") as f:
         json.dump(etat, f, ensure_ascii=False, indent=1)
     shutil.rmtree(travail, ignore_errors=True)
     print(f"Terminé : {args.modele} run {run} en {time.time()-t_debut:.0f} s.")
     ecrire_sortie(nouveau="oui", run=run)
+
+
+def ecrire_tuiles(sortie, cubes, variables, lats, lons, pas):
+    """Découpe les cubes du domaine en tuiles de 1° (clé « lat_lon » du coin sud-ouest) ; tuiles entièrement vides omises."""
+    import gzip
+    m = int(round(1 / pas))
+    dossier = os.path.join(sortie, "t")
+    shutil.rmtree(dossier, ignore_errors=True)
+    os.makedirs(dossier)
+    q = [None] * len(cubes)
+    for k, (cube, v) in enumerate(zip(cubes, variables)):
+        e = np.round((cube - v["off"]) / v["ech"])
+        q[k] = np.where(np.isfinite(e), np.clip(e, -32767, 32767), MANQUANT).astype("<i2")
+    nb = octets = 0
+    for i in range(0, len(lats) - m + 1, m):
+        for j in range(0, len(lons) - m + 1, m):
+            blocs = [a[:, i:i + m, j:j + m] for a in q]
+            if all((b == MANQUANT).all() for b in blocs):
+                continue
+            brut = np.concatenate([b.ravel() for b in blocs]).view(np.uint8).reshape(-1, 2)
+            donnees = gzip.compress(np.concatenate([brut[:, 0], brut[:, 1]]).tobytes(), compresslevel=6, mtime=0)
+            cle = f"{int(round(lats[i]))}_{int(round(lons[j]))}"
+            with open(os.path.join(dossier, cle + ".bin.gz"), "wb") as f:
+                f.write(donnees)
+            nb += 1
+            octets += len(donnees)
+    return nb, octets
 
 
 def ecrire_sortie(**kv):
