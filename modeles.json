@@ -1,0 +1,33 @@
+{
+  "_aide": "Modèles téléchargés. actif=false pour en suspendre un. type : 'groupes' (fichiers par groupe d'échéances) ou 'echeances' (un fichier par échéance). pas_sortie : 1 ou 3 heures. vagues : modèle de vagues associé par défaut dans l'appli. min_echeances : en dessous, le run est jugé incomplet et ignoré.",
+  "arome": {
+    "nom": "AROME 0,025°", "actif": true,
+    "api": "DPPaquetAROME", "modele": "AROME", "produit": "productARO",
+    "grille": "0.025", "paquets": ["SP1", "SP2"], "type": "groupes",
+    "pas_sortie": 1, "parametres": "atmo", "vagues": "mfwam_fr", "min_echeances": 50
+  },
+  "aromeifs": {
+    "nom": "AROME-IFS 0,025°", "actif": true,
+    "api": "DPPaquetAROMEIFS", "modele": "AROMEIFS", "produit": "productAROIFS",
+    "grille": "0.025", "paquets": ["SP1", "SP2"], "type": "groupes",
+    "pas_sortie": 1, "parametres": "atmo", "vagues": null, "min_echeances": 50
+  },
+  "arpege": {
+    "nom": "ARPEGE Europe 0,1°", "actif": true,
+    "api": "DPPaquetARPEGE", "modele": "ARPEGE", "produit": "productARP",
+    "grille": "0.1", "paquets": ["SP1", "SP2"], "type": "groupes",
+    "pas_sortie": 3, "parametres": "atmo", "vagues": "mfwam_glob", "min_echeances": 34
+  },
+  "mfwam_fr": {
+    "nom": "MFWAM 0,025° (forcé par AROME)", "actif": true,
+    "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM",
+    "grille": "0.025", "paquets": ["SP1"], "type": "echeances",
+    "pas_sortie": 1, "parametres": "vagues", "min_echeances": 45
+  },
+  "mfwam_glob": {
+    "nom": "MFWAM 0,1° global (forcé par ARPEGE)", "actif": true,
+    "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM",
+    "grille": "0.1", "paquets": ["SP1"], "type": "echeances",
+    "pas_sortie": 3, "parametres": "vagues", "min_echeances": 30
+  }
+}
