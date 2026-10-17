@@ -1,0 +1,80 @@
+name: AROME-IFS
+
+on:
+  # Lancement automatique toutes les 2 heures (UTC) ; le script s'arrête aussitôt si aucun nouveau run.
+  # À ACTIVER seulement avec un identifiant durable (MF_CLIENT_ID + MF_CLIENT_SECRET, MF_APP_ID ou MF_API_KEY) :
+  # retirer le « # » au début des deux lignes suivantes.
+  # schedule:
+  #   - cron: "23 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      forcer:
+        description: "Refaire la conversion même si le dernier run est déjà publié"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aromeifs
+  cancel-in-progress: false
+
+jobs:
+  convertir:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Installer ecCodes et les bibliothèques
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libeccodes-dev
+          pip install -q eccodes numpy requests
+
+      - name: Récupérer l'état actuellement publié
+        run: |
+          curl -fsS "https://raw.githubusercontent.com/${{ github.repository }}/data/aromeifs/run.json" -o deja.json \
+            || echo '{}' > deja.json
+
+      - name: Télécharger et convertir le dernier run
+        id: conv
+        env:
+          MF_CLIENT_ID: ${{ secrets.MF_CLIENT_ID }}
+          MF_CLIENT_SECRET: ${{ secrets.MF_CLIENT_SECRET }}
+          MF_APP_ID: ${{ secrets.MF_APP_ID }}
+          MF_API_KEY: ${{ secrets.MF_API_KEY }}
+          MF_TOKEN: ${{ secrets.MF_TOKEN }}
+        run: |
+          OPTS="--sortie publie --deja-publie deja.json"
+          if [ "${{ inputs.forcer }}" = "true" ]; then OPTS="$OPTS --forcer"; fi
+          python convertir_aromeifs.py $OPTS
+
+      - name: Publier sur la branche data (GitHub Pages)
+        if: steps.conv.outputs.nouveau == 'oui'
+        run: |
+          cd publie
+          touch .nojekyll
+          printf '%s\n' '<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Données</title><p>Données modèle (Météo-France, licence Etalab).</p>' > index.html
+          printf 'User-agent: *\nDisallow: /\n' > robots.txt
+          git init -q
+          git checkout -q -b data
+          git add -A
+          git -c user.name="robot" -c user.email="robot@users.noreply.github.com" commit -qm "run ${{ steps.conv.outputs.run }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
+
+      - name: Mettre le zip du run dans la Release « dernier »
+        if: steps.conv.outputs.nouveau == 'oui'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd publie && zip -qr ../aromeifs.zip aromeifs)
+          gh release view dernier >/dev/null 2>&1 || \
+            gh release create dernier --title "Dernier run" --notes "Mis à jour automatiquement à chaque nouveau run."
+          gh release upload dernier aromeifs.zip --clobber
+          gh release edit dernier --notes "Run ${{ steps.conv.outputs.run }} — données Météo-France (licence Etalab)."
