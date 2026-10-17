@@ -191,23 +191,48 @@ def telecharger_run(ses, base, cfg, run, travail):
         for paquet in cfg["paquets"]:
             chemin = os.path.join(travail, f"{paquet}_{tok}.grib2")
             t0 = time.time()
-            rr = ses.get(f"{base}/grids/{cfg['grille']}/packages/{paquet}/{cfg['produit']}", accept="*/*",
-                         stream=True, params={"referencetime": run, "time": tok, "format": "grib2"}, timeout=900)
+            n = telecharger_fichier(ses, f"{base}/grids/{cfg['grille']}/packages/{paquet}/{cfg['produit']}",
+                                    {"referencetime": run, "time": tok, "format": "grib2"}, chemin, f"{paquet} {tok}")
+            if n <= 0:
+                print(f"  {paquet} {tok} : indisponible — run {run} abandonné pour l'instant.", flush=True)
+                for fch in fichiers:
+                    os.remove(fch)
+                return []
+            if cfg["type"] == "groupes" or len(fichiers) % 10 == 0:
+                print(f"  {paquet} {tok} : {n/1e6:.0f} Mo en {time.time()-t0:.0f} s", flush=True)
+            fichiers.append(chemin)
+    return fichiers
+
+
+def telecharger_fichier(ses, url, params, chemin, etiquette, essais=5):
+    """Télécharge un fichier en réessayant si la connexion se coupe en cours de route.
+    Renvoie la taille en octets, 0 si le fichier n'existe pas (404), -1 après échecs répétés."""
+    import requests
+    for essai in range(1, essais + 1):
+        try:
+            rr = ses.get(url, accept="*/*", stream=True, params=params, timeout=(30, 180))
             with rr:
+                if rr.status_code == 404:
+                    return 0
                 if rr.status_code != 200:
-                    print(f"  {paquet} {tok} : HTTP {rr.status_code} — run {run} pas encore complet.", flush=True)
-                    for fch in fichiers:
-                        os.remove(fch)
-                    return []
+                    raise IOError(f"HTTP {rr.status_code}")
                 n = 0
                 with open(chemin, "wb") as f:
                     for bloc in rr.iter_content(1 << 20):
                         f.write(bloc)
                         n += len(bloc)
-            if cfg["type"] == "groupes" or len(fichiers) % 10 == 0:
-                print(f"  {paquet} {tok} : {n/1e6:.0f} Mo en {time.time()-t0:.0f} s", flush=True)
-            fichiers.append(chemin)
-    return fichiers
+            attendu = int(rr.headers.get("Content-Length") or 0)
+            if attendu and n != attendu:
+                raise IOError(f"fichier incomplet ({n} / {attendu} octets)")
+            return n
+        except (requests.exceptions.RequestException, IOError) as e:
+            attente = 20 * essai
+            print(f"  {etiquette} : coupure ({str(e)[:80]}), essai {essai}/{essais}, nouvelle tentative dans {attente} s",
+                  flush=True)
+            if os.path.exists(chemin):
+                os.remove(chemin)
+            time.sleep(attente)
+    return -1
 
 
 # ------------------------------------------------------------------ principal
