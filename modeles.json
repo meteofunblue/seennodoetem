@@ -1,5 +1,5 @@
 {
-  "_aide": "Modèles téléchargés. actif=false pour en suspendre un. type : 'groupes' (fichiers par groupe d'échéances) ou 'echeances' (un fichier par échéance). pas_sortie : 1 ou 3 heures. vagues : modèle de vagues associé par défaut dans l'appli. min_echeances : en dessous, le run est jugé incomplet et ignoré.",
+  "_aide": "Modèles téléchargés. actif=false pour en suspendre un. type : 'groupes' (fichiers par groupe d'échéances), 'echeances' (un fichier par échéance) ou 'fichier' (un seul NetCDF pour tout le run, WW3). pas_sortie : 1 ou 3 heures. vagues : modèle de vagues associé par défaut dans l'appli. min_echeances : en dessous, le run est jugé incomplet et ignoré.",
   "arome": {
     "nom": "AROME 0,025°", "actif": true,
     "api": "DPPaquetAROME", "modele": "AROME", "produit": "productARO",
@@ -29,5 +29,23 @@
     "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM",
     "grille": "0.1", "paquets": ["SP1"], "type": "echeances",
     "pas_sortie": 3, "parametres": "vagues", "min_echeances": 30
+  },
+  "ww3_atl": {
+    "nom": "WW3 Atlantique-Manche (forcé par ARPEGE)", "actif": true,
+    "api": "DPPaquetWAVESMODELS", "modele": "WW3-WARP", "produit": "productWWARP",
+    "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc",
+    "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40
+  },
+  "ww3_med": {
+    "nom": "WW3 Méditerranée (forcé par ARPEGE)", "actif": false,
+    "api": "DPPaquetWAVESMODELS", "modele": "WW3-MARP", "produit": "productWMARP",
+    "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc",
+    "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40
+  },
+  "ww3_med_aro": {
+    "nom": "WW3 Méditerranée (forcé par AROME)", "actif": true,
+    "api": "DPPaquetWAVESMODELS", "modele": "WW3-MARO", "produit": "productWMARO",
+    "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc",
+    "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40
   }
 }
