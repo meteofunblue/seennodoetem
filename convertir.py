@@ -65,16 +65,16 @@ P_WW3 = [
     dict(src=["t0m1", "t02", "t01"], genre="scalaire", nom="wave_period",     ech=0.1,  off=0, unite="s", facultatif=True),
     dict(src=["ptp", "fp"], genre="scalaire", nom="wave_peak_period",         ech=0.1,  off=0, unite="s"),
     dict(src=["phs0"],    genre="hauteur_part", nom="wind_wave_height",        ech=0.01, off=0, unite="m"),
-    dict(src=["pdir0"],   genre="direction", nom="wind_wave_direction",       ech=1,    off=0, unite="°"),
-    dict(src=["pt0m10"],  genre="scalaire",  nom="wind_wave_period",          ech=0.1,  off=0, unite="s"),
+    dict(src=["pdir0"],   genre="direction", nom="wind_wave_direction", part="phs0",       ech=1,    off=0, unite="°"),
+    dict(src=["pt0m10"],  genre="scalaire",  nom="wind_wave_period", part="phs0",          ech=0.1,  off=0, unite="s"),
     dict(src=["hsts"],    genre="scalaire",  nom="swell_wave_height",         ech=0.01, off=0, unite="m", facultatif=True),
     dict(src=["phs1"],    genre="hauteur_part", nom="primary_swell_height",    ech=0.01, off=0, unite="m"),
-    dict(src=["pdir1"],   genre="direction", nom="primary_swell_direction",   ech=1,    off=0, unite="°"),
-    dict(src=["pt0m11"],  genre="scalaire",  nom="primary_swell_period",      ech=0.1,  off=0, unite="s"),
-    dict(src=["ptp1"],    genre="scalaire",  nom="primary_swell_peak_period", ech=0.1,  off=0, unite="s", facultatif=True),
+    dict(src=["pdir1"],   genre="direction", nom="primary_swell_direction", part="phs1",   ech=1,    off=0, unite="°"),
+    dict(src=["pt0m11"],  genre="scalaire",  nom="primary_swell_period", part="phs1",      ech=0.1,  off=0, unite="s"),
+    dict(src=["ptp1"],    genre="scalaire",  nom="primary_swell_peak_period", part="phs1", ech=0.1,  off=0, unite="s", facultatif=True),
     dict(src=["phs2"],    genre="hauteur_part", nom="secondary_swell_height",  ech=0.01, off=0, unite="m"),
-    dict(src=["pdir2"],   genre="direction", nom="secondary_swell_direction", ech=1,    off=0, unite="°"),
-    dict(src=["pt0m12"],  genre="scalaire",  nom="secondary_swell_period",    ech=0.1,  off=0, unite="s"),
+    dict(src=["pdir2"],   genre="direction", nom="secondary_swell_direction", part="phs2", ech=1,    off=0, unite="°"),
+    dict(src=["pt0m12"],  genre="scalaire",  nom="secondary_swell_period", part="phs2",    ech=0.1,  off=0, unite="s"),
     dict(src=["uwnd", "vwnd"], genre="vent_vitesse",   nom="wind_speed_10m",     ech=0.1, off=0, unite="kt", facultatif=True),
     dict(src=["uwnd", "vwnd"], genre="vent_direction", nom="wind_direction_10m", ech=1,   off=0, unite="°",  facultatif=True),
 ]
@@ -270,9 +270,15 @@ def lire_maillage(chemin, params, zones, modele, run, ouvrir=None):
             if not p.get("facultatif"):
                 print(f"  {p['nom']} : variable {'/'.join(p['src'])} absente du fichier")
             continue
+        masque = None
+        if p.get("part") and p["part"] in noms_nc:
+            # partition absente ou négligeable (< 5 cm) : direction et période sans signification
+            masque = ~(brut(p["part"]) >= 0.05)
         for zn, (noeuds, poids, ny, nx) in interp.items():
             if p["genre"] == "direction":
                 a = np.radians(brut(dispo[0]))
+                if masque is not None:
+                    a = np.where(masque, np.nan, a)
                 cube = np.degrees(np.arctan2(interpoler(np.sin(a), noeuds, poids),
                                              interpoler(np.cos(a), noeuds, poids))) % 360
             elif p["genre"].startswith("vent"):
@@ -280,6 +286,8 @@ def lire_maillage(chemin, params, zones, modele, run, ouvrir=None):
                 cube = np.hypot(u, v) * KT if p["genre"] == "vent_vitesse" else np.degrees(np.arctan2(-u, -v)) % 360
             else:
                 b = brut(dispo[0])
+                if masque is not None:
+                    b = np.where(masque, np.nan, b)
                 if p["genre"] == "hauteur_part" and hs is not None:
                     b = np.where(np.isfinite(hs) & ~np.isfinite(b), 0.0, b)   # mer présente, partition absente
                 cube = interpoler(b, noeuds, poids)
@@ -287,7 +295,7 @@ def lire_maillage(chemin, params, zones, modele, run, ouvrir=None):
             for t, h in enumerate(heures):
                 champs_zone[zn].setdefault(p["nom"], {})[(None, h)] = cube[t]
         for s_ in dispo:            # libère la mémoire (hs et le vent servent encore)
-            if s_ not in ("hs", "uwnd", "vwnd"):
+            if s_ not in ("hs", "uwnd", "vwnd", "phs0", "phs1", "phs2"):
                 cache.pop(s_, None)
     ds.close()
     return sel, champs_zone, heures
