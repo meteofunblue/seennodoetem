@@ -1419,12 +1419,21 @@ function niceStep(range){ const raw=range/3, p=Math.pow(10,Math.floor(Math.log10
 const maxOf = (...arrs) => Math.max(0,...arrs.filter(Boolean).flat().filter(v=>v!=null));
 function hasData(a){ return !!a && a.some(v=>v!=null); }
 
+/* taille de chaque graphique (boutons − / + dans les titres), mémorisée dans le navigateur */
+const GZ_PAS=[0.6,1,1.5,2,3];
+function gz(k){ const v=(st.gz||(st.gz=store.get("graphiques_tailles",{})))[k]; return Number.isInteger(v)&&v>=0&&v<GZ_PAS.length ? v : 1; }
+function gzSet(k,dz){ const v=Math.max(0,Math.min(GZ_PAS.length-1,gz(k)+dz)); st.gz[k]=v; store.set("graphiques_tailles",st.gz); drawMG(); }
+function mgBtn(e){ const cv=$("mg"), r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  return (cv._btns||[]).find(b=>x>=b.x0-2&&x<=b.x1+2&&y>=b.y0-2&&y<=b.y1+2) || null; }
 function drawMG(){
   const cv=$("mg"), D=mgData(), dpr=window.devicePixelRatio||1;
   const W=cv.parentElement.clientWidth-16 || 400;
   const L0=44, R0=44, pw=W-L0-R0;
   const isRoute = D && D.kind==="route";
-  const panels=[{h:isRoute?52:0, top:0},{h:120,top:26},{h:110},{h:70,top:22},{h:90},{h:66},{h:80},{h:100}];
+  /* hauteur de chaque graphique = hauteur de base × facteur choisi par l'utilisateur (boutons − / + de chaque titre) */
+  const Z=k=>GZ_PAS[gz(k)], hV=Math.round(120*Z("vent")), hM=Math.round(110*Z("mer")), hH=Math.round(70*Z("houle")),
+        hR=Math.round(90*Z("precip")), rN=Math.round(22*Z("nuages")), hN=3*rN, hP=Math.round(80*Z("pmer")), hT=Math.round(100*Z("temp"));
+  const panels=[{h:isRoute?52:0, top:0},{h:hV,top:26},{h:hM},{h:hH,top:22},{h:hR},{h:hN},{h:hP},{h:hT}];
   const TITLE=18, GAP=10, AX=isRoute?44:30;     /* route : une ligne de plus pour les passages aux points tournants */
   let H=AX; for (const p of panels) if (p.h) H+=TITLE+(p.top||0)+p.h+GAP;
   cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+"px";
@@ -1448,14 +1457,26 @@ function drawMG(){
   }
   let y=AX;
   const vgrid=(y0,h)=>{ for (let i=0;i<n;i++){ const hh=tDate(D.times[i]).getUTCHours(); if (hh%6===0){ ctx.strokeStyle=hh===0?C.line:C.grid; ctx.lineWidth=hh===0?1.2:1; ctx.beginPath(); ctx.moveTo(X(i),y0); ctx.lineTo(X(i),y0+h); ctx.stroke(); } } };
-  const title=(txt,legend)=>{
+  const btns=[]; cv._btns=btns;
+  const title=(txt,legend,key)=>{
     ctx.textAlign="left"; ctx.font="700 13px 'Barlow Condensed',sans-serif"; ctx.fillStyle=C.ink;
     ctx.fillText(txt.toUpperCase(),L0,y+13);
     let lx=L0+ctx.measureText(txt.toUpperCase()).width+14; ctx.font="12px Barlow,sans-serif";
     for (const [lbl,col,dash] of legend||[]){
-      if (lx>L0+pw-30) break;
+      if (lx>L0+pw-(key?70:30)) break;
       ctx.strokeStyle=col; ctx.lineWidth=2.2; ctx.setLineDash(dash||[]); ctx.beginPath(); ctx.moveTo(lx,y+9); ctx.lineTo(lx+14,y+9); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle=C.muted; ctx.fillText(lbl,lx+18,y+13); lx+=ctx.measureText(lbl).width+30;
+    }
+    if (key){   /* boutons réduire / agrandir ce graphique */
+      const z=gz(key), bx=L0+pw-36;
+      if (GZ_PAS[z]!==1){ ctx.fillStyle=C.muted; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="right";
+        ctx.fillText("×"+String(GZ_PAS[z]).replace(".",","),bx-4,y+13); }
+      [["−",-1,bx],["+",1,bx+19]].forEach(([g,dz,x0])=>{
+        const off = (dz<0 && z===0) || (dz>0 && z===GZ_PAS.length-1);
+        ctx.strokeStyle=C.line; ctx.lineWidth=1; ctx.fillStyle=css("--panel"); ctx.fillRect(x0,y,17,16); ctx.strokeRect(x0+.5,y+.5,16,15);
+        ctx.fillStyle=off?C.grid:C.ink; ctx.font="700 13px Barlow,sans-serif"; ctx.textAlign="center"; ctx.fillText(g,x0+8.5,y+12.5);
+        btns.push({x0,x1:x0+17,y0:y,y1:y+16,key,dz,off}); });
+      ctx.textAlign="left";
     }
     y+=TITLE;
   };
@@ -1542,7 +1563,7 @@ function drawMG(){
   }
 
   /* 1. Vent */
-  title("Vent 10 m",[["moyen",C.wind],[gustInst(a)?"rafales à l'heure":"rafales max sur le pas",C.gust,[5,3]]]);
+  title("Vent 10 m",[["moyen",C.wind],[gustInst(a)?"rafales à l'heure":"rafales max sur le pas",C.gust,[5,3]]],"vent");
   ctx.lineCap="round"; ctx.lineJoin="round";
   for (const i of glyphIdx){
     ctx.strokeStyle=C.ink; ctx.fillStyle=C.ink; ctx.lineWidth=1.2;
@@ -1550,94 +1571,94 @@ function drawMG(){
   }
   y+=26;
   let mx=niceMax(Math.max(maxOf(a.wind_speed_10m,gustArr(a)),smax(SE.vent),smax(SE.raf))*1.1);
-  yaxis(y,120,0,mx,"l","kt"); vgrid(y,120);
-  for (const [v,lbl] of [[22,"F6"],[34,"F8"],[48,"F10"]]) if (v<mx){ const yy=y+120-v/mx*120; ctx.strokeStyle=C.gust; ctx.globalAlpha=.35; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillStyle=C.gust; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(lbl,L0+pw+5,yy+3); }
-  seuil(a.wind_speed_10m,y,120,0,mx,SE.vent,"vent","kt");
-  seuil(gustArr(a),y,120,0,mx,SE.raf,"rafales","kt");
-  line(gustArr(a),y,120,0,mx,C.gust,{dash:[5,3]});
-  line(a.wind_speed_10m,y,120,0,mx,C.wind,{w:2.4,fill:.12});
-  frame(y,120); y+=120+GAP;
+  yaxis(y,hV,0,mx,"l","kt"); vgrid(y,hV);
+  for (const [v,lbl] of [[22,"F6"],[34,"F8"],[48,"F10"]]) if (v<mx){ const yy=y+hV-v/mx*hV; ctx.strokeStyle=C.gust; ctx.globalAlpha=.35; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillStyle=C.gust; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(lbl,L0+pw+5,yy+3); }
+  seuil(a.wind_speed_10m,y,hV,0,mx,SE.vent,"vent","kt");
+  seuil(gustArr(a),y,hV,0,mx,SE.raf,"rafales","kt");
+  line(gustArr(a),y,hV,0,mx,C.gust,{dash:[5,3]});
+  line(a.wind_speed_10m,y,hV,0,mx,C.wind,{w:2.4,fill:.12});
+  frame(y,hV); y+=hV+GAP;
 
   /* 2. État de la mer */
   const ww3 = hasData(m.primary_swell_height);
   const seaLeg=[["mer totale",C.hs],["mer du vent",C.wws]].concat(ww3?[["houle prim.",C.sw],["houle sec.",C.sw2,[4,3]]]:[["houle totale",C.sw]]);
-  title("État de la mer",seaLeg);
+  title("État de la mer",seaLeg,"mer");
   if (hasData(m.wave_height)){
-    waveGap(y,110,true);
+    waveGap(y,hM,true);
     mx=niceMax(Math.max(maxOf(m.wave_height,m.wind_wave_height,m.swell_wave_height,m.primary_swell_height),smax(SE.hs))*1.1);
-    yaxis(y,110,0,mx,"l","m"); vgrid(y,110);
-    seuil(m.wave_height,y,110,0,mx,SE.hs,"Hs","m");
-    line(m.wave_height,y,110,0,mx,C.hs,{w:2.4,fill:.12});
-    line(m.wind_wave_height,y,110,0,mx,C.wws);
-    if (ww3){ line(m.primary_swell_height,y,110,0,mx,C.sw); line(m.secondary_swell_height,y,110,0,mx,C.sw2,{dash:[4,3]}); }
-    else line(m.swell_wave_height,y,110,0,mx,C.sw);
-  } else empty(y,110, isRoute?"Pas de données de vagues sur la route (hors domaine ou au-delà de l'échéance).":"Pas de données de vagues pour ce point (terre ou hors domaine).");
-  frame(y,110); y+=110+GAP;
+    yaxis(y,hM,0,mx,"l","m"); vgrid(y,hM);
+    seuil(m.wave_height,y,hM,0,mx,SE.hs,"Hs","m");
+    line(m.wave_height,y,hM,0,mx,C.hs,{w:2.4,fill:.12});
+    line(m.wind_wave_height,y,hM,0,mx,C.wws);
+    if (ww3){ line(m.primary_swell_height,y,hM,0,mx,C.sw); line(m.secondary_swell_height,y,hM,0,mx,C.sw2,{dash:[4,3]}); }
+    else line(m.swell_wave_height,y,hM,0,mx,C.sw);
+  } else empty(y,hM, isRoute?"Pas de données de vagues sur la route (hors domaine ou au-delà de l'échéance).":"Pas de données de vagues pour ce point (terre ou hors domaine).");
+  frame(y,hM); y+=hM+GAP;
 
   /* 3. Houle : direction + période */
   const dKey = ww3?"primary_swell_direction":"swell_wave_direction", pKey = ww3?"primary_swell_period":"swell_wave_period";
-  title(ww3?"Houles · direction et période":"Houle totale · direction et période", ww3?[["primaire",C.sw],["secondaire",C.sw2,[4,3]]]:[["période",C.sw]]);
+  title(ww3?"Houles · direction et période":"Houle totale · direction et période", ww3?[["primaire",C.sw],["secondaire",C.sw2,[4,3]]]:[["période",C.sw]],"houle");
   if (hasData(m[pKey])){
     ctx.strokeStyle=C.ink; ctx.fillStyle=C.ink; ctx.lineWidth=1.3;
     for (const i of glyphIdx) drawArrow(ctx,X(i),y+11,near(m[dKey],i),14);
   }
   y+=22;
   if (hasData(m[pKey])){
-    waveGap(y,70,false);
+    waveGap(y,hH,false);
     mx=niceMax(maxOf(m[pKey],ww3?m.secondary_swell_period:null)*1.1)||20;
-    yaxis(y,70,0,mx,"l","s"); vgrid(y,70);
-    line(m[pKey],y,70,0,mx,C.sw,{w:2.2,gaps:true});
-    if (ww3) line(m.secondary_swell_period,y,70,0,mx,C.sw2,{dash:[4,3],gaps:true});
+    yaxis(y,hH,0,mx,"l","s"); vgrid(y,hH);
+    line(m[pKey],y,hH,0,mx,C.sw,{w:2.2,gaps:true});
+    if (ww3) line(m.secondary_swell_period,y,hH,0,mx,C.sw2,{dash:[4,3],gaps:true});
   }
-  frame(y,70); y+=70+GAP;
+  frame(y,hH); y+=hH+GAP;
 
   /* 4. Précipitations + nébulosité */
   const hasShw = hasData(a.showers);
-  title("Précip. et nébulosité",[["nébul.",C.nn],["précip. sur le pas",C.rr]].concat(hasShw?[["averses",C.ink]]:[]));
-  vgrid(y,90);
+  title("Précip. et nébulosité",[["nébul.",C.nn],["précip. sur le pas",C.rr]].concat(hasShw?[["averses",C.ink]]:[]),"precip");
+  vgrid(y,hR);
   const nnO=a.cloud_cover?a.cloud_cover.map(v=>v==null?null:v/12.5):null;
-  if (hasData(nnO)){ line(nnO,y,90,0,8,C.nn,{w:1.5,fill:.25}); yaxis(y,90,0,8,"r","octas",C.nn); }
+  if (hasData(nnO)){ line(nnO,y,hR,0,8,C.nn,{w:1.5,fill:.25}); yaxis(y,hR,0,8,"r","octas",C.nn); }
   mx=niceMax(Math.max(2,maxOf(a.precipitation)*1.1,smax(SE.rr)*1.1));
-  yaxis(y,90,0,mx,"l","mm",C.rr);
-  seuil(a.precipitation,y,90,0,mx,SE.rr,"précip.","mm");
+  yaxis(y,hR,0,mx,"l","mm",C.rr);
+  seuil(a.precipitation,y,hR,0,mx,SE.rr,"précip.","mm");
   const barX=i=>{ const w=Math.max(1.5,halfL(i)*2*0.85); return [X(i)-halfL(i)*2+(halfL(i)*2-w)/2, w]; };
   ctx.fillStyle=C.rr;
-  for (let i=0;i<n;i++){ const v=a.precipitation&&a.precipitation[i]; if (v>0){ const hh=Math.min(90,v/mx*90), [bx,w]=barX(i); ctx.fillRect(bx,y+90-hh,w,hh); } }
-  if (hasShw){ ctx.fillStyle=C.ink; ctx.globalAlpha=.55; for (let i=0;i<n;i++){ const v=a.showers[i]; if (v>0){ const hh=Math.min(90,v/mx*90), [bx,w]=barX(i); ctx.fillRect(bx+w/4,y+90-hh,w/2,hh); } } ctx.globalAlpha=1; }
-  frame(y,90); y+=90+GAP;
+  for (let i=0;i<n;i++){ const v=a.precipitation&&a.precipitation[i]; if (v>0){ const hh=Math.min(hR,v/mx*hR), [bx,w]=barX(i); ctx.fillRect(bx,y+hR-hh,w,hh); } }
+  if (hasShw){ ctx.fillStyle=C.ink; ctx.globalAlpha=.55; for (let i=0;i<n;i++){ const v=a.showers[i]; if (v>0){ const hh=Math.min(hR,v/mx*hR), [bx,w]=barX(i); ctx.fillRect(bx+w/4,y+hR-hh,w/2,hh); } } ctx.globalAlpha=1; }
+  frame(y,hR); y+=hR+GAP;
 
   /* 5. Nuages par étage : bandes B / M / H, teinte proportionnelle aux octas */
-  title("Nuages par étage",[]);
-  vgrid(y,66);
+  title("Nuages par étage",[],"nuages");
+  vgrid(y,hN);
   const layers=[["H","cloud_cover_high",PARAMS.nhigh.scale],["M","cloud_cover_mid",PARAMS.nmid.scale],["B","cloud_cover_low",PARAMS.nlow.scale]];
   layers.forEach(([lbl,k,sc],r)=>{
-    const yy=y+r*22, arr=a[k]||[];
+    const yy=y+r*rN, arr=a[k]||[];
     for (let i=0;i<n;i++){ const v=near(arr,i); if (v==null) continue; const c=colorAt(sc,v/12.5); ctx.fillStyle=rgba(c);
-      const x0=Math.max(L0,X(i)-halfL(i)), x1=Math.min(L0+pw,X(i)+halfR(i)); ctx.fillRect(x0,yy+1,x1-x0+0.5,20); }
-    ctx.fillStyle=C.ink; ctx.font="700 12px 'Barlow Condensed',sans-serif"; ctx.textAlign="right"; ctx.fillText(lbl,L0-6,yy+15);
+      const x0=Math.max(L0,X(i)-halfL(i)), x1=Math.min(L0+pw,X(i)+halfR(i)); ctx.fillRect(x0,yy+1,x1-x0+0.5,rN-2); }
+    ctx.fillStyle=C.ink; ctx.font="700 12px 'Barlow Condensed',sans-serif"; ctx.textAlign="right"; ctx.fillText(lbl,L0-6,yy+rN/2+4);
     if (r) { ctx.strokeStyle=C.line; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); }
   });
-  if (!layers.some(([,k])=>hasData(a[k]))) empty(y,66,"Non fourni par ce modèle.");
-  frame(y,66); y+=66+GAP;
+  if (!layers.some(([,k])=>hasData(a[k]))) empty(y,hN,"Non fourni par ce modèle.");
+  frame(y,hN); y+=hN+GAP;
 
   /* 6. Pression mer */
-  title("Pression mer (Pmer)",[["Pmer",C.ink]]);
+  title("Pression mer (Pmer)",[["Pmer",C.ink]],"pmer");
   const pv=(a.pressure_msl||[]).filter(v=>v!=null);
   if (pv.length){
     const pmin=Math.floor(Math.min(...pv)-1), pmax=Math.ceil(Math.max(...pv)+1);
-    yaxis(y,80,pmin,pmax,"l","hPa"); vgrid(y,80); line(a.pressure_msl,y,80,pmin,pmax,C.ink,{w:2});
+    yaxis(y,hP,pmin,pmax,"l","hPa"); vgrid(y,hP); line(a.pressure_msl,y,hP,pmin,pmax,C.ink,{w:2});
   }
-  frame(y,80); y+=80+GAP;
+  frame(y,hP); y+=hP+GAP;
 
   /* 7. Température, point de rosée (°C, à gauche) et humidité relative (%, à droite) */
-  title("T, Td et HU à 2 m",[["T",C.t],["Td",C.td]].concat(hasData(a.relative_humidity_2m)?[["HU",C.hu,[4,3]]]:[]));
+  title("T, Td et HU à 2 m",[["T",C.t],["Td",C.td]].concat(hasData(a.relative_humidity_2m)?[["HU",C.hu,[4,3]]]:[]),"temp");
   const tv=[...(a.temperature_2m||[]),...(a.dew_point_2m||[])].filter(v=>v!=null);
-  vgrid(y,100);
-  if (hasData(a.relative_humidity_2m)){ yaxis(y,100,0,100,"r","%",C.hu); seuil(a.relative_humidity_2m,y,100,0,100,SE.hu,"HU","%");
-    line(a.relative_humidity_2m,y,100,0,100,C.hu,{w:1.4,dash:[4,3],fill:.08}); }
+  vgrid(y,hT);
+  if (hasData(a.relative_humidity_2m)){ yaxis(y,hT,0,100,"r","%",C.hu); seuil(a.relative_humidity_2m,y,hT,0,100,SE.hu,"HU","%");
+    line(a.relative_humidity_2m,y,hT,0,100,C.hu,{w:1.4,dash:[4,3],fill:.08}); }
   if (tv.length){ const tmin=Math.floor(Math.min(...tv)-1), tmax=Math.ceil(Math.max(...tv)+1);
-    yaxis(y,100,tmin,tmax,"l","°C"); line(a.temperature_2m,y,100,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,100,tmin,tmax,C.td,{w:1.8}); }
-  frame(y,100); y+=100+GAP;
+    yaxis(y,hT,tmin,tmax,"l","°C"); line(a.temperature_2m,y,hT,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,hT,tmin,tmax,C.td,{w:1.8}); }
+  frame(y,hT); y+=hT+GAP;
 
   /* Passages aux points tournants (route) */
   if (isRoute){
@@ -1675,10 +1696,13 @@ function mgIndex(e){
   let best=0; for (let i=1;i<g.n;i++) if (Math.abs(g.XT[i]-x)<Math.abs(g.XT[best]-x)) best=i;
   return best;
 }
-$("mg").addEventListener("pointermove",e=>{ const i=mgIndex(e), hy=e.clientY-$("mg").getBoundingClientRect().top;
+$("mg").addEventListener("pointermove",e=>{ const bt=mgBtn(e); $("mg").style.cursor=bt?(bt.off?"default":"pointer"):"";
+  if (bt){ if (st.hoverY!=null||st.hover!=null){ st.hover=null; st.hoverY=null; drawMG(); } return; }
+  const i=mgIndex(e), hy=e.clientY-$("mg").getBoundingClientRect().top;
   const ch=i!==st.hover; st.hover=i; st.hoverY=hy; drawMG(); if (ch) renderReadout(); });
 $("mg").addEventListener("pointerleave",()=>{ st.hover=null; st.hoverY=null; drawMG(); renderReadout(); });
 $("mg").addEventListener("click",e=>{
+  const bt=mgBtn(e); if (bt){ if (!bt.off) gzSet(bt.key,bt.dz); return; }
   const i=mgIndex(e), D=mgData(); if (i==null||!D) return;
   const k=st.times.indexOf(D.times[i]); if (k>=0) setTime(k);
 });
