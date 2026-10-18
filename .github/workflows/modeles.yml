@@ -35,6 +35,9 @@ env:
   MF_CLIENT_SECRET: ${{ secrets.MF_CLIENT_SECRET }}
   MF_APP_ID: ${{ secrets.MF_APP_ID }}
   MF_TOKEN: ${{ secrets.MF_TOKEN }}
+  # courants Copernicus Marine (compte gratuit, secrets du dépôt)
+  COPERNICUSMARINE_SERVICE_USERNAME: ${{ secrets.CMEMS_USER }}
+  COPERNICUSMARINE_SERVICE_PASSWORD: ${{ secrets.CMEMS_PASS }}
 
 jobs:
   # ---- 1. Quels modèles ont un nouveau run ? (quelques secondes)
@@ -76,6 +79,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq libeccodes-dev
           pip install -q eccodes numpy requests netCDF4
+          case "${{ matrix.modele }}" in courant_*) pip install -q copernicusmarine ;; esac
       - name: Télécharger et convertir ${{ matrix.modele }}
         id: conv
         run: python convertir.py --modele "${{ matrix.modele }}" --sortie publie --deja "${{ matrix.deja }}"
