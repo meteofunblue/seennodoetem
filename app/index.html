@@ -927,26 +927,6 @@ function drawIsobars(ctx,i){
       ctx.fillStyle="#0d1b2a"; ctx.fillText(L0,x,y);
     }
   }
-  /* centres D (dépression) et A (anticyclone) : extremum sur un voisinage d'environ 60 px */
-  const R=Math.max(1,Math.round(60/cp)), marks=[];
-  for (let y=W.i0+1;y<W.i1;y++) for (let x=W.j0+1;x<W.j1;x++){
-    const v=vals[y*g.nx+x]; if (isNaN(v)) continue;
-    let isMin=true, isMax=true;
-    for (let dy=-R;dy<=R && (isMin||isMax);dy++) for (let dx=-R;dx<=R;dx++){
-      if (!dx&&!dy) continue; const yy=y+dy, xx=x+dx;
-      if (yy<0||xx<0||yy>=g.ny||xx>=g.nx){ isMin=isMax=false; break; }
-      const w=vals[yy*g.nx+xx]; if (isNaN(w)){ isMin=isMax=false; break; }
-      if (w<v) isMin=false; if (w>v) isMax=false;      /* égalités tolérées (valeurs arrondies au dixième) */
-    }
-    if ((isMin||isMax) && !marks.some(o=>o.isMin===isMin && Math.abs(o.y-y)<=R && Math.abs(o.x-x)<=R)) marks.push({y,x,v,isMin});
-  }
-  for (const mk of marks){
-    const s=map.latLngToContainerPoint([gLat(g,mk.y),gLon(g,mk.x)]), lbl=mk.isMin?"D":"A";
-    ctx.font="700 22px 'Barlow Condensed',sans-serif";
-    ctx.lineWidth=4; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(lbl,s.x,s.y-6);
-    ctx.fillStyle=mk.isMin?"#b3261e":"#1d4f91"; ctx.fillText(lbl,s.x,s.y-6);
-    ctx.font="600 11px 'JetBrains Mono',monospace"; ctx.strokeText(Math.round(mk.v),s.x,s.y+12); ctx.fillStyle="#0d1b2a"; ctx.fillText(Math.round(mk.v),s.x,s.y+12);
-  }
   ctx.restore();
   return true;
 }
