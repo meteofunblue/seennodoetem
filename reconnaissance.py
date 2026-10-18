@@ -28,15 +28,16 @@ MODELES = {
     "surcote_med":("DPPaquetWAVESMODELS", "HYCOM2D-MARP",  "productHMARP",  "grib2", False),
     "surcote_med_aro": ("DPPaquetWAVESMODELS", "HYCOM2D-MARO", "productHMARO", "grib2", False),
     "om_antilles":("DPPaquetAROME-OM",   "AROME-OM-ANTIL", "productOMAN",   "grib2", True),
-    "om_guyane":  ("DPPaquetAROME-OM",   "AROME-OM-GUYANE","productOMGU",   "grib2", False),
-    "om_indien":  ("DPPaquetAROME-OM",   "AROME-OM-INDIEN","productOMOI",   "grib2", False),
-    "om_polynesie":("DPPaquetAROME-OM",  "AROME-OM-POLYN", "productOMPF",   "grib2", False),
-    "om_caledonie":("DPPaquetAROME-OM",  "AROME-OM-NCALED","productOMNC",   "grib2", False),
+    "om_guyane":  ("DPPaquetAROME-OM",   "AROME-OM-GUYANE","productOMGU",   "grib2", True),
+    "om_indien":  ("DPPaquetAROME-OM",   "AROME-OM-INDIEN","productOMOI",   "grib2", True),
+    "om_polynesie":("DPPaquetAROME-OM",  "AROME-OM-POLYN", "productOMPF",   "grib2", True),
+    "om_caledonie":("DPPaquetAROME-OM",  "AROME-OM-NCALED","productOMNC",   "grib2", True),
 }
 # Échéance d'essai si le catalogue n'en annonce pas (formats tirés des fichiers Swagger)
 ECH_REPLI = {"aromeifs": ["00H06H"], "arome": ["00H06H"], "arpege": ["000H012H", "000H024H", "000H"],
              "mfwam": ["000H", "001H", "003H"], "ww3_atl": ["000H012H", "000H024H"], "ww3_med": ["000H012H", "000H024H"],
-             "ww3_med_aro": ["000H012H", "000H024H"], "surcote_atl": ["000H", "001H"]}
+             "ww3_med_aro": ["000H012H", "000H024H"], "surcote_atl": ["000H", "001H"],
+             **{k: ["00H06H", "00H", "000H", "01H"] for k in ("om_antilles", "om_guyane", "om_indien", "om_polynesie", "om_caledonie")}}
 TAILLE_MAX = 400 * 1024 * 1024   # on n'enregistre pas plus de 400 Mo par exemple
 OUT = "reconnaissance"
 os.makedirs(OUT, exist_ok=True)
@@ -64,6 +65,11 @@ def paquets_de(txt):
     vus = [v for v in vus if not re.fullmatch(r"\d+(\.\d+)?", v)]
     return list(dict.fromkeys(vus)) or re.findall(r"\b[A-Z]{1,4}\d\b", txt)
 
+
+# liste des modèles annoncés par chaque API (utile si un nom de modèle ou de produit a changé)
+for api in dict.fromkeys(MODELES[c][0] for c in choix if c in MODELES):
+    r = ses.get(f"{API}/{api}/v1/models")
+    print(f"Modèles de {api} : HTTP {r.status_code}  {texte(r)[:2000]}", flush=True)
 
 for nom in choix:
     if nom not in MODELES:
