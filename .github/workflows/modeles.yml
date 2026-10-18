@@ -24,8 +24,9 @@ permissions:
   pages: write
   id-token: write
 
+# Deux files séparées : les republications de l'appli (push) n'annulent plus les mises à jour horaires en attente.
 concurrency:
-  group: modeles
+  group: modeles-${{ github.event_name == 'push' && 'appli' || 'donnees' }}
   cancel-in-progress: false
 
 env:
