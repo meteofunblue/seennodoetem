@@ -130,6 +130,7 @@ footer a{color:var(--accent)}
 <header class="bar">
   <div class="brand"><h1>Modèles marine</h1><span id="sub">Météo-France · AROME / ARPEGE · MFWAM / WW3 · IFS via Open-Meteo · heures UTC</span></div>
   <div class="ctl"><label for="model">Atmosphère</label><select id="model"></select></div>
+  <div class="ctl" id="ctlRun" hidden><label for="run">Run</label><select id="run"></select></div>
   <div class="ctl"><label for="wmodel">État de mer</label><select id="wmodel"></select></div>
   <div class="ctl"><label for="param">Paramètre carte</label><select id="param"></select></div>
   <div class="ctl"><label for="zone">Zone</label><select id="zone"></select></div>
@@ -391,10 +392,15 @@ function makeGrid(o){
 /* ---------- Source Météo-France (tuiles) ---------- */
 const TILES = new Map();   /* "id|run|clé" -> Promise<{q:Int16Array, gz:ArrayBuffer}|null> */
 const METAS = new Map();
-async function fetchMeta(id){
+/* meta.json d'un modèle : run le plus récent (chemin vide) ou run choisi (« AAAAMMJJHH/ ») ; _chemin = dossier des tuiles */
+async function fetchMeta(id,chemin){
   if (st.offline){ const m=st.offline.metas[id]; if (!m) throw new Error("modèle absent de la situation enregistrée"); return m; }
-  if (!METAS.has(id)) METAS.set(id, fetch(`${BASE}${id}/meta.json`,{cache:"no-cache"}).then(r=>{ if(!r.ok) throw new Error(`${id} : HTTP ${r.status}`); return r.json(); }).catch(e=>{ METAS.delete(id); throw e; }));
-  return METAS.get(id);
+  const ck=id+"|"+(chemin||"");
+  if (!METAS.has(ck)) METAS.set(ck, fetch(`${BASE}${id}/${chemin||""}meta.json`,{cache:"no-cache"})
+    .then(r=>{ if(!r.ok) throw new Error(`${id} : HTTP ${r.status}`); return r.json(); })
+    .then(m=>{ m._chemin = chemin || m.chemin || ""; return m; })
+    .catch(e=>{ METAS.delete(ck); throw e; }));
+  return METAS.get(ck);
 }
 function unshuffle(buf){
   const b=new Uint8Array(buf), N=b.length>>1, q=new Int16Array(N);
@@ -402,9 +408,9 @@ function unshuffle(buf){
   return q;
 }
 class MF {
-  constructor(id){ this.id=id; this.kind="mf"; }
+  constructor(id,chemin){ this.id=id; this.kind="mf"; this.chemin=chemin||""; }
   async load(){
-    const m=await fetchMeta(this.id);
+    const m=await fetchMeta(this.id,this.chemin);
     if (this.meta!==m){
       this.meta=m; this.T=m.temps.length; this.n=m.n; this.res=m.res;
       this.vi=Object.fromEntries(m.variables.map((v,k)=>[v.nom,k])); this.tset=new Set(m.tuiles);
@@ -425,7 +431,7 @@ class MF {
         const s=st.offline.tiles[`${this.id}/${key}`];
         p = s ? gunzip(unb64(s)).then(buf=>({q:unshuffle(buf), gz:null, b64:s})) : Promise.resolve(null);
       } else {
-        p = fetch(`${BASE}${this.id}/t/${key}.bin.gz?r=${encodeURIComponent(this.meta.run)}`)
+        p = fetch(`${BASE}${this.id}/${this.meta._chemin||""}t/${key}.bin.gz?r=${encodeURIComponent(this.meta.run)}`)
           .then(r=>{ if (r.status===404) return null; if (!r.ok) throw new Error("HTTP "+r.status); return r.arrayBuffer(); })
           .then(async raw=>{ if (!raw) return null; const buf=await gunzip(raw); return {q:unshuffle(buf), gz:raw}; })
           .catch(e=>{ TILES.delete(ck); throw e; });
@@ -1033,11 +1039,36 @@ function provider(val){
   if (!val) return null;
   const [kind,id]=val.split(":");
   if (st.offline && st.offline.om && st.offline.om[val]) return new OMFrozen(st.offline.om[val]);
-  if (kind==="mf") return new MF(id);
+  if (kind==="mf") return new MF(id,cheminFor(id));
   if (kind==="om") return new OM(OM_A[id]?"a":"m", id);
   return null;
 }
 const modelInfo = id => st.index && st.index.modeles[id];
+/* runs gardés d'un modèle (le plus récent en premier) */
+const runsOf = id => ((modelInfo(id)||{}).runs)||[];
+/* run utilisé : atmosphère = celui choisi dans la liste « Run » ; vagues = le même réseau s'il existe,
+   sinon le plus récent qui ne soit pas postérieur au run d'atmosphère (couple cohérent), sinon le plus récent */
+function atmoRun(){
+  const a=$("model").value; if (!a.startsWith("mf:")) return null;
+  const rs=runsOf(a.slice(3)); if (!rs.length) return null;
+  return rs.find(r=>r.chemin===$("run").value) || rs[0];
+}
+function cheminFor(id){
+  if (st.offline) return "";
+  const rs=runsOf(id); if (!rs.length) return "";
+  const info=modelInfo(id);
+  if (info.type!=="vagues"){ const r=("mf:"+id)===$("model").value ? atmoRun() : null; return r ? r.chemin+"/" : ""; }
+  const ar=atmoRun(); if (!ar) return "";
+  const ta=Date.parse(ar.run), same=rs.find(r=>Date.parse(r.run)===ta), before=rs.find(r=>Date.parse(r.run)<=ta);
+  const r=same||before||rs[0];
+  return r===rs[0] && !same && !before ? "" : r.chemin+"/";
+}
+function fillRuns(){
+  const sel=$("run"), a=$("model").value, rs=a.startsWith("mf:")?runsOf(a.slice(3)):[];
+  sel.innerHTML="";
+  rs.forEach((r,i)=>{ const o=document.createElement("option"); o.value=r.chemin; o.textContent=`${runLabel(r.run)}${i?"":" (dernier)"} · → ${tLabel(r.fin)}`; sel.appendChild(o); });
+  $("ctlRun").hidden = rs.length<2 || !!st.offline;
+}
 function fillModels(){
   const ms=$("model"), ws=$("wmodel"), keepA=ms.value, keepM=ws.value;
   ms.innerHTML=""; ws.innerHTML="";
@@ -1099,7 +1130,8 @@ function syncModelUI(){
   const an=$("model").selectedOptions[0]?$("model").selectedOptions[0].text.split("·")[0].trim():"—";
   const wn=w?$("wmodel").selectedOptions[0].text.split("·")[0].trim():"aucun";
   const coh=coherence();
-  $("models").textContent=`Atmosphère : ${an}${ai?` (run ${runLabel(ai.run)})`:""} · Mer : ${wn}${wi?` (run ${runLabel(wi.run)})`:""}${coh?" · "+coh:""}`;
+  const ar=atmoRun(), wch=wi?cheminFor(w.slice(3)):"", wr=wi?(runsOf(w.slice(3)).find(r=>r.chemin+"/"===wch)||{run:wi.run}):null;
+  $("models").textContent=`Atmosphère : ${an}${ai?` (run ${runLabel(ar?ar.run:ai.run)})`:""} · Mer : ${wn}${wr?` (run ${runLabel(wr.run)})`:""}${coh?" · "+coh:""}`;
   $("models").classList.toggle("warn", coh.startsWith("⚠"));
 }
 
@@ -1221,7 +1253,7 @@ async function loadGrid(){
     setTimes(times);
     syncModelUI();
     /* le modèle de vagues a pu changer (choix automatique selon la zone) : météogramme du point à refaire */
-    const ids=(st.provA?st.provA.id:"")+"|"+(st.provM?st.provM.id:"");
+    const ids=(st.provA?st.provA.id:"")+"|"+(st.provM?st.provM.id:"")+"|"+$("run").value;
     if (st.point && st.point.ids!==ids && !st.offline) loadPoint();
   } catch(err){
     if (seq===loadSeq) setStatus("Échec du chargement : "+err.message, true);
@@ -1264,7 +1296,7 @@ async function loadPoint(){
     const a=ra.value, m=rm.status==="fulfilled"?rm.value:null;
     if (!a) throw new Error("point hors du domaine du modèle d'atmosphère");
     st.point={kind:"point", times:a.times, a:align(a.times,a), m:align(a.times,m), glat:a.glat, glon:a.glon, mlat:m&&m.glat, mlon:m&&m.glon,
-      provA:pa.nom, provM:pm?pm.nom:"—", ids:pa.id+"|"+(pm?pm.id:"")};
+      provA:pa.nom, provM:pm?pm.nom:"—", ids:pa.id+"|"+(pm?pm.id:"")+"|"+$("run").value, runM:pm&&pm.meta?pm.meta.run:null};
     let txt=`Demandé ${dm(lat,true)} ${dm(lon,false)} · maille atmo ${dm(a.glat,true)} ${dm(a.glon,false)}`;
     txt += m ? ` · maille vagues ${dm(m.glat,true)} ${dm(m.glon,false)}` : " · vagues indisponibles ici";
     $("coords").textContent=txt;
@@ -1402,6 +1434,23 @@ function drawMG(){
   };
   const frame=(y0,h)=>{ ctx.strokeStyle=C.line; ctx.lineWidth=1; ctx.strokeRect(L0,y0,pw,h); };
   const empty=(y0,h,txt)=>{ ctx.fillStyle=C.muted; ctx.font="12px Barlow,sans-serif"; ctx.textAlign="left"; ctx.fillText(txt,L0+8,y0+h/2+4); };
+  /* bandes grises : heures sans données de vagues (run de vagues décalé ou plus court que celui d'atmosphère) */
+  const waveGap=(y0,h,label)=>{
+    const wh=m.wave_height||[]; let f=-1, l=-1; for (let i=0;i<n;i++) if (wh[i]!=null){ if (f<0) f=i; l=i; }
+    if (f<0) return;
+    const zones=[]; if (f>0) zones.push([L0, X(f)-halfL(f)]); if (l<n-1) zones.push([X(l)+halfR(l), L0+pw]);
+    for (const [x0,x1] of zones){
+      if (x1-x0<1) continue;
+      ctx.fillStyle="rgba(120,130,140,.18)"; ctx.fillRect(x0,y0,x1-x0,h);
+      ctx.strokeStyle="rgba(120,130,140,.35)"; ctx.lineWidth=1; for (let xx=x0-h; xx<x1; xx+=8){ ctx.beginPath(); ctx.moveTo(Math.max(x0,xx),y0+Math.max(0,x0-xx)); ctx.lineTo(Math.min(x1,xx+h),y0+h-Math.max(0,xx+h-x1)); ctx.stroke(); }
+      if (label && x1-x0>50){
+        ctx.save(); ctx.fillStyle=C.muted; ctx.font="600 10px 'Barlow',sans-serif"; ctx.textAlign="center";
+        const cx=(x0+x1)/2, t1=D.runM?`run vagues ${runLabel(D.runM)}`:"", t2= x0<=L0+1 ? "données à partir de " + tLabel(D.times[f]).replace(" · "," ") : "fin du run de vagues";
+        ctx.fillText("pas de vagues",cx,y0+h/2-8); if (t1 && x1-x0>90) ctx.fillText(t1,cx,y0+h/2+4); if (x1-x0>130) ctx.fillText(t2,cx,y0+h/2+16);
+        ctx.restore();
+      }
+    }
+  };
   const glyphIdx=[]; { let last=-1e9; for (let i=0;i<n;i++) if (XT[i]-last>=20){ glyphIdx.push(i); last=XT[i]; } }
   const band=(y0,h,vals,colOf,lbl)=>{
     for (let i=0;i<n;i++){ const c=colOf(vals[i]); if (!c) continue; ctx.fillStyle=c;
@@ -1443,6 +1492,7 @@ function drawMG(){
   const seaLeg=[["mer totale",C.hs],["mer du vent",C.wws]].concat(ww3?[["houle prim.",C.sw],["houle sec.",C.sw2,[4,3]]]:[["houle totale",C.sw]]);
   title("État de la mer",seaLeg);
   if (hasData(m.wave_height)){
+    waveGap(y,110,true);
     mx=niceMax(maxOf(m.wave_height,m.wind_wave_height,m.swell_wave_height,m.primary_swell_height)*1.1);
     yaxis(y,110,0,mx,"l","m"); vgrid(y,110);
     line(m.wave_height,y,110,0,mx,C.hs,{w:2.4,fill:.12});
@@ -1461,6 +1511,7 @@ function drawMG(){
   }
   y+=22;
   if (hasData(m[pKey])){
+    waveGap(y,70,false);
     mx=niceMax(maxOf(m[pKey],ww3?m.secondary_swell_period:null)*1.1)||20;
     yaxis(y,70,0,mx,"l","s"); vgrid(y,70);
     line(m[pKey],y,70,0,mx,C.sw,{w:2.2,gaps:true});
@@ -1728,7 +1779,7 @@ async function computeRoute(){
       warn.push((manque>0.99?`pas de vagues ${pm.nom} sur la route (hors domaine ?)`:`vagues ${pm.nom} manquantes sur ${Math.round(manque*100)} % de la route`)
         + (mieux && mieux[1]>1-manque+0.05 ? ` : essayez ${mieux[0]}` : ""));
     }
-    st.route={kind:"route", times, a:ra, m:rm||{}, pos, wpTimes:[t0,...Lg.map(l=>l.t1)], provA:pa.nom, provM:pm?pm.nom:"—",
+    st.route={kind:"route", times, a:ra, m:rm||{}, pos, wpTimes:[t0,...Lg.map(l=>l.t1)], provA:pa.nom, provM:pm?pm.nom:"—", runM:pm&&pm.meta?pm.meta.run:null,
       warn:warn.length>0, note:`Route ${R.wps.length} points · ${fmt(Lg.reduce((s,l)=>s+l.dist,0),0)} NM · départ ${fmtT(t0)} · arrivée ${fmtT(t1)} UTC · ${pa.nom}${pm?" + "+pm.nom:""}`+(warn.length?" · ⚠ "+warn.join(" ; "):"")};
     $("tabRoute").disabled=false; showTab("route");
     note.textContent=`Météo calculée sur ${times.length} échéances le long de la route.`+(warn.length?" ⚠ "+warn.join(" ; ")+".":"");
@@ -1825,7 +1876,7 @@ async function rawTile(id,meta,key){
   const ck=`${id}|${meta.run}|${key}`;
   if (TILES.has(ck)){ try{ const t=await TILES.get(ck); if (t) return t.b64 || b64(new Uint8Array(t.gz)); return null; }catch(e){} }
   if (st.offline) return st.offline.tiles[`${id}/${key}`] || null;
-  const r=await fetch(`${BASE}${id}/t/${key}.bin.gz?r=${encodeURIComponent(meta.run)}`);
+  const r=await fetch(`${BASE}${id}/${meta._chemin||""}t/${key}.bin.gz?r=${encodeURIComponent(meta.run)}`);
   if (r.status===404) return null; if (!r.ok) throw new Error(`${id} ${key} : HTTP ${r.status}`);
   return b64(new Uint8Array(await r.arrayBuffer()));
 }
@@ -1843,7 +1894,7 @@ $("saveGo").addEventListener("click",async()=>{
     let done=0, total=0;
     const jobs=[];
     for (const id of ids){
-      const meta=await fetchMeta(id), tset=new Set(meta.tuiles), keys=new Set(zoneKeys(b,meta.domaine));
+      const meta=await fetchMeta(id,cheminFor(id)), tset=new Set(meta.tuiles), keys=new Set(zoneKeys(b,meta.domaine));
       if (withR) routeKeys(meta.domaine).forEach(k=>keys.add(k));
       /* tuiles déjà chargées (point, route) incluses aussi */
       const pre=`${id}|${meta.run}|`; for (const k of TILES.keys()) if (k.startsWith(pre)) keys.add(k.slice(pre.length));
@@ -1925,7 +1976,8 @@ $("dens").addEventListener("change",()=>{ store.set("barbules_densite",+$("dens"
 $("isoStep").value=String(store.get("isobares_pas",5));
 $("isoStep").addEventListener("change",()=>{ store.set("isobares_pas",+$("isoStep").value); drawField(); });
 $("opac").addEventListener("input",drawField);
-$("model").addEventListener("change",()=>{ chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
+$("model").addEventListener("change",()=>{ fillRuns(); chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
+$("run").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("wmodel").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("res").addEventListener("change",()=>loadGrid());
 $("gmode").addEventListener("change",()=>{ drawLegend(); drawField(); drawMG(); renderReadout(); });
@@ -2026,7 +2078,7 @@ $("mgWide").addEventListener("click",()=>{
     st.index=null;
     setStatus("Données Météo-France indisponibles ("+e.message+") : IFS via Open-Meteo, ou « Ouvrir… » une situation enregistrée.", true);
   }
-  fillModels(); syncModelUI();
+  fillModels(); fillRuns(); syncModelUI();
   await loadGrid(); loadPoint();
 })();
 </script>
