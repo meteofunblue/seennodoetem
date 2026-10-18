@@ -1,12 +1,14 @@
 """
-Trait de côte fin pour l'appli : GSHHG pleine résolution (« f », niveau 1 = limite terre / mer, îles comprises),
-découpé sur une emprise (côtes françaises par défaut), simplifié (Douglas-Peucker) et écrit en JSON compact.
+Trait de côte fin pour l'appli : polygones de terre OpenStreetMap simplifiés (osmdata.openstreetmap.de, précision
+de l'ordre de la centaine de mètres), ou à défaut GSHHG pleine résolution ; découpé sur une emprise (côtes françaises
+par défaut), simplifié (Douglas-Peucker) et écrit en JSON compact.
 
   python cote.py                               # télécharge GSHHG puis écrit app/cote_fr.json
   python cote.py --shp GSHHS_f_L1.shp          # à partir d'un fichier déjà présent
 
 Format de sortie : {"emprise":[sud,nord,ouest,est], "echelle":1e5, "lignes":[[lon0,lat0,dlon1,dlat1,…], …]}
-(entiers : coordonnées × échelle, puis écarts successifs). Données GSHHG : P. Wessel & W. Smith, licence LGPL.
+(entiers : coordonnées × échelle, puis écarts successifs).
+Données : © contributeurs OpenStreetMap (ODbL) ; GSHHG : P. Wessel & W. Smith (LGPL).
 """
 import argparse
 import io
@@ -15,7 +17,8 @@ import os
 import struct
 import zipfile
 
-# répertoires où chercher l'archive (le nom exact du zip est lu dans la page), puis liens directs de secours
+OSM = "https://osmdata.openstreetmap.de/download/simplified-land-polygons-complete-3857.zip"
+# répertoires où chercher l'archive GSHHG (le nom exact du zip est lu dans la page), puis liens directs de secours
 REPERTOIRES = ["https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhs/latest/",
                "https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhg/latest/",
                "https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhs/oldversions/version2.3.7/",
@@ -115,17 +118,26 @@ def main():
     args = ap.parse_args()
     emp = [float(x) for x in args.emprise.split(",")]
 
+    source = "fichier local"
     if args.shp:
         donnees = open(args.shp, "rb").read()
     else:
         import requests
-        archive = None
-        for url in candidats():
+        archive, source = None, None
+        try:
+            print(f"Téléchargement {OSM}", flush=True)
+            r = requests.get(OSM, timeout=900)
+            print(f"  HTTP {r.status_code}, {len(r.content) / 1e6:.0f} Mo", flush=True)
+            if r.status_code == 200:
+                archive, source = r.content, "osm"
+        except Exception as e:
+            print(f"  échec : {e.__class__.__name__}", flush=True)
+        for url in ([] if archive else candidats()):
             try:
                 print(f"Téléchargement {url}", flush=True)
                 r = requests.get(url, timeout=600)
                 if r.status_code == 200:
-                    archive = r.content
+                    archive, source = r.content, "gshhg"
                     break
                 print(f"  HTTP {r.status_code}")
             except Exception as e:
@@ -133,11 +145,21 @@ def main():
         if archive is None:
             raise SystemExit("GSHHG introuvable.")
         z = zipfile.ZipFile(io.BytesIO(archive))
-        nom = next(n for n in z.namelist() if n.endswith("GSHHS_f_L1.shp"))
+        if source == "osm":
+            nom = next(n for n in z.namelist() if n.endswith(".shp"))
+        else:
+            nom = next(n for n in z.namelist() if n.endswith("GSHHS_f_L1.shp"))
         donnees = z.read(nom)
 
     parties = lire_shp(donnees)
     print(f"{len(parties)} contours lus", flush=True)
+    # coordonnées en mètres (Web Mercator, EPSG:3857) -> degrés
+    if parties and max(abs(parties[0][0][0]), abs(parties[0][0][1])) > 400:
+        import math
+        R = 6378137.0
+        parties = [[(x / R * 180 / math.pi, (2 * math.atan(math.exp(y / R)) - math.pi / 2) * 180 / math.pi) for x, y in p]
+                   for p in parties]
+        print("  projection Web Mercator convertie en degrés", flush=True)
     ech = 100000
     lignes, nb_pts = [], 0
     for p in parties:
@@ -157,7 +179,7 @@ def main():
             nb_pts += len(m)
     os.makedirs(os.path.dirname(args.sortie) or ".", exist_ok=True)
     with open(args.sortie, "w") as f:
-        json.dump({"source": "GSHHG 2.3.7 pleine résolution (Wessel & Smith, LGPL)", "emprise": emp, "echelle": ech,
+        json.dump({"source": {"osm": "© contributeurs OpenStreetMap (ODbL)", "gshhg": "GSHHG (Wessel & Smith, LGPL)"}.get(source, source), "emprise": emp, "echelle": ech,
                    "lignes": lignes}, f, separators=(",", ":"))
     print(f"{len(lignes)} lignes, {nb_pts} points, {os.path.getsize(args.sortie) / 1e6:.1f} Mo -> {args.sortie}")
 
