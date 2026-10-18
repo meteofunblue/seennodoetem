@@ -480,6 +480,8 @@ def main():
         if r.status_code in (401, 403):
             sys.exit(f"Accès refusé (HTTP {r.status_code}) : clé expirée ou API non souscrite pour {cfg['api']}.")
         runs = sorted(set(re.findall(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", r.text)))
+        if cfg.get("heures_runs"):   # runs retenus seulement à ces heures (UTC)
+            runs = [x for x in runs if int(x[11:13]) in cfg["heures_runs"]]
         candidats = [args.run] if args.run else [c for c in reversed(runs[-2:]) if c > args.deja]
         run, fichiers = None, []
         for c in candidats:   # le plus récent d'abord ; s'il est incomplet, le précédent
