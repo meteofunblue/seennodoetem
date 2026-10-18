@@ -1,0 +1,40 @@
+name: Trait de côte
+
+# À lancer une seule fois (onglet Actions → Trait de côte → Run workflow) : télécharge GSHHG pleine résolution,
+# découpe les côtes françaises et enregistre app/cote_fr.json dans le dépôt. Le site le publiera au lancement suivant de « Modèles ».
+on:
+  workflow_dispatch:
+    inputs:
+      emprise:
+        description: "Emprise sud,nord,ouest,est (degrés)"
+        default: "40,53.5,-9,11"
+      tolerance:
+        description: "Simplification en degrés (0.0004 ≈ 40 m)"
+        default: "0.0004"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  cote:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - name: Construire le trait de côte fin
+        run: python cote.py --emprise "${{ inputs.emprise }}" --tolerance "${{ inputs.tolerance }}" --sortie app/cote_fr.json
+      - name: Enregistrer dans le dépôt
+        run: |
+          git config user.name "robot"
+          git config user.email "robot@users.noreply.github.com"
+          git add app/cote_fr.json
+          git commit -m "trait de côte fin" || echo "Pas de changement."
+          git push
+      - name: Republier le site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run modeles.yml -f modeles=arome -f forcer=true
