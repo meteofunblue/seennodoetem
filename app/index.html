@@ -448,20 +448,22 @@ class MF {
       let p;
       if (st.offline){
         const s=st.offline.tiles[`${this.id}/${key}`];
-        p = s ? gunzip(unb64(s)).then(buf=>({q:unshuffle(buf), gz:null, b64:s})) : Promise.resolve(null);
+        p = s ? gunzip(unb64(s)).then(buf=>this.mk({q:unshuffle(buf), gz:null, b64:s})) : Promise.resolve(null);
       } else {
         p = fetch(`${BASE}${this.id}/${this.meta._chemin||""}t/${key}.bin.gz?r=${encodeURIComponent(this.meta.run)}`)
           .then(r=>{ if (r.status===404) return null; if (!r.ok) throw new Error("HTTP "+r.status); return r.arrayBuffer(); })
-          .then(async raw=>{ if (!raw) return null; const buf=await gunzip(raw); return {q:unshuffle(buf), gz:raw}; })
+          .then(async raw=>{ if (!raw) return null; const buf=await gunzip(raw); return this.mk({q:unshuffle(buf), gz:raw}); })
           .catch(e=>{ TILES.delete(ck); throw e; });
       }
       TILES.set(ck,p);
     }
     return TILES.get(ck);
   }
+  /* taille de la tuile (n × n) déduite de sa longueur : tuiles fines (côtes) et normales peuvent coexister */
+  mk(t){ t.n=Math.round(Math.sqrt(t.q.length/(this.meta.variables.length*this.T))); return t; }
   val(tile,name,ti,iy,ix){
     const k=this.vi[name]; if (k==null || !tile || ti==null || ti<0) return NaN;
-    const q=tile.q[((k*this.T+ti)*this.n+iy)*this.n+ix];
+    const n=tile.n||this.n, q=tile.q[((k*this.T+ti)*n+iy)*n+ix];
     if (q===MISS) return NaN;
     const v=this.meta.variables[k]; return q*v.ech+v.off;
   }
@@ -469,8 +471,8 @@ class MF {
   /* point de grille le plus proche ayant des données (recherche jusqu'à 3 mailles pour les vagues près des côtes) */
   async cell(lat,lon){
     const tile=await this.tile(this.keyOf(lat,lon)); if (!tile) return null;
-    const la0=Math.floor(lat), lo0=Math.floor(lon), n=this.n;
-    const iy0=Math.min(n-1,Math.max(0,Math.round((lat-la0)/this.res))), ix0=Math.min(n-1,Math.max(0,Math.round((lon-lo0)/this.res)));
+    const la0=Math.floor(lat), lo0=Math.floor(lon), n=tile.n||this.n, res=1/n;
+    const iy0=Math.min(n-1,Math.max(0,Math.round((lat-la0)/res))), ix0=Math.min(n-1,Math.max(0,Math.round((lon-lo0)/res)));
     const pv=this.primary(), tm=this.T>>1;
     for (let r=0;r<=3;r++){
       let best=null, bd=1e9;
@@ -480,7 +482,7 @@ class MF {
         if (isNaN(this.val(tile,pv,tm,iy,ix))) continue;
         const d=dy*dy+dx*dx; if (d<bd){ bd=d; best={iy,ix}; }
       }
-      if (best) return {tile, iy:best.iy, ix:best.ix, glat:la0+best.iy*this.res, glon:lo0+best.ix*this.res};
+      if (best) return {tile, iy:best.iy, ix:best.ix, glat:la0+best.iy*res, glon:lo0+best.ix*res};
     }
     return null;
   }
@@ -494,20 +496,25 @@ class MF {
     if (keys.length>maxT) throw new Error(`zone trop grande pour ${this.nom} à ${String(this.res).replace(".",",")}° (${keys.length} tuiles de 1°, maximum ${maxT}) : réduisez la zone ou prenez ARPEGE / MFWAM global`);
     let done=0;
     const tiles=await pool(keys,8,async([a,c])=>{ const t=await this.tile(`${a}_${c}`); done++; if (done%8===0) setStatus(`${this.nom} : tuiles ${done} / ${keys.length}…`); return t; });
-    const n=this.n, T=this.T, nyT=la1-la0+1, nxT=lo1-lo0+1, ny=nyT*n, nx=nxT*n, self=this;
-    return makeGrid({prov:this, lat0:la0, lon0:lo0, dlat:this.res, dlon:this.res, ny, nx, times:this.meta.temps,
-      ntiles:tiles.filter(Boolean).length,
+    /* résolution de la mosaïque : fine s'il y a des tuiles fines dans la zone et que le nombre de points reste raisonnable */
+    const nFin=this.meta.res_fin?Math.round(1/this.meta.res_fin):this.n;
+    const n=(nFin>this.n && tiles.some(t=>t&&t.n===nFin) && keys.length*nFin*nFin<=MAX_POINTS) ? nFin : this.n;
+    const T=this.T, nyT=la1-la0+1, nxT=lo1-lo0+1, ny=nyT*n, nx=nxT*n, self=this;
+    return makeGrid({prov:this, lat0:la0, lon0:lo0, dlat:1/n, dlon:1/n, ny, nx, times:this.meta.temps,
+      ntiles:tiles.filter(Boolean).length, nfines:tiles.filter(t=>t&&t.n>self.n).length,
       build(name){
         const k=self.vi[name]; if (k==null) return null;
         const v=self.meta.variables[k], out=new Float32Array(T*ny*nx).fill(NaN);
         keys.forEach(([a,c],j)=>{
           const t=tiles[j]; if (!t) return;
-          const by=(a-la0)*n, bx=(c-lo0)*n;
+          const by=(a-la0)*n, bx=(c-lo0)*n, tn=t.n||self.n;
+          /* tuile d'une autre résolution : point source le plus proche (répété ou sous-échantillonné) */
+          const map_=Int32Array.from({length:n},(_,i)=>Math.min(tn-1,Math.floor(i*tn/n)));
           for (let ti=0;ti<T;ti++){
-            const src=(k*T+ti)*n*n, dst=ti*ny*nx;
+            const src=(k*T+ti)*tn*tn, dst=ti*ny*nx;
             for (let iy=0;iy<n;iy++){
-              const so=src+iy*n, dO=dst+(by+iy)*nx+bx;
-              for (let ix=0;ix<n;ix++){ const q=t.q[so+ix]; if (q!==MISS) out[dO+ix]=q*v.ech+v.off; }
+              const so=src+map_[iy]*tn, dO=dst+(by+iy)*nx+bx;
+              for (let ix=0;ix<n;ix++){ const q=t.q[so+map_[ix]]; if (q!==MISS) out[dO+ix]=q*v.ech+v.off; }
             }
           }
         });
@@ -1098,7 +1105,7 @@ function fillModels(){
   const ordre=["arome","aromeifs","arpege","mfwam_fr","ww3_med_aro","ww3_atl","mfwam_glob","ww3_med"];
   const ids=Object.keys(mods).sort((a,b)=>(ordre.indexOf(a)+99)%99-(ordre.indexOf(b)+99)%99);
   for (const id of ids){
-    const m=mods[id], txt=`${m.nom} · ${String(m.res).replace(".",",")}° · ${m.echeances} éch. · run ${runLabel(m.run)}`;
+    const m=mods[id], txt=`${m.nom} · ${m.res_fin?String(m.res_fin).replace(".",",")+"° côtes / ":""}${String(m.res).replace(".",",")}° · ${m.echeances} éch. · run ${runLabel(m.run)}`;
     add(m.type==="vagues"?ws:ms, m.type==="vagues"?gM1:gA1, "mf:"+id, txt);
   }
   if (gA1.children.length) ms.appendChild(gA1);
@@ -1263,7 +1270,7 @@ async function loadGrid(){
     st.ga = ra.status==="fulfilled" ? ra.value : null;
     st.gm = rm.status==="fulfilled" ? rm.value : null;
     const errs=[]; if (ra.status==="rejected") errs.push("atmosphère : "+ra.reason.message); if (rm.status==="rejected") errs.push("mer : "+rm.reason.message);
-    const desc=g=>!g?"":(g.prov.kind==="mf"?`${g.prov.nom} ${g.ntiles} tuile${g.ntiles>1?"s":""} à ${String(g.dlat).replace(".",",")}°`:`${g.prov.nom} ${g.ny}×${g.nx} points (≈ ${Math.round(g.dlat*111)} km)`);
+    const desc=g=>!g?"":(g.prov.kind==="mf"?`${g.prov.nom} ${g.ntiles} tuile${g.ntiles>1?"s":""} à ${String(+g.dlat.toFixed(3)).replace(".",",")}°${g.nfines&&g.nfines<g.ntiles?` (dont ${g.nfines} fines sur les côtes)`:""}`:`${g.prov.nom} ${g.ny}×${g.nx} points (≈ ${Math.round(g.dlat*111)} km)`);
     delete $("status").dataset.prev; lastMissing=null;
     const times = st.ga ? st.ga.times : st.gm ? st.gm.times : [];
     if (!times.length) throw new Error(errs.join(" · ")||"aucune donnée");
@@ -1864,7 +1871,8 @@ function routeKeys(dom){
       if (la>=s0&&la<n0&&lo>=o0&&lo<e0) set.add(`${la}_${lo}`); } }
   return [...set];
 }
-function estimMo(m,nTiles){ const n=Math.round(1/m.res); return nTiles*n*n*m.echeances*(m.variables||[]).length*2/3.5/1e6; }
+function estimMo(m,nTiles){ const n=Math.round(1/m.res), nf=m.res_fin?Math.round(1/m.res_fin):n;   /* tuiles fines : moyenne prudente */
+  return nTiles*(n*n+nf*nf)/2*m.echeances*(m.variables||[]).length*2/3.5/1e6; }
 function fillSavePanel(){
   const b=currentBounds(), el=$("saveList"), mods=st.index?st.index.modeles:{}, cur=[$("model").value,$("wmodel").value];
   if (!b){ el.innerHTML="<p class='note warn'>Choisissez ou chargez d'abord une zone.</p>"; return; }
