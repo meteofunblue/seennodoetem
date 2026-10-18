@@ -90,6 +90,9 @@ def index_params(liste):
 
 
 # ------------------------------------------------------------------ décodage GRIB
+INCONNUS = {}   # messages non retenus (pour le journal) : (discipline, catégorie, numéro, niveau, pas, valeur du niveau, nom) -> nombre
+
+
 def lire_grib(chemin, params, champs, grille):
     """Range dans champs[nom][(debut|None, fin)] les tableaux 2D des paramètres retenus."""
     import eccodes
@@ -107,9 +110,16 @@ def lire_grib(chemin, params, champs, grille):
             try:
                 lus += 1
                 g = lambda k: eccodes.codes_get(gid, k)
-                cle = (g("discipline"), g("parameterCategory"), g("parameterNumber"), g("typeOfLevel"), g("stepType"))
+
+                def g0(k):   # clé absente (paramètre local Météo-France, niveau inconnu des tables) : None
+                    try:
+                        return eccodes.codes_get(gid, k)
+                    except Exception:
+                        return None
+                cle = (g0("discipline"), g0("parameterCategory"), g0("parameterNumber"), g0("typeOfLevel"), g0("stepType"))
                 p = idx.get(cle) or idx.get(cle[:3] + (None, cle[4]))
-                if p is None or ("niveau" in p and g("level") != p["niveau"]):
+                if p is None or ("niveau" in p and g0("level") != p["niveau"]):
+                    INCONNUS[cle + (g0("level"), g0("shortName"))] = INCONNUS.get(cle + (g0("level"), g0("shortName")), 0) + 1
                     continue
                 if not grille:
                     grille.update(ni=g("Ni"), nj=g("Nj"), lat1=g("latitudeOfFirstGridPointInDegrees"),
@@ -535,6 +545,10 @@ def main():
                     champs_zone[zn].setdefault(nom, {})[cle] = arr[np.ix_(lig, col)].copy()
         if not args.grib:
             os.remove(chemin)
+    if INCONNUS:
+        print("  messages GRIB non retenus (discipline, catégorie, numéro, type de niveau, pas, niveau, nom) :", flush=True)
+        for k, nb in sorted(INCONNUS.items(), key=lambda x: str(x[0])):
+            print(f"    {k} × {nb}", flush=True)
     if not sel:
         sys.exit("Aucune zone produite (aucun champ lu ou aucune zone dans le domaine).")
 
