@@ -111,6 +111,16 @@ aside.mgcol{display:flex;flex-direction:column;min-width:0;min-height:0;overflow
 .sgrid b{font:600 11px var(--f-display);text-transform:uppercase;letter-spacing:.06em}
 #seuilsTxt{padding:0 16px}
 #mg{display:block;width:100%;touch-action:pan-y;cursor:crosshair}
+.mgbig{position:fixed;inset:0;z-index:3000;background:var(--panel);display:flex;flex-direction:column}
+.mgbig[hidden]{display:none}
+.mgbighead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
+.mgbighead select{max-width:60vw}
+.mgbighead .coords{display:inline;width:auto;margin:0;padding:0 4px}
+#mgBigTime{font-size:13px;color:var(--ink)}
+#mgBigBody{flex:1;min-height:0;padding:8px 8px 0;overflow:hidden}
+#mgB{display:block;width:100%;touch-action:pan-y;cursor:crosshair}
+body.bigopen{overflow:hidden}
+
 .hint{font-size:12px;color:var(--muted);margin:0 16px 12px}
 footer{font-size:11px;color:var(--muted);padding-block:6px;background:var(--panel);border-top:1px solid var(--line);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -247,6 +257,19 @@ footer a{color:var(--accent)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<div id="mgBig" class="mgbig" hidden role="dialog" aria-label="Graphique agrandi">
+  <div class="mgbighead">
+    <button id="mgBigPrev" type="button" title="Graphique précédent">◀</button>
+    <select id="mgBigSel" aria-label="Graphique"></select>
+    <button id="mgBigNext" type="button" title="Graphique suivant">▶</button>
+    <span class="coords" id="mgBigRoute"></span>
+    <b class="coords" id="mgBigTime"></b>
+    <span style="flex:1"></span>
+    <button id="mgBigFs" type="button">Plein écran</button>
+    <button id="mgBigClose" type="button" title="Fermer (Échap)">Fermer ✕</button>
+  </div>
+  <div id="mgBigBody"><canvas id="mgB"></canvas></div>
+</div>
 <script>
 "use strict";
 /* =====================================================================================================
@@ -1419,22 +1442,26 @@ function niceStep(range){ const raw=range/3, p=Math.pow(10,Math.floor(Math.log10
 const maxOf = (...arrs) => Math.max(0,...arrs.filter(Boolean).flat().filter(v=>v!=null));
 function hasData(a){ return !!a && a.some(v=>v!=null); }
 
-/* taille de chaque graphique (boutons − / + dans les titres), mémorisée dans le navigateur */
-const GZ_PAS=[0.6,1,1.5,2,3];
-function gz(k){ const v=(st.gz||(st.gz=store.get("graphiques_tailles",{})))[k]; return Number.isInteger(v)&&v>=0&&v<GZ_PAS.length ? v : 1; }
-function gzSet(k,dz){ const v=Math.max(0,Math.min(GZ_PAS.length-1,gz(k)+dz)); st.gz[k]=v; store.set("graphiques_tailles",st.gz); drawMG(); }
-function mgBtn(e){ const cv=$("mg"), r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+function mgBtn(e){ const cv=e.currentTarget, r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
   return (cv._btns||[]).find(b=>x>=b.x0-2&&x<=b.x1+2&&y>=b.y0-2&&y<=b.y1+2) || null; }
-function drawMG(){
-  const cv=$("mg"), D=mgData(), dpr=window.devicePixelRatio||1;
-  const W=cv.parentElement.clientWidth-16 || 400;
+function drawMG(){ drawMGto($("mg"),null); if (st.solo && !$("mgBig").hidden){ drawMGto($("mgB"),st.solo); bigTime(); } }
+/* SOLO = clé d'un graphique : dessiné seul, sur toute la hauteur disponible (fenêtre agrandie) */
+function drawMGto(cv,SOLO){
+  const D=mgData(), dpr=window.devicePixelRatio||1, show=k=>!SOLO||SOLO===k;
+  const W=(cv.parentElement.clientWidth-16) || 400;
   const L0=44, R0=44, pw=W-L0-R0;
-  const isRoute = D && D.kind==="route";
+  const isRoute = D && D.kind==="route", band0 = isRoute && !SOLO;
   /* hauteur de chaque graphique = hauteur de base × facteur choisi par l'utilisateur (boutons − / + de chaque titre) */
-  const Z=k=>GZ_PAS[gz(k)], hV=Math.round(120*Z("vent")), hM=Math.round(110*Z("mer")), hH=Math.round(70*Z("houle")),
+  const Z=k=>1;
+  let hV=Math.round(120*Z("vent")), hM=Math.round(110*Z("mer")), hH=Math.round(70*Z("houle")),
         hR=Math.round(90*Z("precip")), rN=Math.round(22*Z("nuages")), hN=3*rN, hP=Math.round(80*Z("pmer")), hT=Math.round(100*Z("temp"));
-  const panels=[{h:isRoute?52:0, top:0},{h:hV,top:26},{h:hM},{h:hH,top:22},{h:hR},{h:hN},{h:hP},{h:hT}];
-  const TITLE=18, GAP=10, AX=isRoute?44:30;     /* route : une ligne de plus pour les passages aux points tournants */
+  const TITLE=18, GAP=10, AX=isRoute?44:30;
+  if (SOLO){ const hs=Math.max(120,(cv.parentElement.clientHeight||500)-AX-TITLE-GAP-30), tops={vent:26,houle:22};
+    const hh=hs-(tops[SOLO]||0);
+    if (SOLO==="vent") hV=hh; if (SOLO==="mer") hM=hh; if (SOLO==="houle") hH=hh; if (SOLO==="precip") hR=hh;
+    if (SOLO==="nuages"){ rN=Math.floor(hh/3); hN=3*rN; } if (SOLO==="pmer") hP=hh; if (SOLO==="temp") hT=hh; }
+  const K=["","vent","mer","houle","precip","nuages","pmer","temp"];
+  const panels=[{h:band0?52:0, top:0},{h:hV,top:26},{h:hM},{h:hH,top:22},{h:hR},{h:hN},{h:hP},{h:hT}].filter((p,i)=>i===0||show(K[i]));     /* route : une ligne de plus pour les passages aux points tournants */
   let H=AX; for (const p of panels) if (p.h) H+=TITLE+(p.top||0)+p.h+GAP;
   cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+"px";
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
@@ -1463,16 +1490,14 @@ function drawMG(){
     ctx.fillText(txt.toUpperCase(),L0,y+13);
     let lx=L0+ctx.measureText(txt.toUpperCase()).width+14; ctx.font="12px Barlow,sans-serif";
     for (const [lbl,col,dash] of legend||[]){
-      if (lx>L0+pw-(key?70:30)) break;
+      if (lx>L0+pw-(key&&!SOLO?50:30)) break;
       ctx.strokeStyle=col; ctx.lineWidth=2.2; ctx.setLineDash(dash||[]); ctx.beginPath(); ctx.moveTo(lx,y+9); ctx.lineTo(lx+14,y+9); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle=C.muted; ctx.fillText(lbl,lx+18,y+13); lx+=ctx.measureText(lbl).width+30;
     }
-    if (key){   /* boutons réduire / agrandir ce graphique */
-      const z=gz(key), bx=L0+pw-36;
-      if (GZ_PAS[z]!==1){ ctx.fillStyle=C.muted; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="right";
-        ctx.fillText("×"+String(GZ_PAS[z]).replace(".",","),bx-4,y+13); }
-      [["−",-1,bx],["+",1,bx+19]].forEach(([g,dz,x0])=>{
-        const off = (dz<0 && z===0) || (dz>0 && z===GZ_PAS.length-1);
+    if (key && !SOLO){   /* bouton d'ouverture du graphique en grand */
+      const bx=L0+pw-17;
+      [["⤢",0,bx]].forEach(([g,dz,x0])=>{
+        const off=false;
         ctx.strokeStyle=C.line; ctx.lineWidth=1; ctx.fillStyle=css("--panel"); ctx.fillRect(x0,y,17,16); ctx.strokeRect(x0+.5,y+.5,16,15);
         ctx.fillStyle=off?C.grid:C.ink; ctx.font="700 13px Barlow,sans-serif"; ctx.textAlign="center"; ctx.fillText(g,x0+8.5,y+12.5);
         btns.push({x0,x1:x0+17,y0:y,y1:y+16,key,dz,off}); });
@@ -1549,7 +1574,7 @@ function drawMG(){
   const SE=seuils();
 
   /* 0. Route : allure (vent / route) et mer / route */
-  if (isRoute){
+  if (band0){
     title("Allure · mer / route",[]);
     const rw=D.pos.map((p,i)=>relAngle(a.wind_direction_10m&&a.wind_direction_10m[i],p.cap));
     const rs=D.pos.map((p,i)=>relAngle(m.wave_direction&&m.wave_direction[i],p.cap));
@@ -1562,7 +1587,10 @@ function drawMG(){
     frame(y,52); y+=52+GAP;
   }
 
+  let mx;
+  const ww3 = hasData(m.primary_swell_height);
   /* 1. Vent */
+  if (show("vent")){
   title("Vent 10 m",[["moyen",C.wind],[gustInst(a)?"rafales à l'heure":"rafales max sur le pas",C.gust,[5,3]]],"vent");
   ctx.lineCap="round"; ctx.lineJoin="round";
   for (const i of glyphIdx){
@@ -1570,7 +1598,7 @@ function drawMG(){
     drawBarb(ctx,X(i),y+18,a.wind_direction_10m&&a.wind_direction_10m[i],a.wind_speed_10m&&a.wind_speed_10m[i],15);
   }
   y+=26;
-  let mx=niceMax(Math.max(maxOf(a.wind_speed_10m,gustArr(a)),smax(SE.vent),smax(SE.raf))*1.1);
+  mx=niceMax(Math.max(maxOf(a.wind_speed_10m,gustArr(a)),smax(SE.vent),smax(SE.raf))*1.1);
   yaxis(y,hV,0,mx,"l","kt"); vgrid(y,hV);
   for (const [v,lbl] of [[22,"F6"],[34,"F8"],[48,"F10"]]) if (v<mx){ const yy=y+hV-v/mx*hV; ctx.strokeStyle=C.gust; ctx.globalAlpha=.35; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillStyle=C.gust; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(lbl,L0+pw+5,yy+3); }
   seuil(a.wind_speed_10m,y,hV,0,mx,SE.vent,"vent","kt");
@@ -1579,8 +1607,9 @@ function drawMG(){
   line(a.wind_speed_10m,y,hV,0,mx,C.wind,{w:2.4,fill:.12});
   frame(y,hV); y+=hV+GAP;
 
+  }
   /* 2. État de la mer */
-  const ww3 = hasData(m.primary_swell_height);
+  if (show("mer")){
   const seaLeg=[["mer totale",C.hs],["mer du vent",C.wws]].concat(ww3?[["houle prim.",C.sw],["houle sec.",C.sw2,[4,3]]]:[["houle totale",C.sw]]);
   title("État de la mer",seaLeg,"mer");
   if (hasData(m.wave_height)){
@@ -1595,7 +1624,9 @@ function drawMG(){
   } else empty(y,hM, isRoute?"Pas de données de vagues sur la route (hors domaine ou au-delà de l'échéance).":"Pas de données de vagues pour ce point (terre ou hors domaine).");
   frame(y,hM); y+=hM+GAP;
 
+  }
   /* 3. Houle : direction + période */
+  if (show("houle")){
   const dKey = ww3?"primary_swell_direction":"swell_wave_direction", pKey = ww3?"primary_swell_period":"swell_wave_period";
   title(ww3?"Houles · direction et période":"Houle totale · direction et période", ww3?[["primaire",C.sw],["secondaire",C.sw2,[4,3]]]:[["période",C.sw]],"houle");
   if (hasData(m[pKey])){
@@ -1612,7 +1643,9 @@ function drawMG(){
   }
   frame(y,hH); y+=hH+GAP;
 
+  }
   /* 4. Précipitations + nébulosité */
+  if (show("precip")){
   const hasShw = hasData(a.showers);
   title("Précip. et nébulosité",[["nébul.",C.nn],["précip. sur le pas",C.rr]].concat(hasShw?[["averses",C.ink]]:[]),"precip");
   vgrid(y,hR);
@@ -1627,7 +1660,9 @@ function drawMG(){
   if (hasShw){ ctx.fillStyle=C.ink; ctx.globalAlpha=.55; for (let i=0;i<n;i++){ const v=a.showers[i]; if (v>0){ const hh=Math.min(hR,v/mx*hR), [bx,w]=barX(i); ctx.fillRect(bx+w/4,y+hR-hh,w/2,hh); } } ctx.globalAlpha=1; }
   frame(y,hR); y+=hR+GAP;
 
+  }
   /* 5. Nuages par étage : bandes B / M / H, teinte proportionnelle aux octas */
+  if (show("nuages")){
   title("Nuages par étage",[],"nuages");
   vgrid(y,hN);
   const layers=[["H","cloud_cover_high",PARAMS.nhigh.scale],["M","cloud_cover_mid",PARAMS.nmid.scale],["B","cloud_cover_low",PARAMS.nlow.scale]];
@@ -1641,7 +1676,9 @@ function drawMG(){
   if (!layers.some(([,k])=>hasData(a[k]))) empty(y,hN,"Non fourni par ce modèle.");
   frame(y,hN); y+=hN+GAP;
 
+  }
   /* 6. Pression mer */
+  if (show("pmer")){
   title("Pression mer (Pmer)",[["Pmer",C.ink]],"pmer");
   const pv=(a.pressure_msl||[]).filter(v=>v!=null);
   if (pv.length){
@@ -1650,7 +1687,9 @@ function drawMG(){
   }
   frame(y,hP); y+=hP+GAP;
 
+  }
   /* 7. Température, point de rosée (°C, à gauche) et humidité relative (%, à droite) */
+  if (show("temp")){
   title("T, Td et HU à 2 m",[["T",C.t],["Td",C.td]].concat(hasData(a.relative_humidity_2m)?[["HU",C.hu,[4,3]]]:[]),"temp");
   const tv=[...(a.temperature_2m||[]),...(a.dew_point_2m||[])].filter(v=>v!=null);
   vgrid(y,hT);
@@ -1660,6 +1699,7 @@ function drawMG(){
     yaxis(y,hT,tmin,tmax,"l","°C"); line(a.temperature_2m,y,hT,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,hT,tmin,tmax,C.td,{w:1.8}); }
   frame(y,hT); y+=hT+GAP;
 
+  }
   /* Passages aux points tournants (route) */
   if (isRoute){
     ctx.font="700 11px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
@@ -1672,7 +1712,7 @@ function drawMG(){
   if (ci>=0){ ctx.strokeStyle=C.cursor; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X(ci),AX-2); ctx.lineTo(X(ci),H-GAP); ctx.stroke(); }
   if (st.hover!=null){ ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(st.hover),AX-2); ctx.lineTo(X(st.hover),H-GAP); ctx.stroke(); ctx.setLineDash([]); }
   /* échelle de lecture : ligne horizontale à la hauteur de la souris et valeurs lues sur les axes du graphique survolé */
-  if (st.hoverY!=null){
+  if (st.hoverY!=null && st.hoverCv===cv.id){
     const hy=st.hoverY, here=axes.filter(A=>hy>=A.y0 && hy<=A.y0+A.h);
     if (here.length){
       ctx.save(); ctx.strokeStyle=C.ink; ctx.globalAlpha=.7; ctx.lineWidth=1; ctx.setLineDash([3,3]);
@@ -1691,21 +1731,51 @@ function drawMG(){
   }
 }
 function mgIndex(e){
-  const g=$("mg")._geo; if (!g) return null;
-  const r=$("mg").getBoundingClientRect(), x=e.clientX-r.left;
+  const cv=e.currentTarget, g=cv._geo; if (!g) return null;
+  const r=cv.getBoundingClientRect(), x=e.clientX-r.left;
   let best=0; for (let i=1;i<g.n;i++) if (Math.abs(g.XT[i]-x)<Math.abs(g.XT[best]-x)) best=i;
   return best;
 }
-$("mg").addEventListener("pointermove",e=>{ const bt=mgBtn(e); $("mg").style.cursor=bt?(bt.off?"default":"pointer"):"";
-  if (bt){ if (st.hoverY!=null||st.hover!=null){ st.hover=null; st.hoverY=null; drawMG(); } return; }
-  const i=mgIndex(e), hy=e.clientY-$("mg").getBoundingClientRect().top;
-  const ch=i!==st.hover; st.hover=i; st.hoverY=hy; drawMG(); if (ch) renderReadout(); });
-$("mg").addEventListener("pointerleave",()=>{ st.hover=null; st.hoverY=null; drawMG(); renderReadout(); });
-$("mg").addEventListener("click",e=>{
-  const bt=mgBtn(e); if (bt){ if (!bt.off) gzSet(bt.key,bt.dz); return; }
-  const i=mgIndex(e), D=mgData(); if (i==null||!D) return;
-  const k=st.times.indexOf(D.times[i]); if (k>=0) setTime(k);
+for (const id of ["mg","mgB"]){
+  const cv=$(id);
+  cv.addEventListener("pointermove",e=>{ const bt=mgBtn(e); cv.style.cursor=bt?(bt.off?"default":"pointer"):"";
+    if (bt){ if (st.hoverY!=null||st.hover!=null){ st.hover=null; st.hoverY=null; drawMG(); } return; }
+    const i=mgIndex(e), hy=e.clientY-cv.getBoundingClientRect().top;
+    const ch=i!==st.hover; st.hover=i; st.hoverY=hy; st.hoverCv=id; drawMG(); if (ch){ renderReadout(); bigTime(); } });
+  cv.addEventListener("pointerleave",()=>{ st.hover=null; st.hoverY=null; drawMG(); renderReadout(); bigTime(); });
+  cv.addEventListener("click",e=>{
+    const bt=mgBtn(e); if (bt){ openBig(bt.key); return; }
+    const i=mgIndex(e), D=mgData(); if (i==null||!D) return;
+    const k=st.times.indexOf(D.times[i]); if (k>=0) setTime(k);
+  });
+}
+/* ---------- Graphique en grand (fenêtre superposée, plein écran possible) ---------- */
+const BIG_NOMS={vent:"Vent 10 m",mer:"État de la mer",houle:"Houle · direction et période",precip:"Précipitations et nébulosité",
+  nuages:"Nuages par étage",pmer:"Pression mer",temp:"T, Td et HU à 2 m"};
+{ const sel=$("mgBigSel"); for (const [k,v] of Object.entries(BIG_NOMS)) sel.add(new Option(v,k));
+  sel.addEventListener("change",()=>openBig(sel.value)); }
+function bigTime(){
+  if ($("mgBig").hidden) return; const D=mgData(); if (!D) return;
+  const i = st.hover!=null ? st.hover : pIdx(st.tIdx);
+  $("mgBigTime").textContent = i>=0 && D.times[i] ? tLabel(D.times[i]) : "";
+}
+function openBig(k){
+  st.solo=k; $("mgBigSel").value=k; $("mgBig").hidden=false; document.body.classList.add("bigopen");
+  $("mgBigRoute").textContent = st.mgMode==="route" ? "Route" : "Point";
+  requestAnimationFrame(()=>{ drawMG(); bigTime(); });
+}
+function closeBig(){
+  if (document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
+  $("mgBig").hidden=true; st.solo=null; document.body.classList.remove("bigopen"); drawMG();
+}
+$("mgBigClose").addEventListener("click",closeBig);
+$("mgBigFs").addEventListener("click",()=>{
+  const el=$("mgBig");
+  if (document.fullscreenElement) document.exitFullscreen?.(); else el.requestFullscreen?.().catch(()=>{});
 });
+document.addEventListener("fullscreenchange",()=>{ $("mgBigFs").textContent=document.fullscreenElement?"Quitter le plein écran":"Plein écran"; setTimeout(drawMG,80); });
+$("mgBigPrev").addEventListener("click",()=>{ const ks=Object.keys(BIG_NOMS); openBig(ks[(ks.indexOf(st.solo)+ks.length-1)%ks.length]); });
+$("mgBigNext").addEventListener("click",()=>{ const ks=Object.keys(BIG_NOMS); openBig(ks[(ks.indexOf(st.solo)+1)%ks.length]); });
 
 /* ---------- Transit ---------- */
 const D2R=Math.PI/180, R2D=180/Math.PI, R_NM=3440.065;
@@ -2113,6 +2183,7 @@ document.addEventListener("keydown",e=>{
   if (["SELECT","INPUT","TEXTAREA"].includes(e.target.tagName)) return;
   if (e.key==="ArrowRight") setTime(st.tIdx+1);
   if (e.key==="ArrowLeft") setTime(st.tIdx-1);
+  if (e.key==="Escape" && !$("mgBig").hidden){ closeBig(); return; }
   if (e.key==="Escape"){ stopRouteAdd(); if (drawState){ drawState=null; $("zDraw").classList.remove("on"); $("map").classList.remove("drawing"); } }
 });
 let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ map.invalidateSize(); drawLegend(); drawMG(); },150); });
