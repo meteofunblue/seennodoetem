@@ -41,6 +41,9 @@ P_ATMO = [
     dict(cle=(0, 6, 4, "surface", "instant"),            nom="cloud_cover_mid",    conv=lambda v: v,        ech=1,    off=0, unite="%"),
     dict(cle=(0, 6, 5, "surface", "instant"),            nom="cloud_cover_high",   conv=lambda v: v,        ech=1,    off=0, unite="%"),
     dict(cle=(0, 7, 6, None, "instant"),                 nom="cape",               conv=lambda v: v,        ech=1,    off=0, unite="J/kg"),
+    # composantes du vent (si le paquet ne fournit pas vitesse et direction) : converties plus bas, non publiées telles quelles
+    dict(cle=(0, 2, 2, "heightAboveGround", "instant"),  niveau=10, nom="_u10",               conv=lambda v: v,        ech=0.1,  off=0, unite="m/s"),
+    dict(cle=(0, 2, 3, "heightAboveGround", "instant"),  niveau=10, nom="_v10",               conv=lambda v: v,        ech=0.1,  off=0, unite="m/s"),
 ]
 P_VAGUES = [
     dict(cle=(10, 0, 3, "meanSea", "instant"),  nom="wave_height",          conv=lambda v: v, ech=0.01, off=0, unite="m"),
@@ -459,6 +462,9 @@ def main():
 
     modeles = json.load(open("modeles.json", encoding="utf-8"))
     cfg = modeles[args.modele]
+    if cfg.get("source") == "cmems":      # courants Copernicus Marine : traitement à part
+        from courants import convertir_courant
+        return convertir_courant(args, cfg, ecrire_tuiles, ecrire_sortie)
     params = JEUX[cfg["parametres"]]
     natif = float(cfg["grille"])
     # domaine découpé en tuiles de 1° ; bornes nord et est exclues (elles appartiennent aux tuiles voisines)
@@ -536,12 +542,24 @@ def main():
     t_run = datetime.strptime(run, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
     lig, col, lats, lons, pas_deg = sel["domaine"]
     champs = champs_zone["domaine"]
+    # vent fourni en composantes u, v : vitesse (kt) et direction d'où il vient (°)
+    if "_u10" in champs and "_v10" in champs:
+        for cle in set(champs["_u10"]) & set(champs["_v10"]):
+            u, v = champs["_u10"][cle], champs["_v10"][cle]
+            if cle not in champs.get("wind_speed_10m", {}):
+                champs.setdefault("wind_speed_10m", {})[cle] = np.hypot(u, v) * KT
+            if cle not in champs.get("wind_direction_10m", {}):
+                champs.setdefault("wind_direction_10m", {})[cle] = (np.degrees(np.arctan2(-u, -v)) + 360) % 360
+    for k in [k for k in champs if k.startswith("_")]:
+        del champs[k]
     toutes = sorted({cle[1] for m in champs.values() for cle in m})
     sorties = [h for h in heures_de_sortie(toutes, cfg["pas_sortie"]) if h >= 0]
     if not sorties:
         sys.exit("Aucune échéance lue.")
     cubes, variables = [], []
     for p in params:
+        if p["nom"].startswith("_"):
+            continue
         morceaux = champs.get(p["nom"], {})
         if not morceaux:
             continue
@@ -567,7 +585,8 @@ def main():
     del champs_zone, champs
     sortie = os.path.join(args.sortie, args.modele)
     pas_gros = res_gros if zones_fines else pas_deg
-    nb_tuiles, octets, fines = ecrire_tuiles(sortie, cubes, variables, lats, lons, pas_deg, pas_gros, zones_fines)
+    nb_tuiles, octets, fines = ecrire_tuiles(sortie, cubes, variables, lats, lons, pas_deg, pas_gros, zones_fines,
+                                             cfg["tuiles"].get("garder"))
     print(f"  {nb_tuiles} tuiles de 1° ({len(fines)} à {pas_deg:.3f}°, les autres à {pas_gros:.3f}°), {len(sorties)} échéances, "
           f"{len(variables)} paramètres, {octets / 1e6:.1f} Mo compressés", flush=True)
 
@@ -594,10 +613,11 @@ def main():
     ecrire_sortie(nouveau="oui", run=run)
 
 
-def ecrire_tuiles(sortie, cubes, variables, lats, lons, pas, pas_gros=None, zones_fines=()):
+def ecrire_tuiles(sortie, cubes, variables, lats, lons, pas, pas_gros=None, zones_fines=(), garder=None):
     """Découpe les cubes du domaine en tuiles de 1° (clé « lat_lon » du coin sud-ouest) ; tuiles entièrement vides omises.
     Avec zones_fines ([sud, nord, ouest, est], …) : tuiles à la résolution du cube dans ces zones, un point sur k ailleurs
-    (k = pas_gros / pas). La taille d'une tuile (n × n) se déduit de sa longueur à la lecture."""
+    (k = pas_gros / pas). La taille d'une tuile (n × n) se déduit de sa longueur à la lecture.
+    Avec garder ([sud, nord, ouest, est], …) : seules les tuiles situées dans ces zones sont écrites (ex. Réunion et Mayotte)."""
     import gzip
     m = int(round(1 / pas))
     k = max(1, int(round((pas_gros or pas) / pas)))
@@ -613,6 +633,8 @@ def ecrire_tuiles(sortie, cubes, variables, lats, lons, pas, pas_gros=None, zone
     for i in range(0, len(lats) - m + 1, m):
         for j in range(0, len(lons) - m + 1, m):
             la, lo = int(round(lats[i])), int(round(lons[j]))
+            if garder and not any(z[0] <= la < z[1] and z[2] <= lo < z[3] for z in garder):
+                continue
             fine = k == 1 or any(z[0] <= la < z[1] and z[2] <= lo < z[3] for z in zones_fines)
             pas_t = 1 if fine else k
             blocs = [a[:, i:i + m:pas_t, j:j + m:pas_t] for a in q]
