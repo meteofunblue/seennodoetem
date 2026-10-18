@@ -71,7 +71,14 @@ input.bad{border-color:var(--cursor);outline:1px solid var(--cursor)}
 #tDep{font-family:var(--f-mono)}
 #tSpeed{width:5.5em}
 .offline{padding-block:6px;font-size:13px;color:var(--warn);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-main.layout{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,520px);min-height:0}
+main.layout{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 8px var(--mgw,minmax(360px,520px));min-height:0}
+.split{cursor:col-resize;background:var(--line);position:relative;touch-action:none}
+.split:hover,.split.on{background:var(--accent)}
+.split::after{content:"";position:absolute;left:2px;top:50%;width:4px;height:36px;margin-top:-18px;border-left:1px solid var(--panel);border-right:1px solid var(--panel);opacity:.8}
+#hover{position:absolute;z-index:700;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;
+  padding:6px 8px;font:12px/1.45 var(--f-body);box-shadow:0 2px 8px rgba(0,0,0,.25);white-space:nowrap}
+#hover b{font:600 12px var(--f-mono)}
+#hover .pos{font:11px var(--f-mono);color:var(--muted)}
 .mapcol{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--line)}
 #map{flex:1;min-height:320px;background:var(--grid)}
 .timebar{display:flex;align-items:center;gap:10px;background:var(--panel);border-top:1px solid var(--line);padding-block:8px;
@@ -112,6 +119,7 @@ footer a{color:var(--accent)}
 @media (max-width:900px){
   html,body{height:auto;min-height:100%}
   main.layout{grid-template-columns:1fr;flex:none}
+  .split,#mgWide{display:none}
   .mapcol{border-right:0}
   #map{min-height:52vh;flex:none;height:52vh}
   aside.mgcol{overflow:visible}
@@ -138,7 +146,7 @@ footer a{color:var(--accent)}
   <div class="grp">
     <button class="primary" id="load">Charger</button>
     <button id="btnTransit" aria-expanded="false">Transit</button>
-    <button id="btnSave" title="Enregistrer les données chargées dans un fichier, pour les rouvrir sans réseau">Enregistrer</button>
+    <button id="btnSave" title="Enregistrer un ou plusieurs modèles de la zone dans un fichier, pour les rouvrir sans réseau">Enregistrer…</button>
     <button id="btnOpen" title="Ouvrir une situation enregistrée">Ouvrir…</button>
     <input type="file" id="fileOpen" accept=".meteo,.gz,application/gzip" hidden>
   </div>
@@ -175,6 +183,16 @@ footer a{color:var(--accent)}
   <div class="legs" id="legs"></div>
 </section>
 
+<section class="tpanel" id="savePanel" hidden aria-label="Enregistrer une situation">
+  <div class="ctl" style="width:100%"><label>Modèles à enregistrer pour la zone affichée</label></div>
+  <div class="grp" id="saveList" style="width:100%;gap:2px 18px"></div>
+  <label class="chk"><input type="checkbox" id="saveRoute" checked> Inclure les tuiles le long de la route</label>
+  <span class="note" id="saveTot" style="width:auto"></span>
+  <button id="saveGo" class="primary" type="button">Enregistrer le fichier</button>
+  <button id="saveCancel" type="button">Annuler</button>
+  <p class="note">Chaque modèle coché est enregistré avec tous ses paramètres et toutes ses échéances, pour la zone (et la route). Hors ligne, les données ne sont décodées qu'à l'affichage du modèle choisi.</p>
+</section>
+
 <main class="layout">
   <section class="mapcol">
     <div id="map" aria-label="Carte du champ prévu"></div>
@@ -190,6 +208,7 @@ footer a{color:var(--accent)}
     </div>
   </section>
 
+  <div class="split" id="split" role="separator" aria-orientation="vertical" aria-label="Largeur du météogramme (glisser)" tabindex="0" title="Glisser pour élargir ou réduire le météogramme (double-clic : largeur par défaut)"></div>
   <aside class="mgcol">
     <div class="pt-head">
       <h2 id="mgTitle">Météogramme</h2>
@@ -197,6 +216,7 @@ footer a{color:var(--accent)}
         <button id="tabPoint" class="on" role="tab" aria-selected="true">Point</button>
         <button id="tabRoute" role="tab" aria-selected="false" disabled>Route</button>
       </div>
+      <button id="mgWide" title="Élargir le panneau des graphiques">Agrandir</button>
       <button id="csv">CSV</button>
       <div class="coords" id="models">—</div>
       <div class="coords" id="coords">—</div>
@@ -1726,27 +1746,103 @@ $("tCsv").addEventListener("click",()=>{
 });
 
 /* ---------- Situation enregistrée (hors ligne) ---------- */
-$("btnSave").addEventListener("click",async()=>{
-  const btn=$("btnSave"); btn.disabled=true; setStatus("Préparation du fichier…");
+/* Panneau d'enregistrement : choix des modèles du dépôt à inclure (toutes les tuiles de la zone, et de la route) */
+function zoneKeys(b,dom){
+  const [s0,n0,o0,e0]=dom, out=[];
+  for (let a=Math.max(Math.floor(b.s),s0); a<=Math.min(Math.floor(b.n-1e-9),n0-1); a++)
+    for (let c=Math.max(Math.floor(b.o),o0); c<=Math.min(Math.floor(b.e-1e-9),e0-1); c++) out.push(`${a}_${c}`);
+  return out;
+}
+function routeKeys(dom){
+  if (R.wps.length<2) return [];
+  const Lg=legs(), set=new Set(), [s0,n0,o0,e0]=dom;
+  for (let t=Lg[0].t0; t<=Lg[Lg.length-1].t1+1; t+=9e5){ const q=posAt(t,Lg);
+    for (const dy of [-0.3,0,0.3]) for (const dx of [-0.3,0,0.3]){ const la=Math.floor(q.lat+dy), lo=Math.floor(q.lon+dx);
+      if (la>=s0&&la<n0&&lo>=o0&&lo<e0) set.add(`${la}_${lo}`); } }
+  return [...set];
+}
+function estimMo(m,nTiles){ const n=Math.round(1/m.res); return nTiles*n*n*m.echeances*(m.variables||[]).length*2/3.5/1e6; }
+function fillSavePanel(){
+  const b=currentBounds(), el=$("saveList"), mods=st.index?st.index.modeles:{}, cur=[$("model").value,$("wmodel").value];
+  if (!b){ el.innerHTML="<p class='note warn'>Choisissez ou chargez d'abord une zone.</p>"; return; }
+  const withR=$("saveRoute").checked;
+  let html="";
+  for (const [id,m] of Object.entries(mods)){
+    const keys=new Set(zoneKeys(b,m.domaine)); if (withR) routeKeys(m.domaine).forEach(k=>keys.add(k));
+    if (!keys.size) continue;
+    const mo=estimMo(m,keys.size), on=cur.includes("mf:"+id);
+    html+=`<label class="chk"><input type="checkbox" data-id="${id}" data-mo="${mo.toFixed(2)}" ${on?"checked":""}> ${esc(m.nom)} <span style="color:var(--muted)">· ${keys.size} tuile${keys.size>1?"s":""} · ≈ ${mo<0.1?"< 0,1":mo.toFixed(1).replace(".",",")} Mo</span></label>`;
+  }
+  const om=cur.filter(v=>v.startsWith("om:"));
+  if (om.length) html+=`<p class="note">IFS / Copernicus (Open-Meteo) : la grille déjà chargée est incluse d'office.</p>`;
+  el.innerHTML=html||"<p class='note warn'>Aucun modèle du dépôt ne couvre cette zone.</p>";
+  el.querySelectorAll("input").forEach(x=>x.addEventListener("change",saveTotal)); saveTotal();
+}
+function saveTotal(){
+  let t=0; $("saveList").querySelectorAll("input:checked").forEach(x=>t+=+x.dataset.mo);
+  $("saveTot").textContent=`Total estimé ≈ ${t.toFixed(1).replace(".",",")} Mo`+(t>40?" : c'est beaucoup, réduisez la zone ou le nombre de modèles.":"");
+  $("saveTot").classList.toggle("warn",t>40);
+}
+$("btnSave").addEventListener("click",()=>{
+  const p=$("savePanel"); p.hidden=!p.hidden; $("btnSave").classList.toggle("on",!p.hidden);
+  if (!p.hidden){ $("saveRoute").disabled=R.wps.length<2; if (R.wps.length<2) $("saveRoute").checked=false; fillSavePanel(); }
+  setTimeout(()=>map.invalidateSize(),50);
+});
+$("saveRoute").addEventListener("change",fillSavePanel);
+$("saveCancel").addEventListener("click",()=>{ $("savePanel").hidden=true; $("btnSave").classList.remove("on"); setTimeout(()=>map.invalidateSize(),50); });
+/* tuile brute (compressée, en base64) : depuis le cache, la situation ouverte, ou téléchargée sans être décodée */
+async function rawTile(id,meta,key){
+  const ck=`${id}|${meta.run}|${key}`;
+  if (TILES.has(ck)){ try{ const t=await TILES.get(ck); if (t) return t.b64 || b64(new Uint8Array(t.gz)); return null; }catch(e){} }
+  if (st.offline) return st.offline.tiles[`${id}/${key}`] || null;
+  const r=await fetch(`${BASE}${id}/t/${key}.bin.gz?r=${encodeURIComponent(meta.run)}`);
+  if (r.status===404) return null; if (!r.ok) throw new Error(`${id} ${key} : HTTP ${r.status}`);
+  return b64(new Uint8Array(await r.arrayBuffer()));
+}
+$("saveGo").addEventListener("click",async()=>{
+  const btn=$("saveGo"); btn.disabled=true;
   try{
-    const sit={format:"situation-meteo-marine", version:1, cree:new Date().toISOString(),
-      ui:{model:$("model").value, wmodel:$("wmodel").value, param:$("param").value, bounds:currentBounds(), tIdx:st.tIdx, time:st.times[st.tIdx], pt:st.pt, res:$("res").value},
+    const b=currentBounds(); if (!b) throw new Error("zone non définie");
+    const ids=[...$("saveList").querySelectorAll("input:checked")].map(x=>x.dataset.id), withR=$("saveRoute").checked;
+    const sit={format:"situation-meteo-marine", version:2, cree:new Date().toISOString(),
+      ui:{model:$("model").value, wmodel:$("wmodel").value, param:$("param").value, bounds:b, tIdx:st.tIdx, time:st.times[st.tIdx], pt:st.pt, res:$("res").value},
       route:{wps:R.wps, vitesses:R.speeds, depart:$("tDep").value, vitesse:+$("tSpeed").value, nom:$("rName").value},
+      /* résultats déjà calculés (point et route) : ils restent complets même si la route sort de la zone enregistrée */
+      resultats:{point:st.point, route:st.route && !st.route.stale ? st.route : null, mode:st.mgMode},
       metas:{}, tiles:{}, om:{}, index:null};
+    let done=0, total=0;
+    const jobs=[];
+    for (const id of ids){
+      const meta=await fetchMeta(id), tset=new Set(meta.tuiles), keys=new Set(zoneKeys(b,meta.domaine));
+      if (withR) routeKeys(meta.domaine).forEach(k=>keys.add(k));
+      /* tuiles déjà chargées (point, route) incluses aussi */
+      const pre=`${id}|${meta.run}|`; for (const k of TILES.keys()) if (k.startsWith(pre)) keys.add(k.slice(pre.length));
+      sit.metas[id]=meta;
+      for (const k of keys) if (tset.has(k)) jobs.push([id,meta,k]);
+    }
+    total=jobs.length;
+    await pool(jobs,6,async([id,meta,k])=>{ const t=await rawTile(id,meta,k); if (t) sit.tiles[`${id}/${k}`]=t; done++; if (done%10===0) setStatus(`Préparation du fichier : tuiles ${done} / ${total}…`); });
     for (const g of [st.ga,st.gm]){
       if (!g) continue; const p=g.prov;
-      if (p.kind==="mf"){ sit.metas[p.id]=p.meta; const t=await p.loadedTiles(); for (const k in t) sit.tiles[`${p.id}/${k}`]=t[k]; }
-      else if (p.kind==="om" || p.kind==="omf"){
+      if (p.kind==="om" || p.kind==="omf"){
         const data={}; for (const nm of (p.kind==="om"?p.vars.concat(p.k==="a"?["wind_gusts_10m_inst"]:[]):Object.keys(p.saved.data))){ const a=g.get(nm); if (a) data[nm]=Array.from(a,v=>isNaN(v)?null:+v.toFixed(2)); }
         sit.om["om:"+p.model]={k:p.k, model:p.model, times:g.times, lat0:g.lat0, lon0:g.lon0, dlat:g.dlat, dlon:g.dlon, ny:g.ny, nx:g.nx, data};
       }
     }
-    if (!Object.keys(sit.metas).length && !Object.keys(sit.om).length) throw new Error("chargez d'abord une zone");
+    if (!Object.keys(sit.metas).length && !Object.keys(sit.om).length) throw new Error("cochez au moins un modèle");
+    if (!sit.metas[sit.ui.model.slice(3)] && !sit.om[sit.ui.model]) sit.ui.model = Object.keys(sit.metas).map(k=>"mf:"+k).find(v=>(st.index.modeles[v.slice(3)]||{}).type==="atmo") || sit.ui.model;
+    let horsZone=false;
+    if (Object.keys(sit.om).length && R.wps.length>1 && st.ga && st.ga.prov.kind!=="mf"){ const g=st.ga, Lg=legs();
+      for (let t=Lg[0].t0; t<=Lg[Lg.length-1].t1; t+=3.6e6){ const q=posAt(t,Lg);
+        if (q.lat<g.lat0-g.dlat/2||q.lat>g.lat0+(g.ny-0.5)*g.dlat||q.lon<g.lon0-g.dlon/2||q.lon>g.lon0+(g.nx-0.5)*g.dlon){ horsZone=true; break; } } }
     if (st.index){ sit.index={genere:st.index.genere, modeles:Object.fromEntries(Object.entries(st.index.modeles).filter(([k])=>sit.metas[k])), zones:st.index.zones}; }
+    setStatus("Compression du fichier…");
     const blob=await gzipText(JSON.stringify(sit));
     const d=new Date(), name=`situation_${d.toISOString().slice(0,13).replace(/[-:T]/g,"")}.meteo`;
     const url=URL.createObjectURL(blob), A=document.createElement("a"); A.href=url; A.download=name; document.body.appendChild(A); A.click(); A.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
-    setStatus(`Situation enregistrée (${(blob.size/1e6).toFixed(1).replace(".",",")} Mo, ${Object.keys(sit.tiles).length} tuiles) : « Ouvrir… » la rechargera sans réseau.`);
+    $("savePanel").hidden=true; $("btnSave").classList.remove("on"); setTimeout(()=>map.invalidateSize(),50);
+    setStatus(`Situation enregistrée (${(blob.size/1e6).toFixed(1).replace(".",",")} Mo, ${Object.keys(sit.metas).length+Object.keys(sit.om).length} modèle(s), ${Object.keys(sit.tiles).length} tuiles) : « Ouvrir… » la rechargera sans réseau.`
+      + (horsZone ? " La route sort de la zone IFS chargée : sa météo est enregistrée telle quelle, mais un recalcul hors ligne avec IFS sera incomplet." : ""), horsZone);
   } catch(err){ setStatus("Enregistrement impossible : "+err.message, true); }
   finally{ btn.disabled=false; }
 });
@@ -1765,7 +1861,9 @@ async function applySituation(sit){
   st.index = sit.index || {modeles:Object.fromEntries(Object.entries(sit.metas).map(([k,m])=>[k,{nom:m.nom,type:m.type,run:m.run,res:m.res,domaine:m.domaine,vagues:m.vagues,force_par:m.force_par,echeances:m.temps.length}])), zones:{}};
   $("offline").hidden=false;
   $("offTxt").textContent=`Situation enregistrée le ${fmtT(Date.parse(sit.cree))} UTC · hors ligne : seules les données enregistrées sont disponibles.`;
-  fillModels(); $("model").value=sit.ui.model; $("wmodel").value=sit.ui.wmodel||""; $("param").value=sit.ui.param; $("res").value=sit.ui.res||"14";
+  fillModels(); $("model").value=sit.ui.model; if (!$("model").value) $("model").selectedIndex=0;
+  $("wmodel").value=sit.ui.wmodel||""; if (!$("wmodel").value) chooseWave();
+  $("param").value=sit.ui.param; $("res").value=sit.ui.res||"auto";
   if (sit.ui.bounds){ const b=sit.ui.bounds; $("zone").value="custom"; $("zonePanel").hidden=false; setInputs(b); }
   st.pt=sit.ui.pt||st.pt; ptMarker.setLatLng([st.pt.lat,st.pt.lon]);
   if (sit.route && sit.route.wps){ R.wps=sit.route.wps; R.speeds=sit.route.vitesses||[]; if (sit.route.depart) $("tDep").value=sit.route.depart; if (sit.route.vitesse) $("tSpeed").value=sit.route.vitesse; $("rName").value=sit.route.nom||""; routeChanged(true); }
@@ -1773,8 +1871,13 @@ async function applySituation(sit){
   syncModelUI(); drawLegend();
   await loadGrid();
   if (sit.ui.time){ const k=st.times.indexOf(sit.ui.time); if (k>=0) setTime(k); }
-  loadPoint();
-  if (R.wps.length>1){ $("transitPanel").hidden=false; $("btnTransit").classList.add("on"); await computeRoute(); }
+  const res=sit.resultats||{};
+  if (res.point){ st.point=res.point; showTab("point"); } else loadPoint();
+  if (res.route){
+    st.route=res.route; $("tabRoute").disabled=false;
+    $("tNote").textContent="Météo de route enregistrée. Un nouveau calcul hors ligne n'utilise que les données de la zone enregistrée."; $("tNote").classList.remove("warn");
+  } else if (R.wps.length>1){ $("transitPanel").hidden=false; $("btnTransit").classList.add("on"); await computeRoute(); }
+  showTab(res.mode==="route" && st.route ? "route" : "point");
 }
 $("offQuit").addEventListener("click",()=>location.reload());
 
@@ -1807,6 +1910,73 @@ document.addEventListener("keydown",e=>{
   if (e.key==="Escape"){ stopRouteAdd(); if (drawState){ drawState=null; $("zDraw").classList.remove("on"); $("map").classList.remove("drawing"); } }
 });
 let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ map.invalidateSize(); drawLegend(); drawMG(); },150); });
+
+/* ---------- Valeurs au survol de la carte ---------- */
+const hoverEl=document.createElement("div"); hoverEl.id="hover"; hoverEl.hidden=true; $("map").appendChild(hoverEl);
+function gridVal(g,name,lat,lon){
+  if (!g) return null; const a=g.get(name); if (!a) return null;
+  const ti=tiOf(g,st.tIdx); if (ti<0) return null;
+  const iy=Math.round((lat-g.lat0)/g.dlat), ix=Math.round((lon-g.lon0)/g.dlon);
+  if (iy<0||ix<0||iy>=g.ny||ix>=g.nx) return null;
+  const v=a[ti*g.ny*g.nx+iy*g.nx+ix]; return isNaN(v)?null:v;
+}
+let hoverRaf=0;
+function showHover(e){
+  if (hoverRaf) return;
+  hoverRaf=requestAnimationFrame(()=>{ hoverRaf=0;
+    if (!st.ga && !st.gm){ hoverEl.hidden=true; return; }
+    const {lat,lng}=e.latlng, A=(n)=>gridVal(st.ga,n,lat,lng), M=(n)=>gridVal(st.gm,n,lat,lng);
+    const lines=[`<span class="pos">${dm(lat,true)} ${dm(lng,false)}</span>`];
+    const P=PARAMS[$("param").value];
+    if (P && !P.layers && !["wind","gust","pmer","hs","t2"].includes($("param").value)){
+      const g=gridOf(P), v=g?gridVal(g,keyOf(P,g),lat,lng):null;
+      lines.push(`${P.label} : <b>${v==null?"—":fmt(P.conv?P.conv(v):v,P.dec)} ${P.unit}</b>`);
+    }
+    const ws=A("wind_speed_10m"), wd=A("wind_direction_10m"), gu=st.ga?gridVal(st.ga,keyOf(PARAMS.gust,st.ga),lat,lng):null;
+    if (ws!=null) lines.push(`Vent <b>${dir16(wd)} ${fmt(ws,0)} kt</b>${gu!=null?` · raf. <b>${fmt(gu,0)}</b>`:""}`);
+    const pm=A("pressure_msl"); if (pm!=null) lines.push(`Pmer <b>${fmt(pm,1)} hPa</b>`);
+    const t2=A("temperature_2m"); if (t2!=null) lines.push(`T 2 m <b>${fmt(t2,1)} °C</b>`);
+    const hs=M("wave_height");
+    if (hs!=null){
+      lines.push(`Mer totale <b>${fmt(hs,1)} m ${dir16(M("wave_direction"))}</b>`);
+      const ww=M("wind_wave_height"); if (ww!=null) lines.push(`Mer du vent <b>${fmt(ww,1)} m</b>`);
+      const p1=M("primary_swell_height");
+      if (p1!=null){ lines.push(`Houle 1 <b>${fmt(p1,1)} m ${dir16(M("primary_swell_direction"))} ${fmt(M("primary_swell_period"),0)} s</b>`);
+        const p2=M("secondary_swell_height"); if (p2!=null && p2>=0.1) lines.push(`Houle 2 <b>${fmt(p2,1)} m ${dir16(M("secondary_swell_direction"))} ${fmt(M("secondary_swell_period"),0)} s</b>`); }
+      else { const sw=M("swell_wave_height"); if (sw!=null) lines.push(`Houle <b>${fmt(sw,1)} m ${dir16(M("swell_wave_direction"))} ${fmt(M("swell_wave_period"),0)} s</b>`); }
+    } else if (st.gm && ws!=null) lines.push(`<span class="pos">pas de vagues ici</span>`);
+    if (lines.length===1){ hoverEl.hidden=true; return; }
+    hoverEl.innerHTML=lines.join("<br>"); hoverEl.hidden=false;
+    const sz=map.getSize(), p=e.containerPoint, w=hoverEl.offsetWidth, h=hoverEl.offsetHeight;
+    hoverEl.style.left=Math.min(p.x+14, sz.x-w-4)+"px"; hoverEl.style.top=(p.y+h+18>sz.y ? p.y-h-10 : p.y+14)+"px";
+  });
+}
+map.on("mousemove",showHover);
+map.on("mouseout",()=>{ hoverEl.hidden=true; });
+
+/* ---------- Largeur du panneau des graphiques (poignée à glisser, bouton Agrandir) ---------- */
+function setMgWidth(px,save=true){
+  const L=document.querySelector("main.layout");
+  if (px==null){ L.style.removeProperty("--mgw"); $("mgWide").textContent="Agrandir"; }
+  else { px=Math.max(340,Math.min(window.innerWidth-260,px)); L.style.setProperty("--mgw",px+"px"); $("mgWide").textContent = px>window.innerWidth*0.5 ? "Réduire" : "Agrandir"; }
+  if (save) store.set("largeur_graphiques",px);
+  clearTimeout(setMgWidth.t); setMgWidth.t=setTimeout(()=>{ map.invalidateSize(); drawLegend(); drawMG(); },60);
+}
+$("mgWide").addEventListener("click",()=>{
+  const cur=document.querySelector("aside.mgcol").getBoundingClientRect().width;
+  setMgWidth(cur>window.innerWidth*0.5 ? null : Math.round(window.innerWidth*0.65));
+});
+{
+  const sp=$("split"); let drag=false;
+  sp.addEventListener("pointerdown",e=>{ drag=true; sp.classList.add("on"); sp.setPointerCapture(e.pointerId); e.preventDefault(); });
+  sp.addEventListener("pointermove",e=>{ if (drag) setMgWidth(window.innerWidth-e.clientX-4,false); });
+  sp.addEventListener("pointerup",()=>{ if (!drag) return; drag=false; sp.classList.remove("on");
+    store.set("largeur_graphiques",Math.round(document.querySelector("aside.mgcol").getBoundingClientRect().width)); });
+  sp.addEventListener("dblclick",()=>setMgWidth(null));
+  sp.addEventListener("keydown",e=>{ const w=document.querySelector("aside.mgcol").getBoundingClientRect().width;
+    if (e.key==="ArrowLeft") setMgWidth(w+40); if (e.key==="ArrowRight") setMgWidth(w-40); });
+  const w=store.get("largeur_graphiques",null); if (w) setMgWidth(w,false);
+}
 
 /* ---------- Démarrage ---------- */
 (async function init(){
