@@ -1197,6 +1197,9 @@ async function loadGrid(){
     setStatus(st.loadMsg.txt, st.loadMsg.err);
     setTimes(times);
     syncModelUI();
+    /* le modèle de vagues a pu changer (choix automatique selon la zone) : météogramme du point à refaire */
+    const ids=(st.provA?st.provA.id:"")+"|"+(st.provM?st.provM.id:"");
+    if (st.point && st.point.ids!==ids && !st.offline) loadPoint();
   } catch(err){
     if (seq===loadSeq) setStatus("Échec du chargement : "+err.message, true);
   } finally { if (seq===loadSeq) $("load").disabled=false; }
@@ -1238,7 +1241,7 @@ async function loadPoint(){
     const a=ra.value, m=rm.status==="fulfilled"?rm.value:null;
     if (!a) throw new Error("point hors du domaine du modèle d'atmosphère");
     st.point={kind:"point", times:a.times, a:align(a.times,a), m:align(a.times,m), glat:a.glat, glon:a.glon, mlat:m&&m.glat, mlon:m&&m.glon,
-      provA:pa.nom, provM:pm?pm.nom:"—"};
+      provA:pa.nom, provM:pm?pm.nom:"—", ids:pa.id+"|"+(pm?pm.id:"")};
     let txt=`Demandé ${dm(lat,true)} ${dm(lon,false)} · maille atmo ${dm(a.glat,true)} ${dm(a.glon,false)}`;
     txt += m ? ` · maille vagues ${dm(m.glat,true)} ${dm(m.glon,false)}` : " · vagues indisponibles ici";
     $("coords").textContent=txt;
