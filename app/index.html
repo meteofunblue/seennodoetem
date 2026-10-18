@@ -145,6 +145,8 @@ footer a{color:var(--accent)}
     <option value="5" selected>5 hPa</option><option value="4">4 hPa</option><option value="2">2 hPa</option><option value="1">1 hPa</option></select>
   <label class="chk"><input type="checkbox" id="coast" checked> Côte</label>
   <label class="chk"><input type="checkbox" id="vals" checked> Valeurs</label>
+  <select id="dens" aria-label="Densité des barbules et flèches" title="Densité des barbules, flèches et valeurs" style="min-height:30px;padding:3px 6px">
+    <option value="30">Barbules serrées</option><option value="45" selected>Barbules normales</option><option value="70">Barbules espacées</option></select>
   <div class="grp">
     <button class="primary" id="load">Charger</button>
     <button id="btnTransit" aria-expanded="false">Transit</button>
@@ -934,28 +936,49 @@ function drawField(){
   drawCoast(ctx);
   if (($("iso").checked || $("param").value==="pmer") && st.ga) drawIsobars(ctx,i);
   updateMissing();
-  /* barbules / flèches et valeurs sur une sous-grille (espacement ≥ 24 px, ≥ 38 px avec valeurs) */
+  /* barbules / flèches et valeurs : sur une sous-grille de points du modèle quand la grille est fine,
+     sur un quadrillage de l'écran (valeurs interpolées) quand on zoome sur une grille lâche */
   if (!g || !vals || P.layers) return;
-  const showVals=$("vals").checked, cp=cellPx(g), target=showVals?38:24, strd=Math.max(1,Math.ceil(target/cp));
+  const showVals=$("vals").checked, dens=+$("dens").value||40, cp=cellPx(g);
+  const target=showVals?Math.max(dens,38):dens;
   const dv=P.dir?dirVals(P,g,i):null;
   let kt=null; if (P.glyph==="barb"){ const rw=fieldVals(PARAMS.wind,i); kt=rw&&rw.g===g?rw.vals:null; }
-  const W=viewWindow(g,0), cell=cp*strd;
   ctx.lineCap="round"; ctx.lineJoin="round";
+  const glyph=(px,py,v,d,k,cell)=>{
+    const withText = showVals && cell>=34;
+    const gy = withText && P.glyph ? py-Math.min(cell,60)*0.14 : py;
+    if (P.glyph==="barb" && d!=null && k!=null){ const len=Math.min(cell*0.42,22); strokeTwice(ctx,()=>drawBarb(ctx,px,gy,d,k,len)); }
+    else if (P.glyph==="arrow" && d!=null){ const len=Math.min(cell*0.55,22); strokeTwice(ctx,()=>drawArrow(ctx,px,gy,d,len)); }
+    if (P.key==="pressure_msl" && $("iso").checked) return;
+    if (withText || (showVals && !P.glyph && cell>=24)){
+      const ty = P.glyph ? py+Math.min(cell,60)*0.3 : py+4;
+      ctx.font="600 11px 'JetBrains Mono',monospace"; ctx.textAlign="center";
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.strokeText(fmt(v,P.dec),px,ty);
+      ctx.fillStyle="#0d1b2a"; ctx.fillText(fmt(v,P.dec),px,ty);
+    }
+  };
+  if (cp > target*1.3){
+    /* grille lâche à l'écran : quadrillage régulier, direction interpolée par composantes */
+    let du=null, dvv=null;
+    if (dv){ du=new Float32Array(dv.length); dvv=new Float32Array(dv.length);
+      for (let k=0;k<dv.length;k++){ const a=dv[k]*Math.PI/180; du[k]=isNaN(a)?NaN:Math.sin(a); dvv[k]=isNaN(a)?NaN:Math.cos(a); } }
+    const sz=map.getSize();
+    for (let py=target/2; py<sz.y; py+=target) for (let px=target/2; px<sz.x; px+=target){
+      const ll=map.containerPointToLatLng([px,py]), fx=(ll.lng-g.lon0)/g.dlon, fy=(ll.lat-g.lat0)/g.dlat;
+      if (fx<-0.5||fy<-0.5||fx>g.nx-0.5||fy>g.ny-0.5) continue;
+      const v=sampleGrid(vals,g.nx,g.ny,fx,fy); if (isNaN(v)) continue;
+      let d=null; if (du){ const a=sampleGrid(du,g.nx,g.ny,fx,fy), b=sampleGrid(dvv,g.nx,g.ny,fx,fy); if (!isNaN(a)&&!isNaN(b)) d=(Math.atan2(a,b)*180/Math.PI+360)%360; }
+      const k=kt?sampleGrid(kt,g.nx,g.ny,fx,fy):null;
+      glyph(px,py,v,d,k==null||isNaN(k)?null:k,target);
+    }
+    return;
+  }
+  const strd=Math.max(1,Math.ceil(target/cp)), W=viewWindow(g,0), cell=cp*strd;
   const i0=Math.ceil(W.i0/strd)*strd, j0=Math.ceil(W.j0/strd)*strd;
   for (let y=i0;y<=W.i1;y+=strd) for (let x=j0;x<=W.j1;x+=strd){
     const k=y*g.nx+x, v=vals[k]; if (isNaN(v)) continue;
     const p=map.latLngToContainerPoint([gLat(g,y),gLon(g,x)]);
-    const withText = showVals && cell>=34;
-    const gy = withText && P.glyph ? p.y-Math.min(cell,60)*0.14 : p.y;
-    if (P.glyph==="barb" && dv && kt){ const len=Math.min(cell*0.42,22); strokeTwice(ctx,()=>drawBarb(ctx,p.x,gy,dv[k],kt[k],len)); }
-    else if (P.glyph==="arrow" && dv){ const len=Math.min(cell*0.55,22); strokeTwice(ctx,()=>drawArrow(ctx,p.x,gy,dv[k],len)); }
-    if (P.key==="pressure_msl" && $("iso").checked) continue;
-    if (withText || (showVals && !P.glyph && cell>=24)){
-      const ty = P.glyph ? p.y+Math.min(cell,60)*0.3 : p.y+4;
-      ctx.font="600 11px 'JetBrains Mono',monospace"; ctx.textAlign="center";
-      ctx.lineWidth=3; ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.strokeText(fmt(v,P.dec),p.x,ty);
-      ctx.fillStyle="#0d1b2a"; ctx.fillText(fmt(v,P.dec),p.x,ty);
-    }
+    glyph(p.x,p.y,v,dv?dv[k]:null,kt?kt[k]:null,cell);
   }
 }
 
@@ -1897,6 +1920,8 @@ $("offQuit").addEventListener("click",()=>location.reload());
 }
 $("param").addEventListener("change",()=>{ lastMissing=null; drawLegend(); drawField(); });
 ["vals","coast","smooth","iso"].forEach(id=>$(id).addEventListener("change",drawField));
+$("dens").value=String(store.get("barbules_densite",45));
+$("dens").addEventListener("change",()=>{ store.set("barbules_densite",+$("dens").value); drawField(); });
 $("isoStep").value=String(store.get("isobares_pas",5));
 $("isoStep").addEventListener("change",()=>{ store.set("isobares_pas",+$("isoStep").value); drawField(); });
 $("opac").addEventListener("input",drawField);
