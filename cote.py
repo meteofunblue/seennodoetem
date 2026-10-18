@@ -15,8 +15,30 @@ import os
 import struct
 import zipfile
 
-URLS = ["https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhg/latest/gshhg-shp-2.3.7.zip",
+# répertoires où chercher l'archive (le nom exact du zip est lu dans la page), puis liens directs de secours
+REPERTOIRES = ["https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhs/latest/",
+               "https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhg/latest/",
+               "https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhs/oldversions/version2.3.7/",
+               "https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhg/oldversions/version2.3.7/",
+               "https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhs/oldversions/version2.3.6/",
+               "https://www.ngdc.noaa.gov/mgg/shorelines/data/gshhg/oldversions/version2.3.6/"]
+URLS = ["http://www.soest.hawaii.edu/pwessel/gshhg/gshhg-shp-2.3.7.zip",
         "https://www.soest.hawaii.edu/pwessel/gshhg/gshhg-shp-2.3.7.zip"]
+
+
+def candidats():
+    import re
+    import requests
+    for rep in REPERTOIRES:
+        try:
+            r = requests.get(rep, timeout=60)
+            noms = sorted(set(re.findall(r'href="(gshhg-shp-[\d.]+\.zip)"', r.text)), reverse=True) if r.status_code == 200 else []
+            print(f"{rep} : HTTP {r.status_code}{' · ' + ', '.join(noms) if noms else ''}", flush=True)
+            for n in noms:
+                yield rep + n
+        except Exception as e:
+            print(f"{rep} : {e.__class__.__name__}", flush=True)
+    yield from URLS
 
 
 def lire_shp(donnees):
@@ -98,7 +120,7 @@ def main():
     else:
         import requests
         archive = None
-        for url in URLS:
+        for url in candidats():
             try:
                 print(f"Téléchargement {url}", flush=True)
                 r = requests.get(url, timeout=600)
