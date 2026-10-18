@@ -30,6 +30,8 @@ for nom, cfg in modeles.items():
     try:
         r = ses.get(f"{base}/grids/{cfg['grille']}/packages/{cfg['paquets'][0]}")
         runs = sorted(set(re.findall(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", r.text)))
+        if cfg.get("heures_runs"):   # runs retenus seulement à ces heures (UTC)
+            runs = [x for x in runs if int(x[11:13]) in cfg["heures_runs"]]
     except Exception as e:
         print(f"{nom:12s} catalogue injoignable ({e.__class__.__name__})")
         continue
