@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import sys
 from datetime import datetime, timezone
 
 GARDER_DEFAUT = 4          # run courant + 3 précédents
@@ -138,6 +139,11 @@ if os.path.exists(args.app):
     for f in glob.glob(os.path.join(os.path.dirname(args.app), "*")):
         if os.path.isfile(f) and os.path.basename(f) != os.path.basename(args.app):
             shutil.copy(f, os.path.join(args.site, os.path.basename(f)))
+    # version hors ligne (fichier autonome à télécharger depuis l'appli)
+    import subprocess
+    subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "hors_ligne.py"),
+                    "--app", args.app, "--cote", os.path.join(os.path.dirname(args.app), "cote_fr.json"),
+                    "--sortie", os.path.join(args.site, "hors-ligne.html")], check=False)
 with open(os.path.join(args.site, "robots.txt"), "w") as f:
     f.write("User-agent: *\nDisallow: /\n")
 
