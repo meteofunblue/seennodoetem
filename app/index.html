@@ -126,7 +126,9 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="param">Paramètre carte</label><select id="param"></select></div>
   <div class="ctl"><label for="zone">Zone</label><select id="zone"></select></div>
   <div class="ctl" id="ctlRes"><label for="res">Maillage IFS</label>
-    <select id="res"><option value="10">10 × 10</option><option value="14" selected>14 × 14</option><option value="18">18 × 18</option></select></div>
+    <select id="res"><option value="auto" selected>Auto (selon la zone)</option><option value="10">10 × 10</option><option value="14">14 × 14</option><option value="18">18 × 18</option><option value="24">24 × 24</option><option value="30">30 × 30</option></select></div>
+  <div class="ctl"><label for="gmode">Rafales</label>
+    <select id="gmode"><option value="heure" selected>Valeur à l'heure affichée</option><option value="max">Maximum sur le pas</option></select></div>
   <div class="ctl"><label for="basemap">Fond</label><select id="basemap"></select></div>
   <div class="ctl"><label for="opac">Opacité</label><input type="range" id="opac" min="0.2" max="1" step="0.05" value="0.6"></div>
   <label class="chk"><input type="checkbox" id="smooth" checked> Lissage</label>
@@ -279,7 +281,7 @@ const PARAMS = {
   sw2:{label:"Houle secondaire · hauteur (WW3)", unit:"m", src:"m", key:"secondary_swell_height", dir:["secondary_swell_direction"], glyph:"arrow", scale:SC.wave, dec:1},
   sw2p:{label:"Houle secondaire · période (WW3)", unit:"s", src:"m", key:"secondary_swell_period", dir:["secondary_swell_direction"], glyph:"arrow", scale:SC.period, dec:0}
 };
-const A_VARS = ["wind_speed_10m","wind_direction_10m","wind_gusts_10m","precipitation","showers","cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","temperature_2m","dew_point_2m","pressure_msl","cape"];
+const A_VARS = ["wind_speed_10m","wind_direction_10m","wind_gusts_10m","wind_gusts_10m_inst","precipitation","showers","cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","temperature_2m","dew_point_2m","pressure_msl","cape"];
 const M_VARS = ["wave_height","wave_direction","wave_period","wave_peak_period","wind_wave_height","wind_wave_direction","wind_wave_period",
   "swell_wave_height","swell_wave_direction","swell_wave_period","primary_swell_height","primary_swell_direction","primary_swell_period",
   "secondary_swell_height","secondary_swell_direction","secondary_swell_period"];
@@ -505,6 +507,7 @@ function resampleIFS(h){
       if (MAX_VARS.includes(k)){ let m=null; for (let q=from;q<=i;q++) if (src[q]!=null) m=m==null?src[q]:Math.max(m,src[q]); return m; }
       return src[i];
     });
+    if (k==="wind_gusts_10m") o.wind_gusts_10m_inst=K.map(i=>src[i]);   /* rafale à l'heure de l'échéance (comparable aux isobares) */
   }
   return o;
 }
@@ -514,7 +517,7 @@ class OM {
   async load(){ return this; }
   get nom(){ return (this.k==="a"?OM_A:OM_M)[this.model].nom; }
   get vars(){ return this.k==="a"?VARS_A:VARS_M; }
-  has(name){ return this.vars.includes(name); }
+  has(name){ return this.vars.includes(name) || (this.k==="a" && name==="wind_gusts_10m_inst"); }
   url(lats,lons,cell){
     return this.k==="a"
       ? `${API_A}?latitude=${lats.join(",")}&longitude=${lons.join(",")}&hourly=${VARS_A.join(",")}&models=${this.model}&wind_speed_unit=kn&forecast_days=8&timezone=GMT&cell_selection=${cell}`
@@ -522,7 +525,8 @@ class OM {
   }
   prep(h){ return this.k==="a" ? resampleIFS(h) : h; }
   async grid(b){
-    const n=+$("res").value, dlat=(b.n-b.s)/n, dlon=(b.e-b.o)/n, pts=[];
+    const span=Math.max(b.n-b.s,(b.e-b.o)*Math.cos((b.s+b.n)/2*Math.PI/180));
+    const n=$("res").value==="auto" ? (span<=3?14:span<=8?18:24) : +$("res").value, dlat=(b.n-b.s)/n, dlon=(b.e-b.o)/n, pts=[];
     for (let i=0;i<n;i++) for (let j=0;j<n;j++) pts.push({lat:+(b.s+(i+0.5)*dlat).toFixed(3), lon:+(b.o+(j+0.5)*dlon).toFixed(3)});
     for (let k=0;k<pts.length;k+=CHUNK){
       const sl=pts.slice(k,k+CHUNK);
@@ -544,16 +548,16 @@ class OM {
   async series(lat,lon){
     const r=(await getJSON(this.url([lat.toFixed(3)],[lon.toFixed(3)],"sea")))[0];
     const h=this.prep(r.hourly), n=lastValid(h,this.k==="a"?"wind_speed_10m":"wave_height");
-    const v={}; for (const k of this.vars) if (h[k]) v[k]=h[k].slice(0,n);
+    const v={}; for (const k in h) if (k!=="time" && Array.isArray(h[k])) v[k]=h[k].slice(0,n);
     return {times:h.time.slice(0,n), v, glat:r.latitude, glon:r.longitude};
   }
   async at(samples){
-    const v={}; this.vars.forEach(nm=>v[nm]=new Array(samples.length).fill(null));
+    const v={}; this.vars.concat(this.k==="a"?["wind_gusts_10m_inst"]:[]).forEach(nm=>v[nm]=new Array(samples.length).fill(null));
     for (let k=0;k<samples.length;k+=CHUNK){
       const sl=samples.slice(k,k+CHUNK);
       const r=await getJSON(this.url(sl.map(s=>s.lat.toFixed(3)),sl.map(s=>s.lon.toFixed(3)),"sea"));
       r.forEach((x,ix)=>{ const h=this.prep(x.hourly), ti=h.time.indexOf(sl[ix].t); if (ti<0) return;
-        for (const nm of this.vars) if (h[nm]) v[nm][k+ix]=h[nm][ti]; });
+        for (const nm in v) if (h[nm]) v[nm][k+ix]=h[nm][ti]; });
     }
     return v;
   }
@@ -720,9 +724,23 @@ function drawCoast(ctx){
 function gridOf(P){ return P.src==="m" ? st.gm : st.ga; }
 /* indice d'échéance du modèle du paramètre pour l'heure affichée (heures communes, pas d'interpolation) */
 function tiOf(g,i){ if (!g) return -1; const t=st.times[i]; const k=g.tindex.get(t); return k==null?-1:k; }
+/* Rafales : valeur à l'heure (IFS via Open-Meteo) ou maximum sur le pas (seule valeur fournie par Météo-France) */
+const gustMode = () => $("gmode").value;
+function keyOf(P,g){ return P.key==="wind_gusts_10m" && gustMode()==="heure" && g.get("wind_gusts_10m_inst") ? "wind_gusts_10m_inst" : P.key; }
+const gustInst = a => gustMode()==="heure" && !!a && hasData(a.wind_gusts_10m_inst);
+const gustArr = a => !a ? null : gustInst(a) ? a.wind_gusts_10m_inst : a.wind_gusts_10m;
+function gustLabel(D,j){ return gustInst(D.a) ? "Rafales (à l'heure)" : `Rafales max ${stepHours(D.times,j)} h`; }
+function gustDesc(){
+  const g=st.ga; if (!g) return "";
+  const ti=tiOf(g,st.tIdx); if (ti<0) return "";
+  if (gustMode()==="heure" && g.get("wind_gusts_10m_inst")) return `valeur à ${pad(tDate(g.times[ti]).getUTCHours())} h UTC`;
+  const h=stepHours(g.times,ti), t1=tDate(g.times[ti]), t0=new Date(+t1-h*3.6e6);
+  const txt=`max ${pad(t0.getUTCHours())} h → ${pad(t1.getUTCHours())} h UTC`;
+  return gustMode()==="heure" && g.prov.kind==="mf" ? txt+" (seule valeur fournie par Météo-France)" : txt;
+}
 function fieldVals(P,i){
   const g=gridOf(P); if (!g) return null;
-  const a=g.get(P.key); if (!a) return null;
+  const a=g.get(keyOf(P,g)); if (!a) return null;
   const ti=tiOf(g,i); if (ti<0) return {g, vals:null};
   const N=g.ny*g.nx, sub=a.subarray(ti*N,(ti+1)*N);
   if (!P.conv) return {g, vals:sub};
@@ -934,7 +952,7 @@ function updateMissing(){
 }
 function drawLegend(){
   const P=PARAMS[$("param").value], cv=$("legend"), dpr=window.devicePixelRatio||1;
-  $("legendTitle").textContent = `${P.label} (${P.unit})`;
+  $("legendTitle").textContent = `${P.label}${P.key==="wind_gusts_10m"?" · "+gustDesc():""} (${P.unit})`;
   const W=cv.clientWidth||300, H=34; cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   if (P.layers){
@@ -1172,6 +1190,7 @@ function setTime(i){
   $("time").value=st.tIdx;
   const t=st.times[st.tIdx];
   if (t){ const h=Math.round((tDate(t)-Date.now())/3.6e6); $("timeLbl").textContent=`${tLabel(t)} (${h>=0?"+":""}${h} h)`; }
+  if ($("param").value==="gust") drawLegend();
   drawField(); drawMG(); renderReadout(); drawBoat();
 }
 
@@ -1246,7 +1265,7 @@ function renderReadout(){
   }
   rows.push(
     ["Vent 10 m", `${fmt(g(a,"wind_speed_10m"),0)} kt ${dir16(g(a,"wind_direction_10m"))}`],
-    ["Rafales", `${fmt(g(a,"wind_gusts_10m"),0)} kt`],
+    [gustLabel(D,j), `${fmt(near(gustArr(a),j),0)} kt`],
     ["Mer totale Hs", `${fmt(g(m,"wave_height"),1)} m ${dir16(g(m,"wave_direction"))}`],
     ["Mer du vent", `${fmt(g(m,"wind_wave_height"),1)} m · ${fmt(g(m,"wind_wave_period"),0)} s`]);
   if (has("primary_swell_height")){
@@ -1267,7 +1286,7 @@ function renderReadout(){
 function niceMax(v){ if (!(v>0)) return 1; const p=Math.pow(10,Math.floor(Math.log10(v))); for (const f of [1,1.5,2,2.5,3,4,5,6,8,10]) if (f*p>=v) return f*p; return 10*p; }
 function niceStep(range){ const raw=range/3, p=Math.pow(10,Math.floor(Math.log10(raw))); for (const f of [1,2,2.5,5,10]) if (f*p>=raw) return f*p; return 10*p; }
 const maxOf = (...arrs) => Math.max(0,...arrs.filter(Boolean).flat().filter(v=>v!=null));
-const hasData = a => !!a && a.some(v=>v!=null);
+function hasData(a){ return !!a && a.some(v=>v!=null); }
 
 function drawMG(){
   const cv=$("mg"), D=mgData(), dpr=window.devicePixelRatio||1;
@@ -1355,17 +1374,17 @@ function drawMG(){
   }
 
   /* 1. Vent */
-  title("Vent 10 m",[["moyen",C.wind],["rafales",C.gust,[5,3]]]);
+  title("Vent 10 m",[["moyen",C.wind],[gustInst(a)?"rafales à l'heure":"rafales max sur le pas",C.gust,[5,3]]]);
   ctx.lineCap="round"; ctx.lineJoin="round";
   for (const i of glyphIdx){
     ctx.strokeStyle=C.ink; ctx.fillStyle=C.ink; ctx.lineWidth=1.2;
     drawBarb(ctx,X(i),y+18,a.wind_direction_10m&&a.wind_direction_10m[i],a.wind_speed_10m&&a.wind_speed_10m[i],15);
   }
   y+=26;
-  let mx=niceMax(maxOf(a.wind_speed_10m,a.wind_gusts_10m)*1.1);
+  let mx=niceMax(maxOf(a.wind_speed_10m,gustArr(a))*1.1);
   yaxis(y,120,0,mx,"l","kt"); vgrid(y,120);
   for (const [v,lbl] of [[22,"F6"],[34,"F8"],[48,"F10"]]) if (v<mx){ const yy=y+120-v/mx*120; ctx.strokeStyle=C.gust; ctx.globalAlpha=.35; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillStyle=C.gust; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(lbl,L0+pw+5,yy+3); }
-  line(a.wind_gusts_10m,y,120,0,mx,C.gust,{dash:[5,3]});
+  line(gustArr(a),y,120,0,mx,C.gust,{dash:[5,3]});
   line(a.wind_speed_10m,y,120,0,mx,C.wind,{w:2.4,fill:.12});
   frame(y,120); y+=120+GAP;
 
@@ -1681,7 +1700,7 @@ function csvDownload(name,head,cols,rowsLead){
 }
 function csvCols(D){
   const a=D.a||{}, m=D.m||{};
-  return [["vent_kt",a.wind_speed_10m],["dir_vent",a.wind_direction_10m],["rafales_kt",a.wind_gusts_10m],
+  return [["vent_kt",a.wind_speed_10m],["dir_vent",a.wind_direction_10m],["rafales_kt",gustArr(a)],
     ["hs_totale_m",m.wave_height],["dir_mer_totale",m.wave_direction],["periode_pic_s",m.wave_peak_period],
     ["hs_mer_vent_m",m.wind_wave_height],["dir_mer_vent",m.wind_wave_direction],["periode_mer_vent_s",m.wind_wave_period],
     ["hs_houle_totale_m",m.swell_wave_height],["dir_houle_totale",m.swell_wave_direction],["periode_houle_totale_s",m.swell_wave_period],
@@ -1718,7 +1737,7 @@ $("btnSave").addEventListener("click",async()=>{
       if (!g) continue; const p=g.prov;
       if (p.kind==="mf"){ sit.metas[p.id]=p.meta; const t=await p.loadedTiles(); for (const k in t) sit.tiles[`${p.id}/${k}`]=t[k]; }
       else if (p.kind==="om" || p.kind==="omf"){
-        const data={}; for (const nm of (p.kind==="om"?p.vars:Object.keys(p.saved.data))){ const a=g.get(nm); if (a) data[nm]=Array.from(a,v=>isNaN(v)?null:+v.toFixed(2)); }
+        const data={}; for (const nm of (p.kind==="om"?p.vars.concat(p.k==="a"?["wind_gusts_10m_inst"]:[]):Object.keys(p.saved.data))){ const a=g.get(nm); if (a) data[nm]=Array.from(a,v=>isNaN(v)?null:+v.toFixed(2)); }
         sit.om["om:"+p.model]={k:p.k, model:p.model, times:g.times, lat0:g.lat0, lon0:g.lon0, dlat:g.dlat, dlon:g.dlon, ny:g.ny, nx:g.nx, data};
       }
     }
@@ -1772,6 +1791,7 @@ $("opac").addEventListener("input",drawField);
 $("model").addEventListener("change",()=>{ chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("wmodel").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("res").addEventListener("change",()=>loadGrid());
+$("gmode").addEventListener("change",()=>{ drawLegend(); drawField(); drawMG(); renderReadout(); });
 $("time").addEventListener("input",e=>setTime(+e.target.value));
 $("load").addEventListener("click",()=>loadGrid());
 $("zone").addEventListener("change",onZoneChange);
