@@ -289,6 +289,9 @@ const OM_A = {
   ecmwf_ifs025:{nom:"IFS 0,25° (CEP)", pas:"3 h puis 6 h"}
 };
 const OM_M = { meteofrance_wave:{nom:"MFWAM global Copernicus (vent IFS)"} };
+/* courant mondial (Copernicus global SMOC 1/12°, marée incluse) via Open-Meteo : repli hors des zones du dépôt */
+const OM_C = { smoc:{nom:"Courant global Copernicus (Open-Meteo, ≈ 8 km)"} };
+const omTab = k => k==="a"?OM_A:k==="c"?OM_C:OM_M;
 const CHUNK = 100, MAX_POINTS = 100000, MISS = -32768;   /* au plus 100 000 points de grille chargés par modèle */
 const ZONES_DEF = {
   iroise:{nom:"Mer d'Iroise",s:47.75,n:48.75,o:-5.6,e:-4.2},
@@ -611,15 +614,23 @@ function lastValid(h,key){ const a=h[key]||[]; let n=a.length; while(n>0 && a[n-
 class OM {
   constructor(k,model){ this.k=k; this.model=model; this.kind="om"; this.id="om:"+model; }
   async load(){ return this; }
-  get nom(){ return (this.k==="a"?OM_A:OM_M)[this.model].nom; }
-  get vars(){ return this.k==="a"?VARS_A:VARS_M; }
+  get nom(){ return omTab(this.k)[this.model].nom; }
+  get vars(){ return this.k==="a"?VARS_A:this.k==="c"?C_VARS:VARS_M; }
+  get key0(){ return this.k==="a"?"wind_speed_10m":this.k==="c"?"current_speed":"wave_height"; }
   has(name){ return this.vars.includes(name) || (this.k==="a" && name==="wind_gusts_10m_inst"); }
   url(lats,lons,cell){
     return this.k==="a"
       ? `${API_A}?latitude=${lats.join(",")}&longitude=${lons.join(",")}&hourly=${VARS_A.join(",")}&models=${this.model}&wind_speed_unit=kn&forecast_days=8&timezone=GMT&cell_selection=${cell}`
+      : this.k==="c"
+      ? `${API_M}?latitude=${lats.join(",")}&longitude=${lons.join(",")}&hourly=ocean_current_velocity,ocean_current_direction&forecast_days=8&timezone=GMT&cell_selection=${cell}`
       : `${API_M}?latitude=${lats.join(",")}&longitude=${lons.join(",")}&hourly=${VARS_M.join(",")}&models=${this.model}&forecast_days=8&timezone=GMT&cell_selection=${cell}`;
   }
-  prep(h){ return this.k==="a" ? resampleIFS(h) : h; }
+  /* courant : km/h -> kt, direction « vers » (déjà la convention d'Open-Meteo pour les courants) */
+  prep(h){
+    if (this.k==="a") return resampleIFS(h);
+    if (this.k==="c") return {time:h.time, current_speed:(h.ocean_current_velocity||[]).map(v=>v==null?null:v/1.852), current_direction:h.ocean_current_direction||[]};
+    return h;
+  }
   async grid(b){
     const span=Math.max(b.n-b.s,(b.e-b.o)*Math.cos((b.s+b.n)/2*Math.PI/180));
     const n=$("res").value==="auto" ? (span<=3?14:span<=8?18:24) : +$("res").value, dlat=(b.n-b.s)/n, dlon=(b.e-b.o)/n, pts=[];
@@ -630,7 +641,7 @@ class OM {
       const r=await getJSON(this.url(sl.map(p=>p.lat),sl.map(p=>p.lon),"nearest"));
       r.forEach((x,ix)=>{ sl[ix].h=this.prep(x.hourly); });
     }
-    const key=this.k==="a"?"wind_speed_10m":"wave_height";
+    const key=this.key0;
     let nT=0; for (const p of pts) nT=Math.max(nT,lastValid(p.h,key));
     const times=pts[0].h.time.slice(0,nT);
     return makeGrid({prov:this, lat0:b.s+dlat/2, lon0:b.o+dlon/2, dlat, dlon, ny:n, nx:n, times, pts,
@@ -643,7 +654,7 @@ class OM {
   }
   async series(lat,lon){
     const r=(await getJSON(this.url([lat.toFixed(3)],[lon.toFixed(3)],"sea")))[0];
-    const h=this.prep(r.hourly), n=lastValid(h,this.k==="a"?"wind_speed_10m":"wave_height");
+    const h=this.prep(r.hourly), n=lastValid(h,this.key0);
     const v={}; for (const k in h) if (k!=="time" && Array.isArray(h[k])) v[k]=h[k].slice(0,n);
     return {times:h.time.slice(0,n), v, glat:r.latitude, glon:r.longitude};
   }
@@ -662,7 +673,7 @@ class OM {
 class OMFrozen {
   constructor(saved){ Object.assign(this,{k:saved.k, model:saved.model, kind:"omf", id:"om:"+saved.model, saved}); }
   async load(){ return this; }
-  get nom(){ return (this.k==="a"?OM_A:OM_M)[this.model].nom+" (enregistré)"; }
+  get nom(){ return omTab(this.k)[this.model].nom+" (enregistré)"; }
   has(name){ return !!this.saved.data[name]; }
   async grid(){ const s=this.saved, self=this;
     return makeGrid({prov:this, lat0:s.lat0, lon0:s.lon0, dlat:s.dlat, dlon:s.dlon, ny:s.ny, nx:s.nx, times:s.times,
@@ -1115,7 +1126,7 @@ function provider(val){
   const [kind,id]=val.split(":");
   if (st.offline && st.offline.om && st.offline.om[val]) return new OMFrozen(st.offline.om[val]);
   if (kind==="mf") return new MF(id,cheminFor(id));
-  if (kind==="om") return new OM(OM_A[id]?"a":"m", id);
+  if (kind==="om") return new OM(OM_A[id]?"a":OM_C[id]?"c":"m", id);
   return null;
 }
 const modelInfo = id => st.index && st.index.modeles[id];
@@ -1151,18 +1162,19 @@ function fillModels(){
   const gA1=document.createElement("optgroup"); gA1.label="Météo-France · dépôt";
   const gM1=document.createElement("optgroup"); gM1.label="Météo-France · dépôt";
   const mods=st.index?st.index.modeles:{};
-  const ordre=["courant_ibi","courant_med","arome","arome_antilles","arome_guyane","arome_indien","arome_polynesie","arome_caledonie","aromeifs","arpege","mfwam_fr","ww3_med_aro","ww3_atl","mfwam_glob","ww3_med"];
+  const ordre=["courant_ibi","courant_med","courant_atl","arome","arome_antilles","arome_guyane","arome_indien","arome_polynesie","arome_caledonie","aromeifs","arpege","mfwam_fr","ww3_med_aro","ww3_atl","mfwam_glob","ww3_med"];
   const ids=Object.keys(mods).sort((a,b)=>(ordre.indexOf(a)+99)%99-(ordre.indexOf(b)+99)%99);
   for (const id of ids){
     const m=mods[id], txt=`${m.nom} · ${m.res_fin?String(m.res_fin).replace(".",",")+"° côtes / ":""}${String(m.res).replace(".",",")}° · ${m.echeances} éch. · run ${runLabel(m.run)}`;
     if (m.type==="courant"){ add(cs,cs,"mf:"+id,`${m.nom} · ${String(m.res).replace(".",",")}° · bulletin du ${m.run.slice(8,10)}/${m.run.slice(5,7)}`); continue; }
     add(m.type==="vagues"?ws:ms, m.type==="vagues"?gM1:gA1, "mf:"+id, txt);
   }
-  { const o=document.createElement("option"); o.value=""; o.textContent="— aucun —"; cs.appendChild(o); }
-  cs.value = [...cs.options].some(o=>o.value===keepC) ? keepC : "";
   if (gA1.children.length) ms.appendChild(gA1);
   if (gM1.children.length) ws.appendChild(gM1);
   const omSaved = st.offline ? Object.keys(st.offline.om||{}) : null;
+  for (const [k,v] of Object.entries(OM_C)) if (!omSaved || omSaved.includes("om:"+k)) add(cs,cs,"om:"+k,v.nom);
+  { const o=document.createElement("option"); o.value=""; o.textContent="— aucun —"; cs.appendChild(o); }
+  cs.value = [...cs.options].some(o=>o.value===keepC) ? keepC : "";
   const gA2=document.createElement("optgroup"); gA2.label="CEP · Open-Meteo";
   for (const [k,v] of Object.entries(OM_A)) if (!omSaved || omSaved.includes("om:"+k)) add(ms,gA2,"om:"+k,`${v.nom} · 8 j · pas ${v.pas}`);
   if (gA2.children.length) ms.appendChild(gA2);
@@ -1194,8 +1206,12 @@ function autoAtmo(){
 /* courant : choix automatique du jeu qui couvre la zone (sauf si « aucun » a été choisi à la main) */
 function chooseCurrent(){
   const cs=$("cmodel"), b=currentBounds(); if (st.cNone || !b) return;
-  if (cs.value && domOk(cs.value.slice(3),b)) return;
-  cs.value = [...cs.options].map(o=>o.value).find(v=>v.startsWith("mf:") && domOk(v.slice(3),b)) || "";
+  const vals=[...cs.options].map(o=>o.value);
+  const mf=vals.find(v=>v.startsWith("mf:") && domOk(v.slice(3),b));
+  if (cs.value.startsWith("mf:") && domOk(cs.value.slice(3),b)) return;
+  /* Open-Meteo (mondial) gardé tant qu'aucun jeu du dépôt ne couvre la zone */
+  if (cs.value.startsWith("om:") && !mf) return;
+  cs.value = mf || vals.find(v=>v.startsWith("om:")) || "";
 }
 /* modèle choisi qui ne couvre pas la zone : on passe à la première zone prédéfinie de son domaine */
 function autoZone(){
@@ -2187,7 +2203,7 @@ $("saveGo").addEventListener("click",async()=>{
     }
     total=jobs.length;
     await pool(jobs,6,async([id,meta,k])=>{ const t=await rawTile(id,meta,k); if (t) sit.tiles[`${id}/${k}`]=t; done++; if (done%10===0) setStatus(`Préparation du fichier : tuiles ${done} / ${total}…`); });
-    for (const g of [st.ga,st.gm]){
+    for (const g of [st.ga,st.gm,st.gc]){
       if (!g) continue; const p=g.prov;
       if (p.kind==="om" || p.kind==="omf"){
         const data={}; for (const nm of (p.kind==="om"?p.vars.concat(p.k==="a"?["wind_gusts_10m_inst"]:[]):Object.keys(p.saved.data))){ const a=g.get(nm); if (a) data[nm]=Array.from(a,v=>isNaN(v)?null:+v.toFixed(2)); }
