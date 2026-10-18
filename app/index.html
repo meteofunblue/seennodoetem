@@ -14,7 +14,7 @@
   --bg:#eef2f4; --panel:#ffffff; --ink:#132433; --muted:#5a6b78; --line:#d3dce2;
   --accent:#0b6e8a; --accent-ink:#ffffff; --cursor:#d1495b; --grid:#e4eaee; --warn:#b45309;
   --c-wind:#0b6e8a; --c-gust:#d1495b; --c-hs:#1d3f8f; --c-wws:#2a9d8f; --c-sw:#e09f3e; --c-sw2:#9c6ade;
-  --c-rr:#2f6fdc; --c-nn:#8a96a1; --c-t:#c2410c; --c-route:#d1495b;
+  --c-rr:#2f6fdc; --c-nn:#8a96a1; --c-t:#c2410c; --c-td:#2a9d8f; --c-hu:#3b6fd4; --c-route:#d1495b;
   --coast:#14202b;
   --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
   --f-body:"Barlow","Segoe UI",Roboto,Arial,sans-serif;
@@ -26,7 +26,7 @@
     --bg:#0c161e; --panel:#13212c; --ink:#e3ebf0; --muted:#93a4b1; --line:#24384a;
     --accent:#4fb3cf; --accent-ink:#06131b; --cursor:#ff7a8a; --grid:#1c2e3c; --warn:#f2b85c;
     --c-wind:#4fb3cf; --c-gust:#ff7a8a; --c-hs:#8fb0ff; --c-wws:#5fd3c3; --c-sw:#f2b85c; --c-sw2:#c4a0ff;
-    --c-rr:#6fa2ff; --c-nn:#8796a3; --c-t:#ff9a5c; --c-route:#ff7a8a; --coast:#f2f6f8;
+    --c-rr:#6fa2ff; --c-nn:#8796a3; --c-t:#ff9a5c; --c-td:#5fd3c3; --c-hu:#8fb0ff; --c-route:#ff7a8a; --coast:#f2f6f8;
     color-scheme:dark;
   }
 }
@@ -246,7 +246,7 @@ footer a{color:var(--accent)}
 const BASE = location.hostname.endsWith("github.io") ? new URL(".", location.href).href : "https://meteofunblue.github.io/seennodoetem/";
 const API_A = "https://api.open-meteo.com/v1/forecast";
 const API_M = "https://marine-api.open-meteo.com/v1/marine";
-const VARS_A = ["wind_speed_10m","wind_direction_10m","wind_gusts_10m","precipitation","showers","cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","temperature_2m","pressure_msl","cape"];
+const VARS_A = ["wind_speed_10m","wind_direction_10m","wind_gusts_10m","precipitation","showers","cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","temperature_2m","dew_point_2m","relative_humidity_2m","pressure_msl","cape"];
 const VARS_M = ["wave_height","wave_direction","wind_wave_height","wind_wave_direction","wind_wave_period","swell_wave_height","swell_wave_direction","swell_wave_period"];
 const OM_A = {
   ecmwf_ifs:{nom:"IFS HRES 9 km (CEP)", pas:"3 h puis 6 h"},
@@ -278,6 +278,7 @@ const SC = {
   nlow: S([[0,"#a0703f",0],[0.5,"#a0703f",0],[1,"#b08158",0.30],[4,"#8a5a2b",0.65],[8,"#5e3b1a",0.92]]),
   nmid: S([[0,"#a5679a",0],[0.5,"#a5679a",0],[1,"#b98ab0",0.30],[4,"#94467f",0.65],[8,"#6d1a45",0.92]]),
   nhigh: S([[0,"#d6e8f7",0],[0.5,"#d6e8f7",0],[1,"#e2effa",0.35],[4,"#b9d8f2",0.65],[8,"#8fbfe8",0.9]]),
+  hu: S([[0,"#f6e7c8"],[30,"#e9c46a"],[50,"#c7d9a0"],[65,"#8cc5c0"],[80,"#4f97c8"],[90,"#2b62ad"],[100,"#18306e"]]),
   cape: S([[0,"#ffffff",0],[50,"#fff3b0",0],[100,"#fff3b0",0.45],[300,"#fdd36a",0.7],[600,"#f59e3b",0.8],[1000,"#e4572e",0.85],[2000,"#a1124a",0.9],[3000,"#5b0a5e",0.9]])
 };
 
@@ -295,6 +296,8 @@ const PARAMS = {
   nmid:{label:"Nuages moyens", unit:"octas", src:"a", key:"cloud_cover_mid", conv:v=>v/12.5, scale:SC.nmid, dec:0},
   nhigh:{label:"Nuages élevés", unit:"octas", src:"a", key:"cloud_cover_high", conv:v=>v/12.5, scale:SC.nhigh, dec:0},
   t2:{label:"Température 2 m", unit:"°C", src:"a", key:"temperature_2m", scale:SC.temp, dec:0},
+  td:{label:"Point de rosée 2 m", unit:"°C", src:"a", key:"dew_point_2m", scale:SC.temp, dec:0},
+  hu:{label:"Humidité relative 2 m", unit:"%", src:"a", key:"relative_humidity_2m", scale:SC.hu, dec:0},
   hs:{label:"Hauteur mer totale (Hs)", unit:"m", src:"m", key:"wave_height", dir:["wave_direction"], glyph:"arrow", scale:SC.wave, dec:1},
   tp:{label:"Période pic (mer totale)", unit:"s", src:"m", key:"wave_peak_period", dir:["wave_direction"], glyph:"arrow", scale:SC.period, dec:0},
   wws:{label:"Mer du vent · hauteur", unit:"m", src:"m", key:"wind_wave_height", dir:["wind_wave_direction"], glyph:"arrow", scale:SC.wave, dec:1},
@@ -385,8 +388,24 @@ async function pool(items, n, fn){
 function makeGrid(o){
   const g=Object.assign({cache:{}},o);
   g.tindex=new Map(g.times.map((t,i)=>[t,i]));
-  g.get=name=>{ if (!(name in g.cache)) g.cache[name]=g.build(name); return g.cache[name]; };
+  g.get=name=>{
+    if (!(name in g.cache)){
+      let a=g.build(name);
+      /* humidité relative calculée à partir de T et Td quand le modèle ne la fournit pas (Météo-France) */
+      if (!a && name==="relative_humidity_2m"){ const t=g.get("temperature_2m"), d=g.get("dew_point_2m");
+        if (t && d){ a=new Float32Array(t.length); for (let k=0;k<t.length;k++) a[k]=huOf(t[k],d[k]); } }
+      g.cache[name]=a;
+    }
+    return g.cache[name];
+  };
   return g;
+}
+/* formule de Magnus (eau liquide) : HU = 100 · e(Td) / e(T) */
+function huOf(t,d){ if (t==null||d==null||isNaN(t)||isNaN(d)) return NaN; const e=x=>Math.exp(17.62*x/(243.12+x)); return Math.max(0,Math.min(100,100*e(d)/e(t))); }
+function addHU(a){
+  if (!a || (a.relative_humidity_2m && a.relative_humidity_2m.some(v=>v!=null))) return a;
+  if (a.temperature_2m && a.dew_point_2m) a.relative_humidity_2m=a.temperature_2m.map((t,i)=>{ const h=huOf(t,a.dew_point_2m[i]); return isNaN(h)?null:Math.round(h); });
+  return a;
 }
 
 /* ---------- Source Météo-France (tuiles) ---------- */
@@ -1295,7 +1314,7 @@ async function loadPoint(){
     if (ra.status==="rejected") throw ra.reason;
     const a=ra.value, m=rm.status==="fulfilled"?rm.value:null;
     if (!a) throw new Error("point hors du domaine du modèle d'atmosphère");
-    st.point={kind:"point", times:a.times, a:align(a.times,a), m:align(a.times,m), glat:a.glat, glon:a.glon, mlat:m&&m.glat, mlon:m&&m.glon,
+    st.point={kind:"point", times:a.times, a:addHU(align(a.times,a)), m:align(a.times,m), glat:a.glat, glon:a.glon, mlat:m&&m.glat, mlon:m&&m.glon,
       provA:pa.nom, provM:pm?pm.nom:"—", ids:pa.id+"|"+(pm?pm.id:"")+"|"+$("run").value, runM:pm&&pm.meta?pm.meta.run:null};
     let txt=`Demandé ${dm(lat,true)} ${dm(lon,false)} · maille atmo ${dm(a.glat,true)} ${dm(a.glon,false)}`;
     txt += m ? ` · maille vagues ${dm(m.glat,true)} ${dm(m.glon,false)}` : " · vagues indisponibles ici";
@@ -1361,7 +1380,8 @@ function renderReadout(){
     ["Pmer", `${fmt(g(a,"pressure_msl"),1)} hPa`]);
   if (a.showers && a.showers.some(v=>v!=null)) rows.push([`Averses ${stepHours(D.times,j)} h`, `${fmt(g(a,"showers"),1)} mm`]);
   rows.push(["CAPE", `${fmt(g(a,"cape"),0)} J/kg`], ["T 2 m", `${fmt(g(a,"temperature_2m"),1)} °C`]);
-  if (a.dew_point_2m && a.dew_point_2m.some(v=>v!=null)) rows.push(["Point de rosée", `${fmt(g(a,"dew_point_2m"),1)} °C`]);
+  if (a.dew_point_2m && a.dew_point_2m.some(v=>v!=null)) rows.push(["Td 2 m", `${fmt(g(a,"dew_point_2m"),1)} °C`]);
+  if (a.relative_humidity_2m && a.relative_humidity_2m.some(v=>v!=null)) rows.push(["HU 2 m", `${fmt(g(a,"relative_humidity_2m"),0)} %`]);
   el.innerHTML=`<div class="t">${tLabel(D.times[j])}</div>`+rows.map(([k,v])=>`<div><span>${k}</span><br><b>${v}</b></div>`).join("");
 }
 
@@ -1375,13 +1395,13 @@ function drawMG(){
   const W=cv.parentElement.clientWidth-16 || 400;
   const L0=44, R0=44, pw=W-L0-R0;
   const isRoute = D && D.kind==="route";
-  const panels=[{h:isRoute?52:0, top:0},{h:120,top:26},{h:110},{h:70,top:22},{h:90},{h:66},{h:80},{h:80}];
+  const panels=[{h:isRoute?52:0, top:0},{h:120,top:26},{h:110},{h:70,top:22},{h:90},{h:66},{h:80},{h:100}];
   const TITLE=18, GAP=10, AX=isRoute?44:30;     /* route : une ligne de plus pour les passages aux points tournants */
   let H=AX; for (const p of panels) if (p.h) H+=TITLE+(p.top||0)+p.h+GAP;
   cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+"px";
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   const C={ink:css("--ink"),muted:css("--muted"),grid:css("--grid"),line:css("--line"),cursor:css("--cursor"),
-    wind:css("--c-wind"),gust:css("--c-gust"),hs:css("--c-hs"),wws:css("--c-wws"),sw:css("--c-sw"),sw2:css("--c-sw2"),rr:css("--c-rr"),nn:css("--c-nn"),t:css("--c-t"),route:css("--c-route")};
+    wind:css("--c-wind"),gust:css("--c-gust"),hs:css("--c-hs"),wws:css("--c-wws"),sw:css("--c-sw"),sw2:css("--c-sw2"),rr:css("--c-rr"),nn:css("--c-nn"),t:css("--c-t"),td:css("--c-td"),hu:css("--c-hu"),route:css("--c-route")};
   if (!D || !D.times.length){ ctx.fillStyle=C.muted; ctx.font="14px Barlow,sans-serif"; ctx.fillText(st.mgMode==="route"?"Pas de route calculée.":"Chargement du point…",L0,40); cv._geo=null; return; }
   const n=D.times.length, T0=tDate(D.times[0]).getTime(), TN=tDate(D.times[n-1]).getTime(), span=Math.max(1,TN-T0);
   const XT=D.times.map(t=>L0+pw*(tDate(t).getTime()-T0)/span), X=i=>XT[Math.max(0,Math.min(n-1,i))];
@@ -1556,12 +1576,14 @@ function drawMG(){
   }
   frame(y,80); y+=80+GAP;
 
-  /* 7. Température */
-  title("Température 2 m",[["T",C.t]].concat(hasData(a.dew_point_2m)?[["point de rosée",C.t,[4,3]]]:[]));
+  /* 7. Température, point de rosée (°C, à gauche) et humidité relative (%, à droite) */
+  title("T, Td et HU à 2 m",[["T",C.t],["Td",C.td]].concat(hasData(a.relative_humidity_2m)?[["HU",C.hu,[4,3]]]:[]));
   const tv=[...(a.temperature_2m||[]),...(a.dew_point_2m||[])].filter(v=>v!=null);
+  vgrid(y,100);
+  if (hasData(a.relative_humidity_2m)){ yaxis(y,100,0,100,"r","%",C.hu); line(a.relative_humidity_2m,y,100,0,100,C.hu,{w:1.4,dash:[4,3],fill:.08}); }
   if (tv.length){ const tmin=Math.floor(Math.min(...tv)-1), tmax=Math.ceil(Math.max(...tv)+1);
-    yaxis(y,80,tmin,tmax,"l","°C"); vgrid(y,80); line(a.temperature_2m,y,80,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,80,tmin,tmax,C.t,{w:1.4,dash:[4,3]}); }
-  frame(y,80); y+=80+GAP;
+    yaxis(y,100,tmin,tmax,"l","°C"); line(a.temperature_2m,y,100,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,100,tmin,tmax,C.td,{w:1.8}); }
+  frame(y,100); y+=100+GAP;
 
   /* Passages aux points tournants (route) */
   if (isRoute){
@@ -1767,7 +1789,7 @@ async function computeRoute(){
     const {times,last}=await routeTimes(pa,t0,t1);
     if (!times.length) throw new Error(`le transit (${fmtT(t0)} → ${fmtT(t1)}) est en dehors des échéances de ${pa.nom} (dernière : ${tLabel(last)})`);
     const pos=times.map(t=>posAt(tDate(t).getTime(),Lg)), samples=times.map((t,i)=>({t,lat:pos[i].lat,lon:pos[i].lon}));
-    const [ra,rm]=await Promise.all([pa.at(samples,A_VARS), pm?pm.at(samples,M_VARS).catch(()=>null):null]);
+    const [ra,rm]=await Promise.all([pa.at(samples,A_VARS).then(addHU), pm?pm.at(samples,M_VARS).catch(()=>null):null]);
     const warn=[]; if (t1>tDate(last).getTime()) warn.push(`arrivée (${fmtT(t1)}) au-delà de la dernière échéance de ${pa.nom}`);
     if (t0<tDate(times[0]).getTime()-3.6e6) warn.push(`départ avant la première échéance du run : la météo commence à ${tLabel(times[0])}`);
     const manque=pm&&rm ? (rm.wave_height||[]).filter(v=>v==null).length/times.length : 0;
@@ -1808,7 +1830,7 @@ function csvCols(D){
     ["hs_houle_prim_m",m.primary_swell_height],["dir_houle_prim",m.primary_swell_direction],["periode_houle_prim_s",m.primary_swell_period],
     ["hs_houle_sec_m",m.secondary_swell_height],["dir_houle_sec",m.secondary_swell_direction],["periode_houle_sec_s",m.secondary_swell_period],
     ["precip_mm",a.precipitation],["averses_mm",a.showers],["nebulosite_pct",a.cloud_cover],["nuages_bas_pct",a.cloud_cover_low],["nuages_moyens_pct",a.cloud_cover_mid],["nuages_eleves_pct",a.cloud_cover_high],
-    ["pmer_hpa",a.pressure_msl],["cape_jkg",a.cape],["t2m_c",a.temperature_2m],["rosee_c",a.dew_point_2m]].filter(c=>hasData(c[1]));
+    ["pmer_hpa",a.pressure_msl],["cape_jkg",a.cape],["t2m_c",a.temperature_2m],["td2m_c",a.dew_point_2m],["hu2m_pct",a.relative_humidity_2m]].filter(c=>hasData(c[1]));
 }
 $("csv").addEventListener("click",()=>{
   const D=mgData(); if (!D) return;
@@ -2014,14 +2036,15 @@ function showHover(e){
     const {lat,lng}=e.latlng, A=(n)=>gridVal(st.ga,n,lat,lng), M=(n)=>gridVal(st.gm,n,lat,lng);
     const lines=[`<span class="pos">${dm(lat,true)} ${dm(lng,false)}</span>`];
     const P=PARAMS[$("param").value];
-    if (P && !P.layers && !["wind","gust","pmer","hs","t2"].includes($("param").value)){
+    if (P && !P.layers && !["wind","gust","pmer","hs","t2","td","hu"].includes($("param").value)){
       const g=gridOf(P), v=g?gridVal(g,keyOf(P,g),lat,lng):null;
       lines.push(`${P.label} : <b>${v==null?"—":fmt(P.conv?P.conv(v):v,P.dec)} ${P.unit}</b>`);
     }
     const ws=A("wind_speed_10m"), wd=A("wind_direction_10m"), gu=st.ga?gridVal(st.ga,keyOf(PARAMS.gust,st.ga),lat,lng):null;
     if (ws!=null) lines.push(`Vent <b>${dir16(wd)} ${fmt(ws,0)} kt</b>${gu!=null?` · raf. <b>${fmt(gu,0)}</b>`:""}`);
     const pm=A("pressure_msl"); if (pm!=null) lines.push(`Pmer <b>${fmt(pm,1)} hPa</b>`);
-    const t2=A("temperature_2m"); if (t2!=null) lines.push(`T 2 m <b>${fmt(t2,1)} °C</b>`);
+    const t2=A("temperature_2m"), td=A("dew_point_2m"), hu=A("relative_humidity_2m");
+    if (t2!=null) lines.push(`T <b>${fmt(t2,1)} °C</b>${td!=null?` · Td <b>${fmt(td,1)} °C</b>`:""}${hu!=null?` · HU <b>${fmt(hu,0)} %</b>`:""}`);
     const hs=M("wave_height");
     if (hs!=null){
       lines.push(`Mer totale <b>${fmt(hs,1)} m ${dir16(M("wave_direction"))}</b>`);
