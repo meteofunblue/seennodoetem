@@ -111,6 +111,12 @@ aside.mgcol{display:flex;flex-direction:column;min-width:0;min-height:0;overflow
 .sgrid b{font:600 11px var(--f-display);text-transform:uppercase;letter-spacing:.06em}
 #seuilsTxt{padding:0 16px}
 #mg{display:block;width:100%;touch-action:pan-y;cursor:crosshair}
+.saverow{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin-right:14px}
+.bienvenue{position:fixed;inset:0;z-index:3500;background:rgba(13,27,42,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.bienvenue[hidden]{display:none}
+.bienvenue>div{background:var(--panel);color:var(--ink);max-width:460px;padding:20px 22px;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.bienvenue h2{margin:0 0 8px;font:700 20px var(--f-display,sans-serif)}
+.bienvenue p{margin:0 0 14px;line-height:1.45}
 .mgbig{position:fixed;inset:0;z-index:3000;background:var(--panel);display:flex;flex-direction:column}
 .mgbig[hidden]{display:none}
 .mgbighead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}
@@ -212,6 +218,7 @@ footer a{color:var(--accent)}
   <button id="saveGo" class="primary" type="button">Enregistrer le fichier</button>
   <button id="saveCancel" type="button">Annuler</button>
   <p class="note">Chaque modèle coché est enregistré avec tous ses paramètres et toutes ses échéances, pour la zone (et la route). Hors ligne, les données ne sont décodées qu'à l'affichage du modèle choisi.</p>
+  <p class="note lienHL">Pour s'en servir sans Internet (à bord) : <a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">télécharger la version hors ligne</a> (un seul fichier, à copier avec les fichiers .meteo sur l'ordinateur ou une clé USB, puis à ouvrir par double-clic).</p>
 </section>
 
 <main class="layout">
@@ -254,10 +261,18 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS du CEP et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels.</footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS du CEP et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<div id="bienvenue" class="bienvenue" hidden>
+  <div>
+    <h2>Mode hors ligne</h2>
+    <p>Pas de connexion aux serveurs de données. Ouvrez une situation préparée à quai avec « Enregistrer… » (fichier <b>.meteo</b>) : carte, météogrammes, route et seuils fonctionnent ensuite sans réseau.</p>
+    <button id="bvOuvrir" type="button" class="primary">Ouvrir une situation (.meteo)</button>
+    <button id="bvFermer" type="button">Fermer</button>
+  </div>
+</div>
 <div id="mgBig" class="mgbig" hidden role="dialog" aria-label="Graphique agrandi">
   <div class="mgbighead">
     <button id="mgBigPrev" type="button" title="Graphique précédent">◀</button>
@@ -696,22 +711,27 @@ const BASEMAPS = {
   ocean:{label:"Océan (Esri)", url:ESRI("Ocean/World_Ocean_Base"), max:13, attr:'Fond © Esri, GEBCO, NOAA, Garmin'},
   gris:{label:"Gris clair (Esri)", url:ESRI("Canvas/World_Light_Gray_Base"), max:16, attr:'Fond © Esri, HERE, Garmin, © OpenStreetMap'},
   sombre:{label:"Gris sombre (Esri)", url:ESRI("Canvas/World_Dark_Gray_Base"), max:16, attr:'Fond © Esri, HERE, Garmin, © OpenStreetMap'},
-  osm:{label:"OpenStreetMap", url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png", max:18, attr:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}
+  osm:{label:"OpenStreetMap", url:"https://tile.openstreetmap.org/{z}/{x}/{y}.png", max:18, attr:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'},
+  aucun:{label:"Aucun (sans Internet)", url:null, max:18, attr:""}
 };
+/* version hors ligne (fichier autonome) : bibliothèques et traits de côte embarqués, voir hors_ligne.py */
+const HORS_LIGNE = !!window.HORS_LIGNE;
+if (HORS_LIGNE) document.querySelectorAll(".lienHL").forEach(e=>e.hidden=true);
 const FALLBACK = ["ocean","osm","gris"];
-let tiles, baseKey = "ocean", tileErr = 0, tileOk = 0;
+let tiles, baseKey = HORS_LIGNE && !navigator.onLine ? "aucun" : "ocean", tileErr = 0, tileOk = 0;
 function setTiles(key){
   baseKey = key || baseKey; tileErr = 0; tileOk = 0;
-  if (tiles) map.removeLayer(tiles);
+  if (tiles){ map.removeLayer(tiles); tiles=null; }
   const b = BASEMAPS[baseKey];
+  if (!b.url){ $("basemap").value=baseKey; return; }      /* pas de fond : trait de côte sur fond uni */
   tiles = L.tileLayer(b.url,{maxZoom:b.max, maxNativeZoom:b.max, attribution:b.attr}).addTo(map);
   tiles.on("tileload",()=>{ tileOk++; });
   tiles.on("tileerror",()=>{
     tileErr++;
     if (tileErr>=4 && tileOk===0){
-      const next = FALLBACK.find(k=>k!==baseKey && !setTiles.tried.has(k));
+      const next = FALLBACK.find(k=>k!==baseKey && !setTiles.tried.has(k)) || "aucun";   /* plus de réseau : fond uni */
       setTiles.tried.add(baseKey);
-      if (next){ $("basemap").value=next; setTiles(next); }
+      $("basemap").value=next; setTiles(next);
     }
   });
   tiles.bringToBack();
@@ -791,8 +811,7 @@ function strokeTwice(ctx, fn){
 async function loadCoast(){
   try{
     if (typeof topojson==="undefined") throw new Error("topojson absent");
-    const r=await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-10m.json");
-    const topo=await r.json();
+    const topo = window.LAND10M || await (await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-10m.json")).json();
     const geo=topojson.feature(topo, topo.objects.land);
     const rings=[];
     const add=poly=>{ for (const ring of poly){
@@ -811,8 +830,9 @@ async function loadCoast(){
    le trait Natural Earth restant tracé ailleurs */
 async function loadCoastFine(){
   try{
-    const r=await fetch(`${BASE}cote_fr.json`); if (!r.ok) return;
-    const d=await r.json(), k=1/d.echelle, lines=[];
+    let d=window.COTE_FR;
+    if (!d){ const r=await fetch(`${BASE}cote_fr.json`); if (!r.ok) return; d=await r.json(); }
+    const k=1/d.echelle, lines=[];
     for (const enc of d.lignes){
       const pts=[]; let x=enc[0], y=enc[1]; pts.push([x*k,y*k]);
       for (let i=2;i<enc.length;i+=2){ x+=enc[i]; y+=enc[i+1]; pts.push([x*k,y*k]); }
@@ -2152,10 +2172,24 @@ function fillSavePanel(){
     const keys=new Set(zoneKeys(b,m.domaine)); if (withR) routeKeys(m.domaine).forEach(k=>keys.add(k));
     if (!keys.size) continue;
     const mo=estimMo(m,keys.size), on=cur.includes("mf:"+id);
-    html+=`<label class="chk"><input type="checkbox" data-id="${id}" data-mo="${mo.toFixed(2)}" ${on?"checked":""}> ${esc(m.nom)} <span style="color:var(--muted)">· ${keys.size} tuile${keys.size>1?"s":""} · ≈ ${mo<0.1?"< 0,1":mo.toFixed(1).replace(".",",")} Mo</span></label>`;
+    /* run à enregistrer : par défaut celui affiché (ou le couple cohérent pour les vagues), sinon le plus récent */
+    const rs=(!st.offline && m.runs)||[], def=cheminFor(id)||(rs[0]?rs[0].chemin+"/":"");
+    const selRun = rs.length>1 ? ` <select data-run="${id}" aria-label="Run de ${esc(m.nom)}" style="min-height:26px;padding:1px 4px;font-size:12px">${rs.map(r=>`<option value="${r.chemin}/" ${r.chemin+"/"===def?"selected":""}>run ${runLabel(r.run)}</option>`).join("")}</select>` : "";
+    html+=`<span class="saverow"><label class="chk"><input type="checkbox" data-id="${id}" data-mo="${mo.toFixed(2)}" ${on?"checked":""}> ${esc(m.nom)}</label>${selRun} <span style="color:var(--muted)">· ${keys.size} tuile${keys.size>1?"s":""} · ≈ ${mo<0.1?"< 0,1":mo.toFixed(1).replace(".",",")} Mo</span></span>`;
   }
-  const om=cur.filter(v=>v.startsWith("om:"));
-  if (om.length) html+=`<p class="note">IFS / Copernicus (Open-Meteo) : la grille déjà chargée est incluse d'office.</p>`;
+  /* Open-Meteo (mondial) : IFS, vagues MFWAM global, courant mondial ; téléchargés pour la zone à l'enregistrement */
+  if (!st.offline){
+    const span=Math.max(b.n-b.s,(b.e-b.o)*Math.cos((b.s+b.n)/2*Math.PI/180));
+    const n=$("res").value==="auto" ? (span<=3?14:span<=8?18:24) : +$("res").value;
+    const omOpts=[...Object.entries(OM_A).map(([k,v])=>["om:"+k,v.nom,50,VARS_A.length]),
+                  ...Object.entries(OM_M).map(([k,v])=>["om:"+k,v.nom,192,VARS_M.length]),
+                  ...Object.entries(OM_C).map(([k,v])=>["om:"+k,v.nom,192,C_VARS.length])];
+    html+=`<span class="note" style="width:100%;margin-top:4px">Open-Meteo (mondial, grille ${n} × ${n} points sur la zone) :</span>`;
+    for (const [val,nom,T,V] of omOpts){
+      const mo=n*n*T*V*6/3.5/1e6;
+      html+=`<span class="saverow"><label class="chk"><input type="checkbox" data-om="${val}" data-mo="${mo.toFixed(2)}" ${cur.includes(val)?"checked":""}> ${esc(nom)}</label> <span style="color:var(--muted)">· ≈ ${mo<0.1?"< 0,1":mo.toFixed(1).replace(".",",")} Mo</span></span>`;
+    }
+  }
   el.innerHTML=html||"<p class='note warn'>Aucun modèle du dépôt ne couvre cette zone.</p>";
   el.querySelectorAll("input").forEach(x=>x.addEventListener("change",saveTotal)); saveTotal();
 }
@@ -2184,7 +2218,9 @@ $("saveGo").addEventListener("click",async()=>{
   const btn=$("saveGo"); btn.disabled=true;
   try{
     const b=currentBounds(); if (!b) throw new Error("zone non définie");
-    const ids=[...$("saveList").querySelectorAll("input:checked")].map(x=>x.dataset.id), withR=$("saveRoute").checked;
+    const ids=[...$("saveList").querySelectorAll("input[data-id]:checked")].map(x=>x.dataset.id), withR=$("saveRoute").checked;
+    const omIds=[...$("saveList").querySelectorAll("input[data-om]:checked")].map(x=>x.dataset.om);
+    const runSel=id=>{ const s=$("saveList").querySelector(`select[data-run="${id}"]`); return s ? s.value : cheminFor(id); };
     const sit={format:"situation-meteo-marine", version:2, cree:new Date().toISOString(),
       ui:{model:$("model").value, wmodel:$("wmodel").value, cmodel:$("cmodel").value, param:$("param").value, bounds:b, tIdx:st.tIdx, time:st.times[st.tIdx], pt:st.pt, res:$("res").value},
       route:{wps:R.wps, vitesses:R.speeds, depart:$("tDep").value, vitesse:+$("tSpeed").value, nom:$("rName").value},
@@ -2194,7 +2230,7 @@ $("saveGo").addEventListener("click",async()=>{
     let done=0, total=0;
     const jobs=[];
     for (const id of ids){
-      const meta=await fetchMeta(id,cheminFor(id)), tset=new Set(meta.tuiles), keys=new Set(zoneKeys(b,meta.domaine));
+      const meta=await fetchMeta(id,runSel(id)), tset=new Set(meta.tuiles), keys=new Set(zoneKeys(b,meta.domaine));
       if (withR) routeKeys(meta.domaine).forEach(k=>keys.add(k));
       /* tuiles déjà chargées (point, route) incluses aussi */
       const pre=`${id}|${meta.run}|`; for (const k of TILES.keys()) if (k.startsWith(pre)) keys.add(k.slice(pre.length));
@@ -2203,8 +2239,17 @@ $("saveGo").addEventListener("click",async()=>{
     }
     total=jobs.length;
     await pool(jobs,6,async([id,meta,k])=>{ const t=await rawTile(id,meta,k); if (t) sit.tiles[`${id}/${k}`]=t; done++; if (done%10===0) setStatus(`Préparation du fichier : tuiles ${done} / ${total}…`); });
-    for (const g of [st.ga,st.gm,st.gc]){
-      if (!g) continue; const p=g.prov;
+    /* Open-Meteo cochés : grille affichée si c'est la même zone, sinon téléchargée maintenant */
+    const shown=[st.ga,st.gm,st.gc].filter(g=>g && (g.prov.kind==="om"||g.prov.kind==="omf"));
+    const memeZone=g=>Math.abs(g.lat0-g.dlat/2-b.s)<0.01 && Math.abs(g.lon0-g.dlon/2-b.o)<0.01;
+    const omGrids=[];
+    for (const val of (st.offline ? shown.map(g=>g.prov.id) : omIds)){
+      let g=shown.find(x=>x.prov.id===val && (st.offline || memeZone(x)));
+      if (!g){ setStatus(`Préparation du fichier : ${provider(val).nom}…`); g=await provider(val).grid(b); }
+      omGrids.push(g);
+    }
+    for (const g of omGrids){
+      const p=g.prov;
       if (p.kind==="om" || p.kind==="omf"){
         const data={}; for (const nm of (p.kind==="om"?p.vars.concat(p.k==="a"?["wind_gusts_10m_inst"]:[]):Object.keys(p.saved.data))){ const a=g.get(nm); if (a) data[nm]=Array.from(a,v=>isNaN(v)?null:+v.toFixed(2)); }
         sit.om["om:"+p.model]={k:p.k, model:p.model, times:g.times, lat0:g.lat0, lon0:g.lon0, dlat:g.dlat, dlon:g.dlon, ny:g.ny, nx:g.nx, data};
@@ -2216,7 +2261,8 @@ $("saveGo").addEventListener("click",async()=>{
     if (Object.keys(sit.om).length && R.wps.length>1 && st.ga && st.ga.prov.kind!=="mf"){ const g=st.ga, Lg=legs();
       for (let t=Lg[0].t0; t<=Lg[Lg.length-1].t1; t+=3.6e6){ const q=posAt(t,Lg);
         if (q.lat<g.lat0-g.dlat/2||q.lat>g.lat0+(g.ny-0.5)*g.dlat||q.lon<g.lon0-g.dlon/2||q.lon>g.lon0+(g.nx-0.5)*g.dlon){ horsZone=true; break; } } }
-    if (st.index){ sit.index={genere:st.index.genere, modeles:Object.fromEntries(Object.entries(st.index.modeles).filter(([k])=>sit.metas[k])), zones:st.index.zones}; }
+    if (st.index){ sit.index={genere:st.index.genere, modeles:Object.fromEntries(Object.entries(st.index.modeles).filter(([k])=>sit.metas[k])
+      .map(([k,v])=>[k,{...v, run:sit.metas[k].run, echeances:sit.metas[k].temps.length, debut:sit.metas[k].temps[0], fin:sit.metas[k].temps.at(-1), runs:[]}])), zones:st.index.zones}; }
     setStatus("Compression du fichier…");
     const blob=await gzipText(JSON.stringify(sit));
     const d=new Date(), name=`situation_${d.toISOString().slice(0,13).replace(/[-:T]/g,"")}.meteo`;
@@ -2228,6 +2274,8 @@ $("saveGo").addEventListener("click",async()=>{
   finally{ btn.disabled=false; }
 });
 $("btnOpen").addEventListener("click",()=>$("fileOpen").click());
+$("bvOuvrir").addEventListener("click",()=>{ $("bienvenue").hidden=true; $("fileOpen").click(); });
+$("bvFermer").addEventListener("click",()=>{ $("bienvenue").hidden=true; });
 $("fileOpen").addEventListener("change",async e=>{
   const f=e.target.files[0]; e.target.value=""; if (!f) return;
   try{
@@ -2426,6 +2474,11 @@ $("mgWide").addEventListener("click",()=>{
     setStatus("Données Météo-France indisponibles ("+e.message+") : IFS via Open-Meteo, ou « Ouvrir… » une situation enregistrée.", true);
   }
   fillModels(); fillRuns(); syncModelUI();
+  /* sans réseau : rien à télécharger, on propose d'ouvrir une situation enregistrée */
+  if (!st.index && (HORS_LIGNE || !navigator.onLine)){
+    setStatus("Hors ligne : ouvrez une situation enregistrée (.meteo) avec « Ouvrir… ».", true);
+    $("bienvenue").hidden=false; return;
+  }
   await loadGrid(); loadPoint();
 })();
 </script>
