@@ -29,7 +29,7 @@ KT = 1.943844
 # ------------------------------------------------------------------ paramètres retenus
 # clé : (discipline, catégorie, numéro, type de niveau ou None, type de pas) ; niveau = filtre facultatif
 P_ATMO = [
-    dict(cle=(0, 3, 1, "meanSea", "instant"),            nom="pressure_msl",       conv=lambda v: v / 100,  ech=0.1,  off=1000, unite="hPa"),
+    dict(cle=(0, 3, 1, "meanSea", "instant"),            nom="pressure_msl",       conv=lambda v: v / 100,  ech=0.01, off=1000, unite="hPa"),   # 0,01 hPa : isobares lisses à 0,025°
     dict(cle=(0, 2, 1, "heightAboveGround", "instant"),  niveau=10, nom="wind_speed_10m",     conv=lambda v: v * KT, ech=0.1, off=0, unite="kt"),
     dict(cle=(0, 2, 0, "heightAboveGround", "instant"),  niveau=10, nom="wind_direction_10m", conv=lambda v: v,      ech=1,   off=0, unite="°"),
     dict(cle=(0, 2, 22, "heightAboveGround", "max"),     niveau=10, nom="wind_gusts_10m",     conv=lambda v: v * KT, ech=0.1, off=0, unite="kt", cumul="max"),
