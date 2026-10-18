@@ -463,7 +463,11 @@ def main():
     natif = float(cfg["grille"])
     # domaine découpé en tuiles de 1° ; bornes nord et est exclues (elles appartiennent aux tuiles voisines)
     S_, N_, O_, E_ = cfg["tuiles"]["domaine"]
-    res = cfg["tuiles"]["res"]
+    res_gros = cfg["tuiles"]["res"]
+    # tuiles fines facultatives (ex. AROME à 0,025° sur les côtes) : le domaine est lu à la résolution fine,
+    # les autres tuiles sont ensuite publiées un point sur deux
+    res = cfg["tuiles"].get("res_fin", res_gros)
+    zones_fines = cfg["tuiles"].get("zones_fines", [])
     zones = {"domaine": {"nom": "domaine", "s": S_, "n": N_ - res, "o": O_, "e": E_ - res, "res": res}}
     base = f"{API}/{cfg['api']}/v1/models/{cfg['modele']}"
     travail = tempfile.mkdtemp(prefix=args.modele + "_")
@@ -562,16 +566,18 @@ def main():
         variables.append({"nom": p["nom"], "unite": p["unite"], "ech": p["ech"], "off": p["off"]})
     del champs_zone, champs
     sortie = os.path.join(args.sortie, args.modele)
-    nb_tuiles, octets = ecrire_tuiles(sortie, cubes, variables, lats, lons, pas_deg)
-    print(f"  {nb_tuiles} tuiles de 1° à {pas_deg:.3f}°, {len(sorties)} échéances, {len(variables)} paramètres, "
-          f"{octets / 1e6:.1f} Mo compressés", flush=True)
+    pas_gros = res_gros if zones_fines else pas_deg
+    nb_tuiles, octets, fines = ecrire_tuiles(sortie, cubes, variables, lats, lons, pas_deg, pas_gros, zones_fines)
+    print(f"  {nb_tuiles} tuiles de 1° ({len(fines)} à {pas_deg:.3f}°, les autres à {pas_gros:.3f}°), {len(sorties)} échéances, "
+          f"{len(variables)} paramètres, {octets / 1e6:.1f} Mo compressés", flush=True)
 
     genere = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     meta = {
         "modele": args.modele, "nom": cfg["nom"], "source": "Météo-France (licence Etalab)", "run": run, "genere": genere,
         "type": "vagues" if cfg["parametres"] in ("vagues", "ww3") else "atmo",
         "vagues": cfg.get("vagues", []), "force_par": cfg.get("force_par"), "pas_sortie_h": cfg["pas_sortie"],
-        "res": round(pas_deg, 6), "n": int(round(1 / pas_deg)), "domaine": cfg["tuiles"]["domaine"],
+        "res": round(pas_gros, 6), "n": int(round(1 / pas_gros)), "domaine": cfg["tuiles"]["domaine"],
+        "res_fin": round(pas_deg, 6) if zones_fines else None, "tuiles_fines": fines,
         "temps": [(t_run + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in sorties],
         "variables": variables, "tuiles": sorted(os.path.basename(f)[:-7] for f in glob.glob(os.path.join(sortie, "t", "*.bin.gz"))),
         "format": "tuile = pour chaque variable (ordre de 'variables') un bloc int16 temps×lat(sud→nord)×lon(ouest→est), "
@@ -588,31 +594,40 @@ def main():
     ecrire_sortie(nouveau="oui", run=run)
 
 
-def ecrire_tuiles(sortie, cubes, variables, lats, lons, pas):
-    """Découpe les cubes du domaine en tuiles de 1° (clé « lat_lon » du coin sud-ouest) ; tuiles entièrement vides omises."""
+def ecrire_tuiles(sortie, cubes, variables, lats, lons, pas, pas_gros=None, zones_fines=()):
+    """Découpe les cubes du domaine en tuiles de 1° (clé « lat_lon » du coin sud-ouest) ; tuiles entièrement vides omises.
+    Avec zones_fines ([sud, nord, ouest, est], …) : tuiles à la résolution du cube dans ces zones, un point sur k ailleurs
+    (k = pas_gros / pas). La taille d'une tuile (n × n) se déduit de sa longueur à la lecture."""
     import gzip
     m = int(round(1 / pas))
+    k = max(1, int(round((pas_gros or pas) / pas)))
     dossier = os.path.join(sortie, "t")
     shutil.rmtree(dossier, ignore_errors=True)
     os.makedirs(dossier)
     q = [None] * len(cubes)
-    for k, (cube, v) in enumerate(zip(cubes, variables)):
+    for kk, (cube, v) in enumerate(zip(cubes, variables)):
         e = np.round((cube - v["off"]) / v["ech"])
-        q[k] = np.where(np.isfinite(e), np.clip(e, -32767, 32767), MANQUANT).astype("<i2")
+        q[kk] = np.where(np.isfinite(e), np.clip(e, -32767, 32767), MANQUANT).astype("<i2")
     nb = octets = 0
+    fines = []
     for i in range(0, len(lats) - m + 1, m):
         for j in range(0, len(lons) - m + 1, m):
-            blocs = [a[:, i:i + m, j:j + m] for a in q]
+            la, lo = int(round(lats[i])), int(round(lons[j]))
+            fine = k == 1 or any(z[0] <= la < z[1] and z[2] <= lo < z[3] for z in zones_fines)
+            pas_t = 1 if fine else k
+            blocs = [a[:, i:i + m:pas_t, j:j + m:pas_t] for a in q]
             if all((b == MANQUANT).all() for b in blocs):
                 continue
             brut = np.concatenate([b.ravel() for b in blocs]).view(np.uint8).reshape(-1, 2)
             donnees = gzip.compress(np.concatenate([brut[:, 0], brut[:, 1]]).tobytes(), compresslevel=6, mtime=0)
-            cle = f"{int(round(lats[i]))}_{int(round(lons[j]))}"
+            cle = f"{la}_{lo}"
             with open(os.path.join(dossier, cle + ".bin.gz"), "wb") as f:
                 f.write(donnees)
             nb += 1
             octets += len(donnees)
-    return nb, octets
+            if fine and k > 1:
+                fines.append(cle)
+    return nb, octets, sorted(fines)
 
 
 def ecrire_sortie(**kv):
