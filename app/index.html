@@ -105,6 +105,11 @@ aside.mgcol{display:flex;flex-direction:column;min-width:0;min-height:0;overflow
 #readout b{font:600 13px var(--f-mono);font-variant-numeric:tabular-nums}
 #readout span{color:var(--muted)}
 #mgwrap{padding:0 8px 8px;min-width:0}
+.seuils{margin:0 16px 6px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.seuils input{width:5em;min-height:28px;padding:3px 6px}
+.sgrid{display:grid;grid-template-columns:auto auto auto;gap:4px 10px;align-items:center}
+.sgrid b{font:600 11px var(--f-display);text-transform:uppercase;letter-spacing:.06em}
+#seuilsTxt{padding:0 16px}
 #mg{display:block;width:100%;touch-action:pan-y;cursor:crosshair}
 .hint{font-size:12px;color:var(--muted);margin:0 16px 12px}
 footer{font-size:11px;color:var(--muted);padding-block:6px;background:var(--panel);border-top:1px solid var(--line);
@@ -221,11 +226,18 @@ footer a{color:var(--accent)}
         <button id="tabPoint" class="on" role="tab" aria-selected="true">Point</button>
         <button id="tabRoute" role="tab" aria-selected="false" disabled>Route</button>
       </div>
+      <button id="btnSeuils" title="Seuils de vent, rafales, mer et précipitations">Seuils</button>
       <button id="mgWide" title="Élargir le panneau des graphiques">Agrandir</button>
       <button id="csv">CSV</button>
       <div class="coords" id="models">—</div>
       <div class="coords" id="coords">—</div>
     </div>
+    <div id="seuilsPanel" class="seuils" hidden>
+      <div id="seuilsGrid" class="sgrid"></div>
+      <button id="sClear" type="button">Effacer</button>
+      <span class="note">Case vide = pas de seuil. Les heures où le seuil est atteint sont ombrées en orange ou en rouge.</span>
+    </div>
+    <div class="coords" id="seuilsTxt"></div>
     <div id="readout"></div>
     <div id="mgwrap"><canvas id="mg"></canvas></div>
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
@@ -1368,6 +1380,7 @@ function merRel(rel){ if (rel==null) return null; const a=Math.abs(rel); return 
 const side = rel => rel==null?"":Math.abs(rel)<5||Math.abs(rel)>175?"":rel>0?" tribord":" bâbord";
 
 function renderReadout(){
+  if (typeof seuilsResume==="function") try{ seuilsResume(); }catch(e){}
   const D=mgData(), el=$("readout"); if (!D){ el.innerHTML=""; return; }
   let j = st.hover!=null ? st.hover : pIdx(st.tIdx); if (j<0) j=0;
   const a=D.a||{}, m=D.m||{}, g=(o,k)=>o&&o[k]?near(o[k],j):null;
@@ -1446,7 +1459,9 @@ function drawMG(){
     }
     y+=TITLE;
   };
+  const axes=[]; cv._axes=axes;
   const yaxis=(y0,h,min,max,sideA,unit,col)=>{
+    axes.push({y0,h,min,max,side:sideA,unit,col});
     const step=niceStep(max-min); ctx.font="10px 'JetBrains Mono',monospace"; ctx.fillStyle=col||C.muted;
     ctx.textAlign=sideA==="l"?"right":"left";
     for (let v=Math.ceil(min/step)*step; v<=max+1e-9; v+=step){
@@ -1494,6 +1509,24 @@ function drawMG(){
     ctx.fillStyle=C.ink; ctx.font="700 12px 'Barlow Condensed',sans-serif"; ctx.textAlign="right"; ctx.fillText(lbl,L0-6,y0+h/2+4);
   };
 
+  /* seuils réglables (orange et rouge) : lignes horizontales + colonnes ombrées quand la valeur atteint le seuil */
+  const seuil=(arr,y0,h,min,max,S,nom,u)=>{
+    if (!S || !arr || (!S.o && !S.r)) return;
+    const Y=v=>y0+h-(v-min)/(max-min)*h, f=v=>String(v).replace(".",",");
+    ctx.save();
+    for (let i=0;i<n;i++){ const v=arr[i]; if (v==null) continue;
+      const lvl = S.r && v>=S.r ? "r" : S.o && v>=S.o ? "o" : null; if (!lvl) continue;
+      ctx.fillStyle = lvl==="r" ? "rgba(209,73,91,.15)" : "rgba(240,140,30,.15)";
+      const x0=Math.max(L0,X(i)-halfL(i)), x1=Math.min(L0+pw,X(i)+halfR(i)); ctx.fillRect(x0,y0,x1-x0+0.5,h); }
+    for (const [k,col] of [["o","#e8890c"],["r","#d1495b"]]){
+      const val=S[k]; if (!(val>min) || val>max) continue;
+      ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.setLineDash([6,3]); ctx.beginPath(); ctx.moveTo(L0,Y(val)); ctx.lineTo(L0+pw,Y(val)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle=col; ctx.font="600 10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(`${nom} ≥ ${f(val)} ${u}`,L0+4,Y(val)-3); }
+    ctx.restore();
+  };
+  const smax=S=>S?Math.max(S.o||0,S.r||0):0;
+  const SE=seuils();
+
   /* 0. Route : allure (vent / route) et mer / route */
   if (isRoute){
     title("Allure · mer / route",[]);
@@ -1516,9 +1549,11 @@ function drawMG(){
     drawBarb(ctx,X(i),y+18,a.wind_direction_10m&&a.wind_direction_10m[i],a.wind_speed_10m&&a.wind_speed_10m[i],15);
   }
   y+=26;
-  let mx=niceMax(maxOf(a.wind_speed_10m,gustArr(a))*1.1);
+  let mx=niceMax(Math.max(maxOf(a.wind_speed_10m,gustArr(a)),smax(SE.vent),smax(SE.raf))*1.1);
   yaxis(y,120,0,mx,"l","kt"); vgrid(y,120);
   for (const [v,lbl] of [[22,"F6"],[34,"F8"],[48,"F10"]]) if (v<mx){ const yy=y+120-v/mx*120; ctx.strokeStyle=C.gust; ctx.globalAlpha=.35; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillStyle=C.gust; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(lbl,L0+pw+5,yy+3); }
+  seuil(a.wind_speed_10m,y,120,0,mx,SE.vent,"vent","kt");
+  seuil(gustArr(a),y,120,0,mx,SE.raf,"rafales","kt");
   line(gustArr(a),y,120,0,mx,C.gust,{dash:[5,3]});
   line(a.wind_speed_10m,y,120,0,mx,C.wind,{w:2.4,fill:.12});
   frame(y,120); y+=120+GAP;
@@ -1529,8 +1564,9 @@ function drawMG(){
   title("État de la mer",seaLeg);
   if (hasData(m.wave_height)){
     waveGap(y,110,true);
-    mx=niceMax(maxOf(m.wave_height,m.wind_wave_height,m.swell_wave_height,m.primary_swell_height)*1.1);
+    mx=niceMax(Math.max(maxOf(m.wave_height,m.wind_wave_height,m.swell_wave_height,m.primary_swell_height),smax(SE.hs))*1.1);
     yaxis(y,110,0,mx,"l","m"); vgrid(y,110);
+    seuil(m.wave_height,y,110,0,mx,SE.hs,"Hs","m");
     line(m.wave_height,y,110,0,mx,C.hs,{w:2.4,fill:.12});
     line(m.wind_wave_height,y,110,0,mx,C.wws);
     if (ww3){ line(m.primary_swell_height,y,110,0,mx,C.sw); line(m.secondary_swell_height,y,110,0,mx,C.sw2,{dash:[4,3]}); }
@@ -1561,8 +1597,9 @@ function drawMG(){
   vgrid(y,90);
   const nnO=a.cloud_cover?a.cloud_cover.map(v=>v==null?null:v/12.5):null;
   if (hasData(nnO)){ line(nnO,y,90,0,8,C.nn,{w:1.5,fill:.25}); yaxis(y,90,0,8,"r","octas",C.nn); }
-  mx=niceMax(Math.max(2,maxOf(a.precipitation)*1.1));
+  mx=niceMax(Math.max(2,maxOf(a.precipitation)*1.1,smax(SE.rr)*1.1));
   yaxis(y,90,0,mx,"l","mm",C.rr);
+  seuil(a.precipitation,y,90,0,mx,SE.rr,"précip.","mm");
   const barX=i=>{ const w=Math.max(1.5,halfL(i)*2*0.85); return [X(i)-halfL(i)*2+(halfL(i)*2-w)/2, w]; };
   ctx.fillStyle=C.rr;
   for (let i=0;i<n;i++){ const v=a.precipitation&&a.precipitation[i]; if (v>0){ const hh=Math.min(90,v/mx*90), [bx,w]=barX(i); ctx.fillRect(bx,y+90-hh,w,hh); } }
@@ -1596,7 +1633,8 @@ function drawMG(){
   title("T, Td et HU à 2 m",[["T",C.t],["Td",C.td]].concat(hasData(a.relative_humidity_2m)?[["HU",C.hu,[4,3]]]:[]));
   const tv=[...(a.temperature_2m||[]),...(a.dew_point_2m||[])].filter(v=>v!=null);
   vgrid(y,100);
-  if (hasData(a.relative_humidity_2m)){ yaxis(y,100,0,100,"r","%",C.hu); line(a.relative_humidity_2m,y,100,0,100,C.hu,{w:1.4,dash:[4,3],fill:.08}); }
+  if (hasData(a.relative_humidity_2m)){ yaxis(y,100,0,100,"r","%",C.hu); seuil(a.relative_humidity_2m,y,100,0,100,SE.hu,"HU","%");
+    line(a.relative_humidity_2m,y,100,0,100,C.hu,{w:1.4,dash:[4,3],fill:.08}); }
   if (tv.length){ const tmin=Math.floor(Math.min(...tv)-1), tmax=Math.ceil(Math.max(...tv)+1);
     yaxis(y,100,tmin,tmax,"l","°C"); line(a.temperature_2m,y,100,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,100,tmin,tmax,C.td,{w:1.8}); }
   frame(y,100); y+=100+GAP;
@@ -1612,6 +1650,24 @@ function drawMG(){
   const ci=pIdx(st.tIdx);
   if (ci>=0){ ctx.strokeStyle=C.cursor; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X(ci),AX-2); ctx.lineTo(X(ci),H-GAP); ctx.stroke(); }
   if (st.hover!=null){ ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(st.hover),AX-2); ctx.lineTo(X(st.hover),H-GAP); ctx.stroke(); ctx.setLineDash([]); }
+  /* échelle de lecture : ligne horizontale à la hauteur de la souris et valeurs lues sur les axes du graphique survolé */
+  if (st.hoverY!=null){
+    const hy=st.hoverY, here=axes.filter(A=>hy>=A.y0 && hy<=A.y0+A.h);
+    if (here.length){
+      ctx.save(); ctx.strokeStyle=C.ink; ctx.globalAlpha=.7; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(L0,hy); ctx.lineTo(L0+pw,hy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+      ctx.font="600 11px 'JetBrains Mono',monospace";
+      for (const A of here){
+        const v=A.min+(A.y0+A.h-hy)/A.h*(A.max-A.min), d=Math.abs(A.max-A.min)<=12?1:0;
+        const txt=`${v.toFixed(d).replace(".",",")} ${A.unit}`, tw=ctx.measureText(txt).width+8;
+        const bx = A.side==="l" ? L0+2 : L0+pw-tw-2;
+        ctx.fillStyle=css("--panel"); ctx.strokeStyle=A.col||C.ink; ctx.lineWidth=1;
+        ctx.fillRect(bx,hy-9,tw,17); ctx.strokeRect(bx,hy-9,tw,17);
+        ctx.fillStyle=A.col||C.ink; ctx.textAlign="left"; ctx.fillText(txt,bx+4,hy+4);
+      }
+      ctx.restore();
+    }
+  }
 }
 function mgIndex(e){
   const g=$("mg")._geo; if (!g) return null;
@@ -1619,8 +1675,9 @@ function mgIndex(e){
   let best=0; for (let i=1;i<g.n;i++) if (Math.abs(g.XT[i]-x)<Math.abs(g.XT[best]-x)) best=i;
   return best;
 }
-$("mg").addEventListener("pointermove",e=>{ const i=mgIndex(e); if (i!==st.hover){ st.hover=i; drawMG(); renderReadout(); } });
-$("mg").addEventListener("pointerleave",()=>{ st.hover=null; drawMG(); renderReadout(); });
+$("mg").addEventListener("pointermove",e=>{ const i=mgIndex(e), hy=e.clientY-$("mg").getBoundingClientRect().top;
+  const ch=i!==st.hover; st.hover=i; st.hoverY=hy; drawMG(); if (ch) renderReadout(); });
+$("mg").addEventListener("pointerleave",()=>{ st.hover=null; st.hoverY=null; drawMG(); renderReadout(); });
 $("mg").addEventListener("click",e=>{
   const i=mgIndex(e), D=mgData(); if (i==null||!D) return;
   const k=st.times.indexOf(D.times[i]); if (k>=0) setTime(k);
@@ -2035,6 +2092,47 @@ document.addEventListener("keydown",e=>{
   if (e.key==="Escape"){ stopRouteAdd(); if (drawState){ drawState=null; $("zDraw").classList.remove("on"); $("map").classList.remove("drawing"); } }
 });
 let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ map.invalidateSize(); drawLegend(); drawMG(); },150); });
+
+/* ---------- Seuils réglables (météogramme) : niveau orange et niveau rouge ---------- */
+function sDefs(){ return [["vent","Vent moyen","kt",1],["raf","Rafales","kt",1],["hs","Hs","m",0.1],["rr","Précip.","mm",0.1],["hu","HU","%",1]]; }
+function seuils(){
+  const o={};
+  for (const [k] of sDefs()){ const S={};
+    for (const lv of ["o","r"]){ const el=$(`s_${k}_${lv}`); const v=el?parseFloat(String(el.value).replace(",",".")):NaN; if (v>0) S[lv]=v; }
+    if (S.o||S.r) o[k]=S; }
+  return o;
+}
+function seuilsResume(){
+  const D=mgData(), SE=seuils(), el=$("seuilsTxt"); if (!D || !Object.keys(SE).length){ el.innerHTML=""; return; }
+  const a=D.a||{}, m=D.m||{}, arrs={vent:a.wind_speed_10m, raf:gustArr(a), hs:m.wave_height, rr:a.precipitation, hu:a.relative_humidity_2m};
+  const periodes=(arr,val)=>{ const per=[]; let d=-1;
+    for (let i=0;i<=D.times.length;i++){ const ok=i<D.times.length && arr[i]!=null && arr[i]>=val;
+      if (ok && d<0) d=i; if (!ok && d>=0){ per.push([d,i-1]); d=-1; } } return per; };
+  const txt=per=>per.length ? per.slice(0,3).map(([x,y])=>x===y?tLabel(D.times[x]):`${tLabel(D.times[x])} → ${tLabel(D.times[y])}`).join(" ; ")+(per.length>3?" …":"") : "jamais atteint";
+  const out=[];
+  for (const [k,nom,u] of sDefs()){
+    const S=SE[k], arr=arrs[k]; if (!S || !arr) continue;
+    for (const [lv,col,mot] of [["r","#d1495b","rouge"],["o","#e8890c","orange"]]) if (S[lv])
+      out.push(`<span style="color:${col}">● ${nom} ≥ ${String(S[lv]).replace(".",",")} ${u} (${mot}) : ${txt(periodes(arr,S[lv]))}</span>`);
+  }
+  el.innerHTML=out.join("<br>");
+}
+/* champs : un orange et un rouge par paramètre ; HU rouge à 98 % par défaut */
+{
+  const box=$("seuilsGrid"); let html="<span></span><b style='color:#e8890c'>orange ≥</b><b style='color:#d1495b'>rouge ≥</b>";
+  for (const [k,nom,u,st_] of sDefs()) html+=`<span>${nom} (${u})</span><input type="number" id="s_${k}_o" min="0" step="${st_}" placeholder="—"><input type="number" id="s_${k}_r" min="0" step="${st_}" placeholder="—">`;
+  box.innerHTML=html;
+  const ancien={vent:store.get("seuil_vent",null), raf:store.get("seuil_raf",null), hs:store.get("seuil_hs",null), rr:store.get("seuil_rr",null)};
+  for (const [k] of sDefs()) for (const lv of ["o","r"]){
+    const el=$(`s_${k}_${lv}`), key=`seuil_${k}_${lv}`;
+    let v=store.get(key,undefined);
+    if (v===undefined) v = lv==="r" ? (ancien[k] || (k==="hu" ? "98" : null)) : null;
+    if (v && v!=="-") el.value=v;
+    el.addEventListener("input",()=>{ store.set(key,el.value||"-"); drawMG(); seuilsResume(); });
+  }
+}
+$("btnSeuils").addEventListener("click",()=>{ const p=$("seuilsPanel"); p.hidden=!p.hidden; $("btnSeuils").classList.toggle("on",!p.hidden); });
+$("sClear").addEventListener("click",()=>{ for (const [k] of sDefs()) for (const lv of ["o","r"]){ $(`s_${k}_${lv}`).value=""; store.set(`seuil_${k}_${lv}`,"-"); } drawMG(); seuilsResume(); });
 
 /* ---------- Valeurs au survol de la carte ---------- */
 const hoverEl=document.createElement("div"); hoverEl.id="hover"; hoverEl.hidden=true; $("map").appendChild(hoverEl);
