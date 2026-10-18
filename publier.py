@@ -120,6 +120,7 @@ for mo in modeles:
         json.dump(etat, f, ensure_ascii=False, indent=1)
     index["modeles"][mo] = {
         "nom": dernier["nom"], "type": dernier["type"], "run": dernier["run"], "genere": dernier["genere"], "res": dernier["res"],
+        "res_fin": dernier.get("res_fin"),
         "domaine": dernier["domaine"], "vagues": dernier.get("vagues", []), "force_par": dernier.get("force_par"),
         "pas_sortie_h": dernier.get("pas_sortie_h"), "debut": dernier["temps"][0], "fin": dernier["temps"][-1],
         "echeances": len(dernier["temps"]), "tuiles": len(dernier["tuiles"]), "variables": [v["nom"] for v in dernier["variables"]],
