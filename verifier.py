@@ -26,13 +26,19 @@ for nom, cfg in modeles.items():
         continue
     if not cfg.get("actif", True) and not choix:
         continue
-    base = f"{API}/{cfg['api']}/v1/models/{cfg['modele']}"
-    try:
+    if cfg.get("source") == "cmems":
+        # courants Copernicus : un bulletin par jour, disponible vers heure_dispo UTC
+        from courants import run_du_jour
+        runs = [run_du_jour(cfg).strftime("%Y-%m-%dT%H:%M:%SZ")]
+        r = type("R", (), {"status_code": 200})()
+    else:
+      base = f"{API}/{cfg['api']}/v1/models/{cfg['modele']}"
+      try:
         r = ses.get(f"{base}/grids/{cfg['grille']}/packages/{cfg['paquets'][0]}")
         runs = sorted(set(re.findall(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", r.text)))
         if cfg.get("heures_runs"):   # runs retenus seulement à ces heures (UTC)
             runs = [x for x in runs if int(x[11:13]) in cfg["heures_runs"]]
-    except Exception as e:
+      except Exception as e:
         print(f"{nom:12s} catalogue injoignable ({e.__class__.__name__})")
         continue
     if r.status_code != 200 or not runs:
