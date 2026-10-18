@@ -134,6 +134,10 @@ with open(os.path.join(args.site, "index.json"), "w", encoding="utf-8") as f:
 # 6. appli à la racine, pas d'indexation par les moteurs de recherche
 if os.path.exists(args.app):
     shutil.copy(args.app, os.path.join(args.site, "index.html"))
+    # autres fichiers de l'appli (trait de côte fin…)
+    for f in glob.glob(os.path.join(os.path.dirname(args.app), "*")):
+        if os.path.isfile(f) and os.path.basename(f) != os.path.basename(args.app):
+            shutil.copy(f, os.path.join(args.site, os.path.basename(f)))
 with open(os.path.join(args.site, "robots.txt"), "w") as f:
     f.write("User-agent: *\nDisallow: /\n")
 
