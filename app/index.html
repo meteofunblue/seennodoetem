@@ -231,7 +231,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS du CEP et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth. Outil pédagogique : ne remplace pas les bulletins officiels.</footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS du CEP et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et GSHHG (Wessel &amp; Smith). Outil pédagogique : ne remplace pas les bulletins officiels.</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -756,12 +756,30 @@ async function loadCoast(){
     coast.rings=rings; drawField();
   } catch(e){ console.warn("Trait de côte indisponible :", e); }
 }
+/* Trait de côte fin (GSHHG pleine résolution, côtes françaises) : utilisé à partir du zoom 6 dans son emprise,
+   le trait Natural Earth restant tracé ailleurs */
+async function loadCoastFine(){
+  try{
+    const r=await fetch(`${BASE}cote_fr.json`); if (!r.ok) return;
+    const d=await r.json(), k=1/d.echelle, lines=[];
+    for (const enc of d.lignes){
+      const pts=[]; let x=enc[0], y=enc[1]; pts.push([x*k,y*k]);
+      for (let i=2;i<enc.length;i+=2){ x+=enc[i]; y+=enc[i+1]; pts.push([x*k,y*k]); }
+      let w=180,e=-180,so=90,n=-90; for (const [a,b] of pts){ if(a<w)w=a; if(a>e)e=a; if(b<so)so=b; if(b>n)n=b; }
+      lines.push({pts,w,e,s:so,n});
+    }
+    coast.fine={lines, emp:d.emprise}; drawField();
+  } catch(e){ /* pas de trait fin : Natural Earth seul */ }
+}
 function drawCoast(ctx){
   if (!coast.rings || !$("coast").checked) return;
   const bb=map.getBounds(), W=bb.getWest()-0.5, E=bb.getEast()+0.5, So=bb.getSouth()-0.5, N=bb.getNorth()+0.5;
-  const z=map.getZoom ? map.getZoom() : 8;
+  const z=map.getZoom ? map.getZoom() : 8, F=coast.fine, useF=!!F && z>=6;
+  const sz=map.getSize();
+  const empRect=()=>{ const [s0,n0,o0,e0]=F.emp, a=map.latLngToContainerPoint([n0,o0]), b=map.latLngToContainerPoint([s0,e0]); return [a.x,a.y,b.x-a.x,b.y-a.y]; };
   ctx.save();
   ctx.strokeStyle=css("--coast"); ctx.lineWidth=z>=9?1.6:1.2; ctx.lineJoin="round";
+  if (useF){ ctx.beginPath(); ctx.rect(0,0,sz.x,sz.y); ctx.rect(...empRect()); ctx.clip("evenodd"); }
   ctx.beginPath();
   for (const r of coast.rings){
     if (r.e<W||r.w>E||r.n<So||r.s>N) continue;
@@ -774,6 +792,17 @@ function drawCoast(ctx){
     }
   }
   ctx.stroke(); ctx.restore();
+  if (useF){
+    ctx.save(); ctx.beginPath(); ctx.rect(...empRect()); ctx.clip();
+    ctx.strokeStyle=css("--coast"); ctx.lineWidth=z>=9?1.5:1.1; ctx.lineJoin="round";
+    ctx.beginPath();
+    for (const l of F.lines){
+      if (l.e<W||l.w>E||l.n<So||l.s>N) continue;
+      let first=true;
+      for (const [x,y] of l.pts){ const p=map.latLngToContainerPoint([y,x]); first?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y); first=false; }
+    }
+    ctx.stroke(); ctx.restore();
+  }
 }
 
 /* ---------- Champs : valeurs, interpolation, isolignes ---------- */
@@ -2078,7 +2107,7 @@ $("mgWide").addEventListener("click",()=>{
 /* ---------- Démarrage ---------- */
 (async function init(){
   $("tDep").value=defaultDep();
-  fillZones(); fillRoutes(); drawLegend(); drawMG(); loadCoast();
+  fillZones(); fillRoutes(); drawLegend(); drawMG(); loadCoast(); loadCoastFine();
   try{
     const r=await fetch(`${BASE}index.json`,{cache:"no-cache"});
     if (!r.ok) throw new Error("HTTP "+r.status);
