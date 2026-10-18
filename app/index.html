@@ -141,6 +141,8 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="opac">Opacité</label><input type="range" id="opac" min="0.2" max="1" step="0.05" value="0.6"></div>
   <label class="chk"><input type="checkbox" id="smooth" checked> Lissage</label>
   <label class="chk"><input type="checkbox" id="iso" checked> Isobares</label>
+  <select id="isoStep" aria-label="Écart entre isobares" title="Écart entre isobares" style="min-height:30px;padding:3px 6px">
+    <option value="5" selected>5 hPa</option><option value="4">4 hPa</option><option value="2">2 hPa</option><option value="1">1 hPa</option></select>
   <label class="chk"><input type="checkbox" id="coast" checked> Côte</label>
   <label class="chk"><input type="checkbox" id="vals" checked> Valeurs</label>
   <div class="grp">
@@ -848,7 +850,8 @@ function drawIsobars(ctx,i){
   for (let y=0;y<my;y++) SY[y]=map.latLngToContainerPoint([gLat(g,W.i0+y/F),g.lon0]).y;
   let lo=Infinity, hi=-Infinity; for (const v of U) if (!isNaN(v)){ lo=Math.min(lo,v); hi=Math.max(hi,v); }
   if (!isFinite(lo)) return false;
-  const stepP = hi-lo>14 ? 4 : 2;
+  const stepP = +$("isoStep").value || 5;
+  if ((hi-lo)/stepP>80) return false;            /* garde-fou : trop de lignes */
   const segsBy={};
   for (let L0=Math.ceil(lo/stepP)*stepP; L0<=hi; L0+=stepP){
     const segs=[];
@@ -869,7 +872,8 @@ function drawIsobars(ctx,i){
   const ink=css("--coast");
   ctx.save(); ctx.lineCap="round";
   for (const L0 in segsBy){
-    const major = +L0%20===0;
+    /* trait renforcé : 1015 hPa (et tous les 20 hPa autour) avec l'écart de 5 hPa, multiples de 20 hPa sinon */
+    const major = stepP===5 ? ((+L0-1015)%20===0) : (+L0%20===0);
     ctx.beginPath();
     for (const [p,q] of segsBy[L0]){ ctx.moveTo(p[0],p[1]); ctx.lineTo(q[0],q[1]); }
     ctx.strokeStyle="rgba(255,255,255,.55)"; ctx.lineWidth=major?3.6:2.8; ctx.stroke();
@@ -1890,6 +1894,8 @@ $("offQuit").addEventListener("click",()=>location.reload());
 }
 $("param").addEventListener("change",()=>{ lastMissing=null; drawLegend(); drawField(); });
 ["vals","coast","smooth","iso"].forEach(id=>$(id).addEventListener("change",drawField));
+$("isoStep").value=String(store.get("isobares_pas",5));
+$("isoStep").addEventListener("change",()=>{ store.set("isobares_pas",+$("isoStep").value); drawField(); });
 $("opac").addEventListener("input",drawField);
 $("model").addEventListener("change",()=>{ chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("wmodel").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
