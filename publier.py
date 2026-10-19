@@ -87,7 +87,8 @@ for meta in glob.glob(os.path.join(args.artefacts, "**", "meta.json"), recursive
 modeles = sorted(d for d in os.listdir(args.site) if os.path.isdir(os.path.join(args.site, d)) and runs_de(os.path.join(args.site, d)))
 for mo in modeles:
     dm = os.path.join(args.site, mo)
-    garder = int(cfg.get(mo, {}).get("runs_gardes", GARDER_DEFAUT))
+    parent = cfg.get(mo) or next((c for c in cfg.values() if isinstance(c, dict) and mo in c.get("sorties", {})), {})
+    garder = int(parent.get("runs_gardes", GARDER_DEFAUT))
     for r in runs_de(dm)[garder:]:
         shutil.rmtree(os.path.join(dm, r))
         print(f"Run retiré (plus de {garder} gardés) : {mo}/{r}")
