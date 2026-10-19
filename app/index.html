@@ -1239,13 +1239,16 @@ function autoAtmo(){
 }
 /* courant : choix automatique du jeu qui couvre la zone (sauf si « aucun » a été choisi à la main) */
 function chooseCurrent(){
-  const cs=$("cmodel"), b=currentBounds(); if (st.cNone || !b) return;
+  const cs=$("cmodel"), b=currentBounds(); if (!b) return;
+  /* jeux du dépôt qui ne couvrent pas la zone : grisés dans la liste */
+  for (const o of cs.options) if (o.value.startsWith("mf:")) o.disabled=!domOk(o.value.slice(3),b);
+  if (st.cNone) return;
   const vals=[...cs.options].map(o=>o.value);
-  const mf=vals.find(v=>v.startsWith("mf:") && domOk(v.slice(3),b));
-  if (cs.value.startsWith("mf:") && domOk(cs.value.slice(3),b)) return;
-  /* Open-Meteo (mondial) gardé tant qu'aucun jeu du dépôt ne couvre la zone */
-  if (cs.value.startsWith("om:") && !mf) return;
-  cs.value = mf || vals.find(v=>v.startsWith("om:")) || "";
+  /* jeu choisi à la main : gardé tant qu'il couvre la zone (Open-Meteo couvre le monde entier) */
+  const m=st.cManual;
+  if (m && vals.includes(m) && (m.startsWith("om:") || domOk(m.slice(3),b))){ cs.value=m; return; }
+  /* sinon le plus fin du dépôt qui couvre la zone (IBI, MED, puis global), à défaut Open-Meteo */
+  cs.value = vals.find(v=>v.startsWith("mf:") && domOk(v.slice(3),b)) || vals.find(v=>v.startsWith("om:")) || "";
 }
 /* modèle choisi qui ne couvre pas la zone : on passe à la première zone prédéfinie de son domaine */
 function autoZone(){
@@ -2341,7 +2344,7 @@ $("isoStep").addEventListener("change",()=>{ store.set("isobares_pas",+$("isoSte
 $("opac").addEventListener("input",drawField);
 $("model").addEventListener("change",()=>{ st.autoOM=false; fillRuns(); autoZone(); chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("run").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
-$("cmodel").addEventListener("change",()=>{ st.cNone=!$("cmodel").value; loadGrid(); loadPoint(); if (st.route) routeChanged(); });
+$("cmodel").addEventListener("change",()=>{ st.cNone=!$("cmodel").value; st.cManual=$("cmodel").value||null; loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("wmodel").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("res").addEventListener("change",()=>loadGrid());
 $("gmode").addEventListener("change",()=>{ drawLegend(); drawField(); drawMG(); renderReadout(); });
