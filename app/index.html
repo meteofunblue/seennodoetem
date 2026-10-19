@@ -362,7 +362,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS du CEP et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1311,7 +1311,7 @@ function fillModels(){
   const gA1=document.createElement("optgroup"); gA1.label="Météo-France · dépôt";
   const gM1=document.createElement("optgroup"); gM1.label="Météo-France · dépôt";
   const mods=st.index?st.index.modeles:{};
-  const ordre=["courant_ibi","courant_med","courant_atl","arome","arome_antilles","arome_guyane","arome_indien","arome_polynesie","arome_caledonie","aromeifs","arpege","mfwam_fr","ww3_med_aro","ww3_atl","mfwam_glob","ww3_med"];
+  const ordre=["courant_ibi","courant_med","courant_atl","arome","arome_antilles","arome_guyane","arome_indien","arome_polynesie","arome_caledonie","aromeifs","arpege","ifs_atl","ifs_antilles","ifs_guyane","ifs_indien","ifs_polynesie","ifs_caledonie","mfwam_fr","ww3_med_aro","ww3_atl","mfwam_glob","wam_atl","wam_antilles","wam_guyane","wam_indien","wam_polynesie","wam_caledonie","ww3_med"];
   const ids=Object.keys(mods).sort((a,b)=>(ordre.indexOf(a)+99)%99-(ordre.indexOf(b)+99)%99);
   for (const id of ids){
     const m=mods[id], txt=`${m.nom} · ${m.res_fin?String(m.res_fin).replace(".",",")+"° côtes / ":""}${String(m.res).replace(".",",")}° · ${m.echeances} éch. · run ${runLabel(m.run)}`;
