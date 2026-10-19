@@ -97,6 +97,12 @@ main.layout{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 8px var(--mg
 .dock label span{font:600 10px var(--f-display,sans-serif);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 .dock select{min-height:32px;padding:4px 8px;border-radius:9px;font-size:13px;background:color-mix(in srgb,var(--panel) 92%,transparent);width:100%}
 .dockbtns{display:flex;gap:6px;margin-left:auto}
+.zonerow{display:flex;gap:6px;align-items:center;min-width:0}
+.zonerow select{flex:1;min-width:0}
+.dock .zonerow button{min-height:32px;padding:4px 10px;border-radius:9px;font-size:13px}
+.dock label:has(.zonerow){max-width:340px;flex-basis:220px}
+button.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}50%{box-shadow:0 0 0 6px transparent}}
 .dockbtns .glassbtn{position:static;width:34px;height:34px;font-size:15px}
 /* volets de la carte agrandie */
 .edge{position:fixed;top:0;bottom:0;width:14px;z-index:850}
@@ -133,6 +139,9 @@ body.mapfull main aside.mgcol{display:flex!important;position:fixed;top:0;right:
   box-shadow:0 0 40px rgba(13,27,42,.22);border-left:1px solid color-mix(in srgb,var(--line) 70%,transparent);
   transform:translateX(102%);transition:transform .26s cubic-bezier(.2,.8,.2,1);padding-top:46px}
 body.mapfull.drwR main aside.mgcol{transform:none}
+/* la zone sensible du bord droit ne doit pas recouvrir la barre de défilement du volet ouvert */
+body.drwR .edgeR, body.drwL .edgeL{display:none!important}
+body.mapfull main aside.mgcol{overflow-y:auto!important;overscroll-behavior:contain}
 #drawRhead{position:fixed;top:0;right:0;width:var(--drw,520px);max-width:96vw;z-index:905;transform:translateX(102%);transition:transform .26s cubic-bezier(.2,.8,.2,1)}
 body.drwR #drawRhead{transform:none}
 .gripR{position:fixed;top:0;bottom:0;z-index:906;width:8px;cursor:col-resize;right:calc(min(var(--drw,520px),96vw) - 4px);opacity:0;transition:opacity .2s;touch-action:none;pointer-events:none}
@@ -233,7 +242,7 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="wmodel">État de mer</label><select id="wmodel"></select></div>
   <div class="ctl"><label for="cmodel">Courant</label><select id="cmodel"></select></div>
   <div class="ctl"><label for="param">Paramètre carte</label><select id="param"></select></div>
-  <div class="ctl"><label for="zone">Zone</label><select id="zone"></select></div>
+  <div class="ctl"><label for="zone">Zone</label><div class="zonerow"><select id="zone"></select><button class="primary" id="load" title="Charger (ou recharger) les modèles pour la zone">Charger</button></div></div>
   <div class="ctl" id="ctlRes"><label for="res">Maillage IFS</label>
     <select id="res"><option value="auto" selected>Auto (selon la zone)</option><option value="10">10 × 10</option><option value="14">14 × 14</option><option value="18">18 × 18</option><option value="24">24 × 24</option><option value="30">30 × 30</option></select></div>
   <div class="ctl"><label for="gmode">Rafales</label>
@@ -249,7 +258,6 @@ footer a{color:var(--accent)}
   <select id="dens" aria-label="Densité des barbules et flèches" title="Densité des barbules, flèches et valeurs" style="min-height:30px;padding:3px 6px">
     <option value="30">Barbules serrées</option><option value="45" selected>Barbules normales</option><option value="70">Barbules espacées</option></select>
   <div class="grp">
-    <button class="primary" id="load">Charger</button>
     <button id="btnTransit" aria-expanded="false">Transit</button>
     <button id="btnSave" title="Enregistrer un ou plusieurs modèles de la zone dans un fichier, pour les rouvrir sans réseau">Enregistrer…</button>
     <button id="btnOpen" title="Ouvrir une situation enregistrée">Ouvrir…</button>
@@ -308,7 +316,7 @@ footer a{color:var(--accent)}
       <label><span>Atmosphère</span><select id="mModel" data-src="model"></select></label>
       <label><span>Mer</span><select id="mWmodel" data-src="wmodel"></select></label>
       <label><span>Courant</span><select id="mCmodel" data-src="cmodel"></select></label>
-      <label><span>Zone</span><select id="mZone" data-src="zone"></select></label>
+      <label><span>Zone</span><span class="zonerow"><select id="mZone" data-src="zone"></select><button id="mLoad" type="button" class="primary" title="Charger les modèles pour la zone">Charger</button></span></label>
       <div class="dockbtns">
         <button id="mMore" type="button" class="glassbtn" title="Afficher / masquer les autres choix">⋯</button>
         <button id="mFs" type="button" class="glassbtn" title="Plein écran">⛶</button>
@@ -1509,6 +1517,7 @@ async function loadGrid(){
   const b=currentBounds();
   if (!b){ setStatus("Zone personnalisée incomplète ou incohérente : vérifiez les quatre limites.", true); return; }
   if ($("zone").value!=="vue") map.fitBounds([[b.s,b.o],[b.n,b.e]]);
+  ["load","mLoad"].forEach(id=>$(id).classList.remove("pulse"));
   autoAtmo(); chooseCurrent(); pointDansZone(b);
   const seq=++loadSeq; $("load").disabled=true;
   /* modèle de vagues du dépôt qui ne couvre pas le centre de la zone : on reprend le choix automatique */
@@ -2549,6 +2558,17 @@ $("res").addEventListener("change",()=>loadGrid());
 $("gmode").addEventListener("change",()=>{ drawLegend(); drawField(); drawMG(); renderReadout(); });
 $("time").addEventListener("input",e=>setTime(+e.target.value));
 $("load").addEventListener("click",()=>loadGrid());
+$("mLoad").addEventListener("click",()=>loadGrid());
+/* zone « Vue actuelle de la carte » : rechargement automatique après un déplacement (données du dépôt, légères) ;
+   avec IFS / Open-Meteo, chargement à la demande pour ménager le quota partagé */
+let moveT=0;
+map.on("moveend",()=>{
+  if ($("zone").value!=="vue" || st.offline) return;
+  const om=[st.provA,st.provM,st.provC].some(p=>p && p.kind==="om");
+  clearTimeout(moveT);
+  if (om){ ["load","mLoad"].forEach(id=>$(id).classList.add("pulse")); setStatus("Carte déplacée : cliquez sur « Charger » pour mettre à jour (IFS / Open-Meteo : chargement à la demande).", false); return; }
+  moveT=setTimeout(()=>loadGrid(),800);
+});
 $("zone").addEventListener("change",onZoneChange);
 $("play").addEventListener("click",()=>{
   if (st.playing){ clearInterval(st.playing); st.playing=null; $("play").textContent="▶"; return; }
