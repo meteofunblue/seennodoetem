@@ -98,6 +98,48 @@ main.layout{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 8px var(--mg
 .dock select{min-height:32px;padding:4px 8px;border-radius:9px;font-size:13px;background:color-mix(in srgb,var(--panel) 92%,transparent);width:100%}
 .dockbtns{display:flex;gap:6px;margin-left:auto}
 .dockbtns .glassbtn{position:static;width:34px;height:34px;font-size:15px}
+/* volets de la carte agrandie */
+.edge{position:fixed;top:0;bottom:0;width:14px;z-index:850}
+.edgeL{left:0} .edgeR{right:0}
+.edge[hidden],.drwtab[hidden],.drawer[hidden],.gripR[hidden],#drawRhead[hidden]{display:none!important}
+.drwtab{position:fixed;top:50%;z-index:860;writing-mode:vertical-rl;padding:14px 7px;min-height:0;border-radius:0 12px 12px 0;
+  font:600 11px var(--f-display,sans-serif);letter-spacing:.12em;text-transform:uppercase;color:var(--ink);cursor:pointer;
+  background:color-mix(in srgb,var(--panel) 80%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border:1px solid color-mix(in srgb,var(--line) 70%,transparent);box-shadow:0 4px 14px rgba(13,27,42,.16);transform:translateY(-50%);transition:opacity .2s}
+.drwtabL{left:0;border-left:0}
+.drwtabR{right:0;border-right:0;border-radius:12px 0 0 12px;transform:translateY(-50%) rotate(180deg)}
+.drawer{position:fixed;top:0;bottom:0;z-index:900;overflow:auto;display:flex;flex-direction:column;
+  background:rgba(255,255,255,.86);background:color-mix(in srgb,var(--panel) 86%,transparent);
+  -webkit-backdrop-filter:blur(16px) saturate(1.3);backdrop-filter:blur(16px) saturate(1.3);box-shadow:0 0 40px rgba(13,27,42,.22);
+  transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+.drawerL{left:0;width:min(430px,92vw);transform:translateX(-102%);border-right:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+body.drwL .drawerL{transform:none}
+.drwhead{display:flex;align-items:center;gap:6px;padding:10px 12px;position:sticky;top:0;z-index:2;
+  background:color-mix(in srgb,var(--panel) 70%,transparent);border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.drwhead b{font:700 13px var(--f-display,sans-serif);text-transform:uppercase;letter-spacing:.08em}
+.drwhead button{min-height:28px;width:30px;padding:0;border-radius:8px;background:transparent;border:1px solid transparent;cursor:pointer;font-size:14px}
+.drwhead button:hover{border-color:var(--line);background:var(--panel)}
+.drwpin{opacity:.45} .drwpin.on{opacity:1;background:var(--panel)!important;border-color:var(--accent)!important}
+#drawLbody header.bar{display:flex!important;flex-direction:column;align-items:stretch;gap:10px;background:transparent;border:0;padding:12px}
+#drawLbody header.bar .brand{display:none}
+#drawLbody header.bar .ctl{width:100%;max-width:none}
+#drawLbody header.bar select{width:100%;max-width:none}
+#drawLbody header.bar input[type=range]{width:100%}
+#drawLbody header.bar label.chk{min-height:24px}
+#drawLbody .tpanel:not([hidden]),#drawLbody .zpanel:not([hidden]),#drawLbody .offline:not([hidden]){display:flex!important;background:transparent;border-top:1px solid var(--line);border-bottom:0}
+/* graphiques : le volet du météogramme devient un tiroir à droite */
+body.mapfull main aside.mgcol{display:flex!important;position:fixed;top:0;right:0;bottom:0;z-index:900;width:var(--drw,520px);max-width:96vw;
+  background:rgba(255,255,255,.9);background:color-mix(in srgb,var(--panel) 90%,transparent);-webkit-backdrop-filter:blur(16px) saturate(1.3);backdrop-filter:blur(16px) saturate(1.3);
+  box-shadow:0 0 40px rgba(13,27,42,.22);border-left:1px solid color-mix(in srgb,var(--line) 70%,transparent);
+  transform:translateX(102%);transition:transform .26s cubic-bezier(.2,.8,.2,1);padding-top:46px}
+body.mapfull.drwR main aside.mgcol{transform:none}
+#drawRhead{position:fixed;top:0;right:0;width:var(--drw,520px);max-width:96vw;z-index:905;transform:translateX(102%);transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+body.drwR #drawRhead{transform:none}
+.gripR{position:fixed;top:0;bottom:0;z-index:906;width:8px;cursor:col-resize;right:calc(min(var(--drw,520px),96vw) - 4px);opacity:0;transition:opacity .2s;touch-action:none;pointer-events:none}
+body.drwR .gripR{pointer-events:auto}
+body.drwR .gripR{opacity:1;background:linear-gradient(90deg,transparent 3px,var(--accent) 3px,var(--accent) 5px,transparent 5px)}
+body.drwR .gripR:not(:hover):not(.on){background:linear-gradient(90deg,transparent 3px,color-mix(in srgb,var(--line) 80%,transparent) 3px,color-mix(in srgb,var(--line) 80%,transparent) 5px,transparent 5px)}
+body.drwL .drwtabL, body.drwR .drwtabR{opacity:0;pointer-events:none}
 @keyframes dockIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 body.mapfull header.bar, body.mapfull .zpanel, body.mapfull .tpanel, body.mapfull .offline, body.mapfull .split,
 body.mapfull aside.mgcol, body.mapfull footer{display:none!important}
@@ -112,7 +154,9 @@ body.mapfull .timebar, body.mapfull .legendrow{background:transparent;border:0;p
 body.mapfull .timebar{padding-top:8px;padding-bottom:2px}
 body.mapfull .legendrow{padding-bottom:8px}
 body.mapfull #legend{height:28px}
-@media (max-width:700px){ .dock{left:10px;right:10px;top:60px} .dock label{flex:1 1 40%} }
+#mMore{display:none}
+@media (max-width:700px){ .dock{left:10px;right:10px;top:60px;flex-wrap:wrap} .dock label{flex:1 1 40%}
+  #mMore{display:inline-block} .dock.compact label:not(:first-child){display:none} .dock.compact label:first-child{flex:1 1 auto} }
 #map{flex:1;min-height:320px;background:var(--grid)}
 .timebar{display:flex;align-items:center;gap:10px;background:var(--panel);border-top:1px solid var(--line);padding-block:8px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px}
@@ -265,6 +309,7 @@ footer a{color:var(--accent)}
       <label><span>Courant</span><select id="mCmodel" data-src="cmodel"></select></label>
       <label><span>Zone</span><select id="mZone" data-src="zone"></select></label>
       <div class="dockbtns">
+        <button id="mMore" type="button" class="glassbtn" title="Afficher / masquer les autres choix">⋯</button>
         <button id="mFs" type="button" class="glassbtn" title="Plein écran">⛶</button>
         <button id="mClose" type="button" class="glassbtn" title="Réduire (Échap)">✕</button>
       </div>
@@ -312,6 +357,20 @@ footer a{color:var(--accent)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<!-- carte agrandie : volets latéraux (outils à gauche, graphiques à droite) -->
+<div id="edgeL" class="edge edgeL" hidden></div><div id="edgeR" class="edge edgeR" hidden></div>
+<button id="tabL" class="drwtab drwtabL" type="button" hidden title="Outils : modèles, route, enregistrer, ouvrir…">Outils</button>
+<button id="tabR" class="drwtab drwtabR" type="button" hidden title="Graphiques (météogramme, route)">Graphiques</button>
+<aside id="drawL" class="drawer drawerL" aria-label="Outils" hidden>
+  <div class="drwhead"><b>Outils</b><span style="flex:1"></span>
+    <button class="drwpin" data-side="L" type="button" title="Garder le volet ouvert">📌</button>
+    <button class="drwx" data-side="L" type="button" title="Fermer">✕</button></div>
+  <div id="drawLbody"></div>
+</aside>
+<div id="drawRhead" class="drwhead drwheadR" hidden><b>Graphiques</b><span style="flex:1"></span>
+  <button class="drwpin" data-side="R" type="button" title="Garder le volet ouvert">📌</button>
+  <button class="drwx" data-side="R" type="button" title="Fermer">✕</button></div>
+<div id="gripR" class="gripR" hidden title="Glisser pour élargir ou réduire les graphiques"></div>
 <div id="bienvenue" class="bienvenue" hidden>
   <div>
     <h2>Mode hors ligne</h2>
@@ -2350,15 +2409,82 @@ function syncDock(){
 }
 DOCK.forEach(sel=>sel.addEventListener("change",()=>{ const src=$(sel.dataset.src); src.value=sel.value; src.dispatchEvent(new Event("change")); setTimeout(syncDock,50); }));
 let dockTimer=0;
+/* volets : outils (barre du haut et panneaux, déplacés dans le volet gauche) et graphiques (tiroir droit) */
+const DRW={pin:{L:false,R:false}, moved:[], t:{}};
+function drawer(side,open){
+  const cls="drw"+side, was=document.body.classList.contains(cls);
+  if (open===was) return;
+  document.body.classList.toggle(cls,open);
+  if (side==="R") setTimeout(()=>{ drawMG(); renderReadout(); },280);
+}
+function moveTools(into){
+  if (into){
+    const items=[document.querySelector("header.bar"),$("offline"),$("zonePanel"),$("transitPanel"),$("savePanel")];
+    DRW.moved=items.map(el=>({el, parent:el.parentNode, next:el.nextSibling}));
+    for (const it of DRW.moved) $("drawLbody").appendChild(it.el);
+  } else {
+    for (const it of DRW.moved.slice().reverse()) it.parent.insertBefore(it.el, it.next);
+    DRW.moved=[];
+  }
+}
+function setDrw(px,save=true){
+  px=Math.max(340,Math.min(window.innerWidth-120,px));
+  document.documentElement.style.setProperty("--drw",px+"px");
+  if (save) store.set("largeur_volet_graphiques",px);
+  clearTimeout(setDrw.t); setDrw.t=setTimeout(()=>drawMG(),60);
+}
+{ const w=store.get("largeur_volet_graphiques",null); if (w) setDrw(w,false); }
 function mapFull(on){
   document.body.classList.toggle("mapfull",on); $("dock").hidden=!on;
+  for (const id of ["edgeL","edgeR","tabL","tabR","drawL","drawRhead","gripR"]) $(id).hidden=!on;
+  moveTools(on);
+  if (!on){ document.body.classList.remove("drwL","drwR"); DRW.pin={L:false,R:false}; document.querySelectorAll(".drwpin").forEach(b=>b.classList.remove("on")); }
   clearInterval(dockTimer);
   if (on){ syncDock(); dockTimer=setInterval(syncDock,600); }
   else if (document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
   setTimeout(()=>{ map.invalidateSize(); drawLegend(); drawField(); if (!on) drawMG(); },60);
 }
 $("mapBig").addEventListener("click",()=>mapFull(true));
+/* ouverture au bord de l'écran, fermeture quand la souris quitte le volet (sauf épinglé ou saisie en cours) */
+const panelOf = side => side==="L" ? $("drawL") : document.querySelector("aside.mgcol");
+for (const side of ["L","R"]){
+  $("edge"+side).addEventListener("mouseenter",()=>{ clearTimeout(DRW.t[side]); DRW.t[side]=setTimeout(()=>drawer(side,true),120); });
+  $("edge"+side).addEventListener("mouseleave",()=>clearTimeout(DRW.t[side]));
+  $("tab"+side).addEventListener("click",()=>drawer(side,true));
+  $("tab"+side).addEventListener("mouseenter",()=>{ clearTimeout(DRW.t[side]); DRW.t[side]=setTimeout(()=>drawer(side,true),120); });
+  const leave=()=>{
+    if (DRW.pin[side]) return;
+    clearTimeout(DRW.t[side]);
+    DRW.t[side]=setTimeout(()=>{
+      const P=panelOf(side), H=side==="R"?$("drawRhead"):null, a=document.activeElement;
+      const saisie = a && P.contains(a) && ["SELECT","INPUT","TEXTAREA"].includes(a.tagName);
+      if (P.matches(":hover") || (H && H.matches(":hover")) || $("gripR").classList.contains("on") || saisie) return;
+      drawer(side,false);
+    },450);
+  };
+  DRW.leave=DRW.leave||{}; DRW.leave[side]=leave;
+  panelOf(side).addEventListener("mouseleave",()=>{ if (document.body.classList.contains("mapfull")) leave(); });
+  panelOf(side).addEventListener("mouseenter",()=>clearTimeout(DRW.t[side]));
+  if (side==="R"){ $("drawRhead").addEventListener("mouseleave",()=>{ if (document.body.classList.contains("mapfull")) leave(); }); $("drawRhead").addEventListener("mouseenter",()=>clearTimeout(DRW.t.R)); }
+}
+document.querySelectorAll(".drwpin").forEach(b=>b.addEventListener("click",()=>{ const s=b.dataset.side; DRW.pin[s]=!DRW.pin[s];
+  document.querySelectorAll(`.drwpin[data-side="${s}"]`).forEach(x=>x.classList.toggle("on",DRW.pin[s])); }));
+document.querySelectorAll(".drwx").forEach(b=>b.addEventListener("click",()=>{ const s=b.dataset.side; DRW.pin[s]=false;
+  document.querySelectorAll(`.drwpin[data-side="${s}"]`).forEach(x=>x.classList.remove("on")); drawer(s,false); }));
+/* clic sur la carte : referme les volets non épinglés */
+$("map").addEventListener("pointerdown",()=>{ if (!document.body.classList.contains("mapfull")) return;
+  for (const s of ["L","R"]) if (!DRW.pin[s]) drawer(s,false); });
+/* largeur du volet des graphiques : poignée à glisser */
+{ const g=$("gripR"); let x0=0,w0=0;
+  g.addEventListener("pointerdown",e=>{ g.setPointerCapture(e.pointerId); g.classList.add("on"); x0=e.clientX; w0=document.querySelector("aside.mgcol").getBoundingClientRect().width; });
+  g.addEventListener("pointermove",e=>{ if (g.classList.contains("on")) setDrw(w0+(x0-e.clientX)); });
+  const fin=()=>{ g.classList.remove("on"); if (!g.matches(":hover")) DRW.leave.R(); };
+  g.addEventListener("pointerup",fin); g.addEventListener("pointercancel",fin);
+  g.addEventListener("mouseleave",()=>{ if (!g.classList.contains("on") && document.body.classList.contains("mapfull")) DRW.leave.R(); });
+  g.addEventListener("dblclick",()=>{ document.documentElement.style.removeProperty("--drw"); store.set("largeur_volet_graphiques",null); drawMG(); }); }
 $("mClose").addEventListener("click",()=>mapFull(false));
+$("mMore").addEventListener("click",()=>$("dock").classList.toggle("compact"));
+if (innerWidth<700) $("dock").classList.add("compact");     /* téléphone : seul le paramètre est affiché, « ⋯ » pour le reste */
 $("mFs").addEventListener("click",()=>{
   if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(()=>{});
 });
