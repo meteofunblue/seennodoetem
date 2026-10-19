@@ -82,6 +82,30 @@ def decouper(partie, emp, marge=0.2):
     return morceaux
 
 
+def couper_polygone(poly, emp, marge=0.2):
+    """Polygone fermé découpé sur le rectangle de l'emprise (Sutherland-Hodgman) : reste un polygone fermé."""
+    s, n, o, e = emp[0] - marge, emp[1] + marge, emp[2] - marge, emp[3] + marge
+    bords = [(lambda p: p[0] >= o, lambda a, b: (o, a[1] + (b[1] - a[1]) * (o - a[0]) / (b[0] - a[0]))),
+             (lambda p: p[0] <= e, lambda a, b: (e, a[1] + (b[1] - a[1]) * (e - a[0]) / (b[0] - a[0]))),
+             (lambda p: p[1] >= s, lambda a, b: (a[0] + (b[0] - a[0]) * (s - a[1]) / (b[1] - a[1]), s)),
+             (lambda p: p[1] <= n, lambda a, b: (a[0] + (b[0] - a[0]) * (n - a[1]) / (b[1] - a[1]), n))]
+    pts = list(poly)
+    for dedans, inter in bords:
+        if not pts:
+            break
+        sortie, prec = [], pts[-1]
+        for cur in pts:
+            if dedans(cur):
+                if not dedans(prec):
+                    sortie.append(inter(prec, cur))
+                sortie.append(cur)
+            elif dedans(prec):
+                sortie.append(inter(prec, cur))
+            prec = cur
+        pts = sortie
+    return pts
+
+
 def douglas_peucker(pts, tol):
     if len(pts) < 3:
         return pts
@@ -162,11 +186,22 @@ def main():
         print("  projection Web Mercator convertie en degrés", flush=True)
     ech = 100000
     lignes, nb_pts = [], 0
+    polygones, nb_poly = [], 0     # terre en polygones fermés : masque des paramètres marins dans l'appli
     for p in parties:
         xs = [x for x, _ in p]
         ys = [y for _, y in p]
         if max(ys) < emp[0] - 1 or min(ys) > emp[1] + 1 or max(xs) < emp[2] - 1 or min(xs) > emp[3] + 1:
             continue
+        pg = couper_polygone(p, emp)
+        if len(pg) >= 3:
+            pg = douglas_peucker(pg + [pg[0]], args.tolerance)[:-1]
+            if len(pg) >= 3:
+                q = [(round(x * ech), round(y * ech)) for x, y in pg]
+                enc = [q[0][0], q[0][1]]
+                for (x0, y0), (x1, y1) in zip(q[:-1], q[1:]):
+                    enc += [x1 - x0, y1 - y0]
+                polygones.append(enc)
+                nb_poly += len(pg)
         for m in decouper(p, emp):
             m = douglas_peucker(m, args.tolerance)
             if len(m) < 2:
@@ -180,8 +215,8 @@ def main():
     os.makedirs(os.path.dirname(args.sortie) or ".", exist_ok=True)
     with open(args.sortie, "w") as f:
         json.dump({"source": {"osm": "© contributeurs OpenStreetMap (ODbL)", "gshhg": "GSHHG (Wessel & Smith, LGPL)"}.get(source, source), "emprise": emp, "echelle": ech,
-                   "lignes": lignes}, f, separators=(",", ":"))
-    print(f"{len(lignes)} lignes, {nb_pts} points, {os.path.getsize(args.sortie) / 1e6:.1f} Mo -> {args.sortie}")
+                   "lignes": lignes, "polygones": polygones}, f, separators=(",", ":"))
+    print(f"{len(polygones)} polygones de terre ({nb_poly} points) ; {len(lignes)} lignes, {nb_pts} points, {os.path.getsize(args.sortie) / 1e6:.1f} Mo -> {args.sortie}")
 
 
 if __name__ == "__main__":
