@@ -979,8 +979,38 @@ async function loadCoastFine(){
       let w=180,e=-180,so=90,n=-90; for (const [a,b] of pts){ if(a<w)w=a; if(a>e)e=a; if(b<so)so=b; if(b>n)n=b; }
       lines.push({pts,w,e,s:so,n});
     }
-    coast.fine={lines, emp:d.emprise}; drawField();
+    /* polygones de terre fins (masque des paramètres marins), s'ils sont fournis */
+    const polys=(d.polygones||[]).map(enc=>{ const pts=[]; let x=enc[0], y=enc[1]; pts.push([x*k,y*k]);
+      for (let i=2;i<enc.length;i+=2){ x+=enc[i]; y+=enc[i+1]; pts.push([x*k,y*k]); }
+      let w=180,e=-180,so=90,n=-90; for (const [a,b] of pts){ if(a<w)w=a; if(a>e)e=a; if(b<so)so=b; if(b>n)n=b; }
+      return {pts,w,e,s:so,n}; });
+    coast.fine={lines, polys, emp:d.emprise}; drawField();
   } catch(e){ /* pas de trait fin : Natural Earth seul */ }
+}
+/* terre au premier plan pour les paramètres marins : le champ est effacé sur les terres (le fond de carte réapparaît).
+   Polygones fins (OSM) dans leur emprise à partir du zoom 6 s'ils existent, Natural Earth 1:10 M ailleurs. */
+function maskLand(ctx){
+  if (!coast.rings) return;
+  const bb=map.getBounds(), W=bb.getWest()-0.5, E=bb.getEast()+0.5, So=bb.getSouth()-0.5, N=bb.getNorth()+0.5;
+  const z=map.getZoom ? map.getZoom() : 8, F=coast.fine, useF=!!(F && F.polys && F.polys.length) && z>=6, sz=map.getSize();
+  const empRect=()=>{ const [s0,n0,o0,e0]=F.emp, a=map.latLngToContainerPoint([n0,o0]), b=map.latLngToContainerPoint([s0,e0]); return [a.x,a.y,b.x-a.x,b.y-a.y]; };
+  const fill=(list,key)=>{
+    ctx.beginPath();
+    for (const r of list){
+      if (r.e<W||r.w>E||r.n<So||r.s>N) continue;
+      let px=null;
+      for (const [x,y] of r[key]){ const p=map.latLngToContainerPoint([y,x]);
+        (px===null || Math.abs(x-px)>180) ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y); px=x; }
+      ctx.closePath();
+    }
+    ctx.fill("nonzero");
+  };
+  ctx.save(); ctx.globalCompositeOperation="destination-out"; ctx.fillStyle="#000";
+  if (useF){
+    ctx.save(); ctx.beginPath(); ctx.rect(0,0,sz.x,sz.y); ctx.rect(...empRect()); ctx.clip("evenodd"); fill(coast.rings,"ring"); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(...empRect()); ctx.clip(); fill(F.polys,"pts"); ctx.restore();
+  } else fill(coast.rings,"ring");
+  ctx.restore();
 }
 function drawCoast(ctx){
   if (!coast.rings || !$("coast").checked) return;
@@ -1185,6 +1215,13 @@ function drawField(){
     if (r && r.vals){ g=r.g; vals=r.vals; any=vals.some(x=>!isNaN(x)); paintScalar(ctx,P,g,vals,op); }
   }
   st.missing = !any;
+  const marin = P && (P.src==="m" || P.src==="c");
+  if (marin) maskLand(ctx);
+  /* points du champ effacés (terre) : pas de flèche ni de valeur dessus */
+  let alpha=null;
+  if (marin){ try{ alpha=ctx.getImageData(0,0,ctx.canvas.width,ctx.canvas.height); }catch(e){ alpha=null; } }
+  const surTerre=(px,py)=>{ if (!alpha) return false; const x=Math.round(px*dpr), y=Math.round(py*dpr);
+    if (x<0||y<0||x>=alpha.width||y>=alpha.height) return false; return alpha.data[(y*alpha.width+x)*4+3]===0; };
   drawCoast(ctx);
   if (($("iso").checked || $("param").value==="pmer") && st.ga) drawIsobars(ctx,i);
   updateMissing();
@@ -1197,6 +1234,7 @@ function drawField(){
   let kt=null; if (P.glyph==="barb"){ const rw=fieldVals(PARAMS.wind,i); kt=rw&&rw.g===g?rw.vals:null; }
   ctx.lineCap="round"; ctx.lineJoin="round";
   const glyph=(px,py,v,d,k,cell)=>{
+    if (surTerre(px,py)) return;
     const withText = showVals && cell>=34;
     const gy = withText && P.glyph ? py-Math.min(cell,60)*0.14 : py;
     if (P.glyph==="barb" && d!=null && k!=null){ const len=Math.min(cell*0.42,22); strokeTwice(ctx,()=>drawBarb(ctx,px,gy,d,k,len)); }
