@@ -434,10 +434,21 @@ const ZONES_DEF = {
 
 /* ---------- Échelles de couleur ---------- */
 const hex = h => { const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255,1]; };
+/* échelle par classes (couleurs franches) : [[seuil bas, couleur, nom], …] ; la dernière classe va jusqu'à « fin » */
+function classes(defs, fin){
+  const sc=[]; defs.forEach(([v,c],i)=>{ const col=hex(c); if (i) sc.push([v-1e-4, sc[sc.length-1][1]]); sc.push([v,col]); });
+  sc.push([fin, sc[sc.length-1][1]]);
+  sc.classes=defs.map(([v,c,nom],i)=>({min:v, max:i<defs.length-1?defs[i+1][0]:null, col:c, nom}));
+  return sc;
+}
+/* état de la mer (échelle de Douglas) d'après la hauteur */
+function etatMer(h){ if (h==null||isNaN(h)) return ""; if (h<0.1) return "calme";
+  const c=SC.wave.classes; for (let i=c.length-1;i>=0;i--) if (h>=c[i].min) return c[i].nom; return ""; }
 const S = (arr) => arr.map(([v,c,a]) => { const col = hex(c); if (a!==undefined) col[3]=a; return [v,col]; });
 const SC = {
   wind: S([[0,"#d6eaf8"],[5,"#9ecae1"],[10,"#4daf7c"],[15,"#a6d96a"],[20,"#fee08b"],[25,"#fdae61"],[30,"#f46d43"],[40,"#d73027"],[50,"#a50026"],[60,"#6a00a8"]]),
-  wave: S([[0,"#e0f3f8"],[0.5,"#abd9e9"],[1,"#74add1"],[2,"#4575b4"],[3,"#66bd63"],[4,"#fee08b"],[5,"#fdae61"],[6,"#f46d43"],[8,"#d73027"],[10,"#7f0000"]]),
+  wave: classes([[0,"#fff35c","belle"],[0.5,"#ffbe1a","peu agitée"],[1.25,"#a6e22e","agitée"],[2.5,"#1fb3f5","forte"],
+                 [4,"#5b3cf0","très forte"],[6,"#a033f0","grosse"],[9,"#f03cf0","très grosse"],[14,"#ff1e8c","énorme"]], 16),
   period: S([[0,"#fde725"],[4,"#a0da39"],[7,"#4ac16d"],[10,"#1fa187"],[13,"#277f8e"],[16,"#365c8d"],[20,"#46327e"]]),
   rr: S([[0,"#ffffff",0],[0.09,"#c6dbef",0],[0.1,"#c6dbef"],[0.5,"#6baed6"],[1,"#2171b5"],[2,"#41ab5d"],[5,"#fec44f"],[10,"#e31a1c"],[20,"#a50f15"]]),
   cloud: S([[0,"#ffffff",0],[1,"#d9dee3",0.35],[4,"#aab4bd",0.7],[8,"#5f6b76",0.9]]),
@@ -1254,6 +1265,16 @@ function drawLegend(){
     });
     return;
   }
+  if (P.scale.classes){            /* échelle par classes : cases de même largeur, seuils et noms */
+    const C=P.scale.classes, n=C.length, w=(W-8)/n;
+    ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="center";
+    C.forEach((c,i)=>{ const x0=4+i*w; ctx.fillStyle=c.col; ctx.fillRect(x0,2,w,14);
+      ctx.fillStyle=css("--muted"); if (i) ctx.fillText(String(c.min).replace(".",","), x0, 27);
+      if (w>52){ const [r,g,b]=hex(c.col); ctx.fillStyle=(0.299*r+0.587*g+0.114*b)/255>0.55?"#0d1b2a":"#ffffff";
+        ctx.font="600 10px Barlow,sans-serif"; ctx.fillText(c.nom, x0+w/2, 12.5); ctx.font="10px 'JetBrains Mono',monospace"; } });
+    ctx.strokeStyle=css("--line"); ctx.strokeRect(4,2,W-8,14);
+    return;
+  }
   const sc=P.scale, v0=sc[0][0], v1=sc[sc.length-1][0];
   const x = v => 4+(W-8)*(v-v0)/(v1-v0);
   for (let px=0; px<W-8; px++){ const v=v0+(v1-v0)*px/(W-8); ctx.fillStyle=rgba(colorAt(sc,v)); ctx.fillRect(4+px,2,1.2,14); }
@@ -1673,7 +1694,7 @@ function renderReadout(){
   rows.push(
     ["Vent 10 m", `${fmt(g(a,"wind_speed_10m"),0)} kt ${dir16(g(a,"wind_direction_10m"))}`],
     [gustLabel(D,j), `${fmt(near(gustArr(a),j),0)} kt`],
-    ["Mer totale Hs", `${fmt(g(m,"wave_height"),1)} m ${dir16(g(m,"wave_direction"))}`],
+    ["Mer totale Hs", `${fmt(g(m,"wave_height"),1)} m ${dir16(g(m,"wave_direction"))}${g(m,"wave_height")!=null?" · "+etatMer(g(m,"wave_height")):""}`],
     ["Mer du vent", `${fmt(g(m,"wind_wave_height"),1)} m · ${fmt(g(m,"wind_wave_period"),0)} s`]);
   if (has("primary_swell_height")){
     rows.push(["Houle primaire", `${fmt(g(m,"primary_swell_height"),1)} m ${dir16(g(m,"primary_swell_direction"))} · ${fmt(g(m,"primary_swell_period"),0)} s`]);
@@ -2682,7 +2703,7 @@ function showHover(e){
     if (t2!=null) lines.push(`T <b>${fmt(t2,1)} °C</b>${td!=null?` · Td <b>${fmt(td,1)} °C</b>`:""}${hu!=null?` · HU <b>${fmt(hu,0)} %</b>`:""}`);
     const hs=M("wave_height");
     if (hs!=null){
-      lines.push(`Mer totale <b>${fmt(hs,1)} m ${dir16(M("wave_direction"))}</b>`);
+      lines.push(`Mer totale <b>${fmt(hs,1)} m ${dir16(M("wave_direction"))}</b> · ${etatMer(hs)}`);
       const ww=M("wind_wave_height"); if (ww!=null) lines.push(`Mer du vent <b>${fmt(ww,1)} m</b>`);
       const p1=M("primary_swell_height");
       if (p1!=null){ lines.push(`Houle 1 <b>${fmt(p1,1)} m ${dir16(M("primary_swell_direction"))} ${fmt(M("primary_swell_period"),0)} s</b>`);
