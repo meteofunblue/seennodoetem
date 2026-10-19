@@ -472,6 +472,10 @@ def main():
 
     modeles = json.load(open("modeles.json", encoding="utf-8"))
     cfg = modeles[args.modele]
+    if cfg.get("source") == "cep":        # IFS / WAM du CEP (données ouvertes) : un téléchargement, plusieurs domaines
+        import convertir as conv
+        from cep import convertir_cep
+        return convertir_cep(args, cfg, conv)
     if cfg.get("source") == "cmems":      # courants Copernicus Marine : traitement à part
         from courants import convertir_courant
         return convertir_courant(args, cfg, ecrire_tuiles, ecrire_sortie)
