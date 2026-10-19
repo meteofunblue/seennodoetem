@@ -844,7 +844,7 @@ class OMFrozen {
 }
 
 /* ---------- Carte ---------- */
-const map = L.map("map",{zoomControl:true, worldCopyJump:false}).fitBounds([[47.75,-5.6],[48.75,-4.2]]);
+const map = L.map("map",{zoomControl:true, worldCopyJump:false}).fitBounds([[46.9,-6.3],[49.2,-1.8]]);
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
 const ESRI = s => `https://server.arcgisonline.com/ArcGIS/rest/services/${s}/MapServer/tile/{z}/{y}/{x}`;
 const BASEMAPS = {
@@ -1475,7 +1475,9 @@ function fillZones(){
   add(z,"vue","Vue actuelle de la carte"); add(z,"custom","Zone personnalisée…");
   const mz=myZones(), keys=Object.keys(mz);
   if (keys.length){ const g=document.createElement("optgroup"); g.label="Mes zones"; for (const k of keys) add(g,"mine:"+k,mz[k].nom); z.appendChild(g); }
-  z.value = [...z.options].some(o=>o.value===keep) ? keep : "iroise";
+  /* zone : celle déjà choisie, sinon la dernière utilisée (mémorisée), sinon la Bretagne */
+  const memo=store.get("zone_choisie",null), has=v=>[...z.options].some(o=>o.value===v);
+  z.value = has(keep) ? keep : (memo && has(memo) && memo!=="custom") ? memo : has("bretagne") ? "bretagne" : "iroise";
 }
 /* « 47.75 », « 47,75 », « 47°45' N », « 47 45,5 N », « 005°36'W » */
 function parseCoord(txt,isLat){
@@ -1543,7 +1545,7 @@ $("zSave").addEventListener("click",()=>{
 });
 $("zDel").addEventListener("click",()=>{
   const v=$("zone").value; if (!v.startsWith("mine:")) return;
-  const mz=myZones(); delete mz[v.slice(5)]; store.set("zones_perso",mz); fillZones(); $("zone").value="iroise"; onZoneChange();
+  const mz=myZones(); delete mz[v.slice(5)]; store.set("zones_perso",mz); fillZones(); $("zone").value="bretagne"; onZoneChange();
 });
 $("zGo").addEventListener("click",()=>loadGrid());
 function onZoneChange(sansCharger){
@@ -2493,7 +2495,8 @@ function setDrw(px,save=true){
   clearTimeout(setDrw.t); setDrw.t=setTimeout(()=>drawMG(),60);
 }
 { const w=store.get("largeur_volet_graphiques",null); if (w) setDrw(w,false); }
-function mapFull(on){
+function mapFull(on, memoriser=true){
+  if (memoriser) store.set("carte_agrandie", on);
   document.body.classList.toggle("mapfull",on); $("dock").hidden=!on;
   for (const id of ["edgeL","edgeR","tabL","tabR","drawL","drawRhead","gripR"]) $(id).hidden=!on;
   moveTools(on);
@@ -2619,6 +2622,7 @@ map.on("moveend",()=>{
   moveT=setTimeout(()=>loadGrid(),800);
 });
 $("zone").addEventListener("change",onZoneChange);
+$("zone").addEventListener("change",()=>store.set("zone_choisie",$("zone").value));
 $("play").addEventListener("click",()=>{
   if (st.playing){ clearInterval(st.playing); st.playing=null; $("play").textContent="▶"; return; }
   $("play").textContent="❚❚";
@@ -2760,6 +2764,8 @@ $("mgWide").addEventListener("click",()=>{
     setStatus("Données Météo-France indisponibles ("+e.message+") : IFS via Open-Meteo, ou « Ouvrir… » une situation enregistrée.", true);
   }
   fillModels(); fillRuns(); syncModelUI();
+  /* ouverture en carte agrandie par défaut (ou selon le dernier choix de l'utilisateur) */
+  if (store.get("carte_agrandie", true)) mapFull(true, false);
   /* sans réseau : rien à télécharger, on propose d'ouvrir une situation enregistrée */
   if (!st.index && (HORS_LIGNE || !navigator.onLine)){
     setStatus("Hors ligne : ouvrez une situation enregistrée (.meteo) avec « Ouvrir… ».", true);
