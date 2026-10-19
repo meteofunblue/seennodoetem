@@ -417,11 +417,25 @@ const stepHours = (times,j) => j>0 ? Math.round((tDate(times[j])-tDate(times[j-1
 function setStatus(msg,err){ const s=$("status"); s.textContent=msg; s.classList.toggle("err",!!err); }
 const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
+/* Open-Meteo gratuit : quota par minute partagé par tous les postes d'une même connexion (salle de classe…).
+   Réponses gardées 30 min en mémoire ; quota dépassé : nouvel essai automatique après une minute. */
+const OM_CACHE = new Map(), OM_TTL = 30*60e3;
+const pause = ms => new Promise(r=>setTimeout(r,ms));
 async function getJSON(url){
-  const r = await fetch(url);
-  let j; try { j = await r.json(); } catch(e){ throw new Error("Réponse illisible (HTTP "+r.status+")"); }
-  if (!r.ok || j.error) throw new Error(j.reason || ("HTTP "+r.status));
-  return Array.isArray(j) ? j : [j];
+  const c=OM_CACHE.get(url); if (c && Date.now()-c.t<OM_TTL) return c.data;
+  for (let essai=0; ; essai++){
+    const r = await fetch(url);
+    let j; try { j = await r.json(); } catch(e){ throw new Error("Réponse illisible (HTTP "+r.status+")"); }
+    const quota = r.status===429 || /limit exceeded/i.test(j && j.reason || "");
+    if (quota && essai<2){
+      for (let s=60; s>0; s-=5){ setStatus(`Open-Meteo : quota de requêtes atteint (connexion partagée ?), nouvel essai dans ${s} s…`, true); await pause(5000); }
+      continue;
+    }
+    if (quota) throw new Error("quota Open-Meteo dépassé : réessayez dans quelques minutes, réduisez « Maillage IFS » ou utilisez les modèles Météo-France");
+    if (!r.ok || j.error) throw new Error(j.reason || ("HTTP "+r.status));
+    const data = Array.isArray(j) ? j : [j];
+    OM_CACHE.set(url,{t:Date.now(), data}); return data;
+  }
 }
 async function gunzip(buf){
   const u=new Uint8Array(buf);
@@ -648,7 +662,7 @@ class OM {
   }
   async grid(b){
     const span=Math.max(b.n-b.s,(b.e-b.o)*Math.cos((b.s+b.n)/2*Math.PI/180));
-    const n=$("res").value==="auto" ? (span<=3?14:span<=8?18:24) : +$("res").value, dlat=(b.n-b.s)/n, dlon=(b.e-b.o)/n, pts=[];
+    const n=$("res").value==="auto" ? (span<=3?10:span<=8?14:18) : +$("res").value, dlat=(b.n-b.s)/n, dlon=(b.e-b.o)/n, pts=[];
     for (let i=0;i<n;i++) for (let j=0;j<n;j++) pts.push({lat:+(b.s+(i+0.5)*dlat).toFixed(3), lon:+(b.o+(j+0.5)*dlon).toFixed(3)});
     for (let k=0;k<pts.length;k+=CHUNK){
       const sl=pts.slice(k,k+CHUNK);
@@ -2180,7 +2194,7 @@ function fillSavePanel(){
   /* Open-Meteo (mondial) : IFS, vagues MFWAM global, courant mondial ; téléchargés pour la zone à l'enregistrement */
   if (!st.offline){
     const span=Math.max(b.n-b.s,(b.e-b.o)*Math.cos((b.s+b.n)/2*Math.PI/180));
-    const n=$("res").value==="auto" ? (span<=3?14:span<=8?18:24) : +$("res").value;
+    const n=$("res").value==="auto" ? (span<=3?10:span<=8?14:18) : +$("res").value;
     const omOpts=[...Object.entries(OM_A).map(([k,v])=>["om:"+k,v.nom,50,VARS_A.length]),
                   ...Object.entries(OM_M).map(([k,v])=>["om:"+k,v.nom,192,VARS_M.length]),
                   ...Object.entries(OM_C).map(([k,v])=>["om:"+k,v.nom,192,C_VARS.length])];
