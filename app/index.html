@@ -1409,7 +1409,30 @@ function coherence(){
   if (aid==="aromeifs") return `⚠ pas de modèle de vagues forcé par AROME-IFS (${wi.nom})`;
   return `⚠ vagues forcées par ${(modelInfo(wi.force_par)||{nom:wi.force_par}).nom}, pas par ${(modelInfo(aid)||{nom:aid}).nom}`;
 }
+/* variables disponibles d'une source (null = inconnu : tout est proposé) */
+function varsOf(val){
+  if (!val) return [];
+  const [kind,id]=val.split(":");
+  if (kind==="om") return OM_A[id]?VARS_A:OM_C[id]?C_VARS:VARS_M;
+  const m=modelInfo(id); return m && m.variables ? m.variables : null;
+}
+/* liste « Paramètre carte » : seuls les paramètres fournis par les modèles choisis sont proposés */
+function updateParams(){
+  const src={a:varsOf($("model").value), m:varsOf($("wmodel").value), c:varsOf($("cmodel").value)};
+  const dispo=(P)=>{
+    const L=src[P.src]; if (L===null) return true; if (!L.length) return false;
+    const has=k=>L.includes(k) || (k==="relative_humidity_2m" && L.includes("dew_point_2m") && L.includes("temperature_2m"));
+    return P.layers ? P.layers.some(k=>has(PARAMS[k].key)) : has(P.key);
+  };
+  const sel=$("param");
+  for (const o of sel.querySelectorAll("option")){ const ok=dispo(PARAMS[o.value]); o.hidden=!ok; o.disabled=!ok; }
+  for (const gp of sel.querySelectorAll("optgroup")) gp.hidden=![...gp.children].some(o=>!o.hidden);
+  if (sel.selectedOptions[0] && sel.selectedOptions[0].disabled){
+    const first=[...sel.options].find(o=>!o.disabled); if (first){ sel.value=first.value; lastMissing=null; drawLegend(); drawField(); }
+  }
+}
 function syncModelUI(){
+  updateParams();
   const a=$("model").value, w=$("wmodel").value;
   $("ctlRes").hidden = !(a.startsWith("om:") || w.startsWith("om:"));
   const ai=a.startsWith("mf:")?modelInfo(a.slice(3)):null, wi=w.startsWith("mf:")?modelInfo(w.slice(3)):null;
@@ -1664,8 +1687,9 @@ function renderReadout(){
       const p=D.pos[j], rc=relAngle(cd,p.cap);
       rows.push(["Courant / route", rc==null||cs==null?"—":`${Math.abs(rc)<45?"portant":Math.abs(rc)>135?"contraire":"traversier"+side(rc)} · ${(cs*Math.cos(rc*Math.PI/180)>=0?"+":"−")+fmt(Math.abs(cs*Math.cos(rc*Math.PI/180)),1)} kt sur le fond`]);
     }
+    /* ligne toujours présente (même vide) : le tableau garde sa hauteur et les graphiques ne sautent pas */
     const vc=ventCourant(g(a,"wind_direction_10m"),g(a,"wind_speed_10m"),cd,cs);
-    if (vc) rows.push(["Vent / courant", vc==="contre"?"⚠ vent contre courant (mer creuse)":"vent avec le courant (mer adoucie)"]);
+    rows.push(["Vent / courant", vc==="contre"?"⚠ contre courant (mer creuse)":vc==="avec"?"avec le courant (mer adoucie)":"—"]);
   }
   rows.push(
     [`Précip. ${stepHours(D.times,j)} h`, `${fmt(g(a,"precipitation"),1)} mm`],
@@ -1677,6 +1701,10 @@ function renderReadout(){
   if (a.dew_point_2m && a.dew_point_2m.some(v=>v!=null)) rows.push(["Td 2 m", `${fmt(g(a,"dew_point_2m"),1)} °C`]);
   if (a.relative_humidity_2m && a.relative_humidity_2m.some(v=>v!=null)) rows.push(["HU 2 m", `${fmt(g(a,"relative_humidity_2m"),0)} %`]);
   el.innerHTML=`<div class="t">${tLabel(D.times[j])}</div>`+rows.map(([k,v])=>`<div><span>${k}</span><br><b>${v}</b></div>`).join("");
+  /* hauteur du tableau : jamais réduite tant qu'on lit les mêmes données (survol), pour éviter les sauts */
+  const cle=D.kind+"|"+(D.provA||"")+"|"+(D.glat||"")+"|"+(D.glon||"")+"|"+D.times.length+"|"+(el.clientWidth>>4);
+  if (el._cle!==cle){ el._cle=cle; el._maxH=0; el.style.minHeight=""; }
+  const hh=el.offsetHeight; if (hh>(el._maxH||0)){ el._maxH=hh; el.style.minHeight=hh+"px"; }
 }
 
 function niceMax(v){ if (!(v>0)) return 1; const p=Math.pow(10,Math.floor(Math.log10(v))); for (const f of [1,1.5,2,2.5,3,4,5,6,8,10]) if (f*p>=v) return f*p; return 10*p; }
