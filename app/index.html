@@ -1117,24 +1117,6 @@ function viewWindow(g,margin=2){
 }
 const cellPx = g => { const a=map.latLngToContainerPoint([g.lat0,g.lon0]), b=map.latLngToContainerPoint([g.lat0+g.dlat,g.lon0+g.dlon]); return Math.max(0.1,Math.min(Math.abs(b.x-a.x),Math.abs(b.y-a.y))); };
 const gLat = (g,i) => g.lat0+i*g.dlat, gLon = (g,j) => g.lon0+j*g.dlon;
-/* nuages superposés : moyens en hachures « / » mauves, élevés en hachures « \ » bleues, bas en aplat brun */
-const HACH={ nmid:{col:"#7b2d8e", sens:1}, nhigh:{col:"#1f6fd1", sens:-1} };
-function motif(ctx,h){
-  const k="_m"+h.sens+h.col; if (motif[k]) return ctx.createPattern(motif[k],"repeat");
-  const c=document.createElement("canvas"), n=9; c.width=c.height=n; const x=c.getContext("2d");
-  x.strokeStyle=h.col; x.lineWidth=2.2; x.lineCap="square"; x.beginPath();
-  if (h.sens>0){ x.moveTo(0,n); x.lineTo(n,0); x.moveTo(-n/2,n/2); x.lineTo(n/2,-n/2); x.moveTo(n/2,n*1.5); x.lineTo(n*1.5,n/2); }
-  else { x.moveTo(0,0); x.lineTo(n,n); x.moveTo(-n/2,n/2); x.lineTo(n/2,n*1.5); x.moveTo(n/2,-n/2); x.lineTo(n*1.5,n/2); }
-  x.stroke(); motif[k]=c; return ctx.createPattern(c,"repeat");
-}
-function paintPattern(ctx,P,g,vals,op,h){
-  const dpr=window.devicePixelRatio||1, W=ctx.canvas.width, H=ctx.canvas.height;
-  const off=document.createElement("canvas"); off.width=W; off.height=H;
-  const oc=off.getContext("2d"); oc.setTransform(dpr,0,0,dpr,0,0);
-  paintScalar(oc,P,g,vals,1);                         /* opacité = part du ciel couverte */
-  oc.globalCompositeOperation="source-in"; oc.fillStyle=motif(oc,h); oc.fillRect(0,0,W/dpr,H/dpr);
-  ctx.save(); ctx.globalAlpha=op; ctx.drawImage(off,0,0,W/dpr,H/dpr); ctx.restore();
-}
 function paintScalar(ctx,P,g,vals,op){
   if ($("smooth").checked){
     const step=4, A=screenAxes(g,step);
@@ -1231,8 +1213,10 @@ function drawField(){
   const P=PARAMS[$("param").value], i=st.tIdx, op=+$("opac").value;
   let any=false, g=null, vals=null;
   if (P && P.layers){
-    for (const k of ["nlow","nmid","nhigh"]){ const r=fieldVals(PARAMS[k],i); if (r&&r.vals){ g=r.g; any=any||r.vals.some(x=>!isNaN(x));
-      if (k==="nlow") paintScalar(ctx,PARAMS[k],r.g,r.vals,Math.min(1,op+0.15)); else paintPattern(ctx,PARAMS[k],r.g,r.vals,Math.min(1,op+0.25),HACH[k]); } }
+    /* étages superposés plus transparents (élevés en dessous, bas au-dessus) : les couches du dessous restent visibles */
+    const TR={nhigh:0.55, nmid:0.65, nlow:0.75};
+    for (const k of P.layers){ const r=fieldVals(PARAMS[k],i); if (r&&r.vals){ g=r.g; any=any||r.vals.some(x=>!isNaN(x));
+      paintScalar(ctx,PARAMS[k],r.g,r.vals,Math.min(1,(op+0.15)*TR[k])); } }
   } else if (P){
     const r=fieldVals(P,i);
     if (r && r.vals){ g=r.g; vals=r.vals; any=vals.some(x=>!isNaN(x)); paintScalar(ctx,P,g,vals,op); }
@@ -1316,14 +1300,11 @@ function drawLegend(){
   const W=cv.clientWidth||300, H=34; cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   if (P.layers){
-    const names={nlow:"Bas · aplat",nmid:"Moyens · hachures /",nhigh:"Élevés · hachures \\"}, order=["nlow","nmid","nhigh"], seg=(W-8)/3;
+    const names={nlow:"Bas",nmid:"Moyen",nhigh:"Élevé"}, order=["nlow","nmid","nhigh"], seg=(W-8)/3;
     ctx.font="11px 'JetBrains Mono',monospace"; ctx.textAlign="left";
     order.forEach((k,j)=>{
       const x0=4+j*seg+ (j?6:0), w=seg-12, sc=PARAMS[k].scale;
-      if (k==="nlow"){ for (let px=0;px<w;px++){ ctx.fillStyle=rgba(colorAt(sc,8*px/w)); ctx.fillRect(x0+px,2,1.2,14); } }
-      else { ctx.save(); const gr=ctx.createLinearGradient(x0,0,x0+w,0); gr.addColorStop(0,"rgba(0,0,0,0)"); gr.addColorStop(1,"rgba(0,0,0,1)");
-        ctx.beginPath(); ctx.rect(x0,2,w,14); ctx.clip(); ctx.fillStyle=motif(ctx,HACH[k]); ctx.fillRect(x0,2,w,14);
-        ctx.globalCompositeOperation="destination-in"; ctx.fillStyle=gr; ctx.fillRect(x0,2,w,14); ctx.restore(); }
+      for (let px=0;px<w;px++){ ctx.fillStyle=rgba(colorAt(sc,8*px/w)); ctx.fillRect(x0+px,2,1.2,14); }
       ctx.strokeStyle=css("--line"); ctx.strokeRect(x0,2,w,14);
       ctx.fillStyle=css("--muted"); ctx.fillText(`${names[k]} 0→8`, x0, 30);
     });
