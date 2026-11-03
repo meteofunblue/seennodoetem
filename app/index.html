@@ -362,7 +362,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 03/11/2026 09:45</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 03/11/2026 09:50</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -448,8 +448,8 @@ const S = (arr) => arr.map(([v,c,a]) => { const col = hex(c); if (a!==undefined)
 const SEUIL_NUAGE = 3;   /* octas : un étage est compté présent à partir de cette couverture */
 const SC = {
   /* vent et rafales : une couleur par tranche de 5 nœuds */
-  wind: classes([[0,"#e8f4fb",""],[5,"#b9def0",""],[10,"#7cc4e4",""],[15,"#4daf7c",""],[20,"#9ccf4f",""],[25,"#f3e04b",""],
-                 [30,"#fdb748",""],[35,"#f68a3c",""],[40,"#e8532f",""],[45,"#c9252b",""],[50,"#9b1532",""],[55,"#6e0f4f",""],[60,"#4a0a6b",""]], 80),
+  wind: classes([[0,"#e8f4fb",""],[5,"#b9def0",""],[10,"#7cc4e4",""],[15,"#4daf7c",""],[20,"#f3e04b",""],[25,"#f68a3c",""],
+                 [30,"#e8532f",""],[35,"#c9252b",""],[40,"#9b1532",""],[45,"#6e0f4f",""],[50,"#4a0a6b",""],[55,"#33075a",""],[60,"#1e0440",""]], 80),
   wave: classes([[0,"#fff35c","belle"],[0.5,"#ffbe1a","peu agitée"],[1.25,"#a6e22e","agitée"],[2.5,"#1fb3f5","forte"],
                  [4,"#5b3cf0","très forte"],[6,"#a033f0","grosse"],[9,"#f03cf0","très grosse"],[14,"#ff1e8c","énorme"]], 16),
   period: S([[0,"#fde725"],[4,"#a0da39"],[7,"#4ac16d"],[10,"#1fa187"],[13,"#277f8e"],[16,"#365c8d"],[20,"#46327e"]]),
