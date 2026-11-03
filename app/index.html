@@ -362,7 +362,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 03/11/2026 09:25</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -457,7 +457,7 @@ const SC = {
   /* étages nuageux : brun (bas), mauve-bordeaux (moyen), bleu pâle (haut) */
   nlow: S([[0,"#a0703f",0],[0.5,"#a0703f",0],[1,"#b08158",0.30],[4,"#8a5a2b",0.65],[8,"#5e3b1a",0.92]]),
   nmid: S([[0,"#a5679a",0],[0.5,"#a5679a",0],[1,"#b98ab0",0.30],[4,"#94467f",0.65],[8,"#6d1a45",0.92]]),
-  nhigh: S([[0,"#d6e8f7",0],[0.5,"#d6e8f7",0],[1,"#e2effa",0.35],[4,"#b9d8f2",0.65],[8,"#8fbfe8",0.9]]),
+  nhigh: S([[0,"#6fa8e6",0],[0.5,"#6fa8e6",0],[1,"#8bb9ec",0.40],[4,"#4f8fdb",0.70],[8,"#2a62b8",0.90]]),   /* bleu soutenu : lisible sur le fond océan */
   cur: S([[0,"#eef3f7",0.15],[0.25,"#d4e6f1",0.5],[0.5,"#9ecae1"],[1,"#4daf7c"],[1.5,"#fee08b"],[2,"#fdae61"],[3,"#f46d43"],[4,"#d73027"],[6,"#7f0000"]]),
   hu: S([[0,"#f6e7c8"],[30,"#e9c46a"],[50,"#c7d9a0"],[65,"#8cc5c0"],[80,"#4f97c8"],[90,"#2b62ad"],[100,"#18306e"]]),
   /* CAPE par classes : les faibles valeurs (25–250 J/kg, fréquentes en averses de traîne) restent bien visibles */
@@ -1213,9 +1213,9 @@ function drawField(){
   const P=PARAMS[$("param").value], i=st.tIdx, op=+$("opac").value;
   let any=false, g=null, vals=null;
   if (P && P.layers){
-    /* étages superposés plus transparents (élevés en dessous, bas au-dessus) : les couches du dessous restent visibles */
-    const TR={nhigh:0.55, nmid:0.65, nlow:0.75};
-    for (const k of P.layers){ const r=fieldVals(PARAMS[k],i); if (r&&r.vals){ g=r.g; any=any||r.vals.some(x=>!isNaN(x));
+    /* étages superposés plus transparents, dans l'ordre vu d'en haut (bas, puis moyens, puis élevés par-dessus) */
+    const TR={nlow:0.75, nmid:0.7, nhigh:0.8};
+    for (const k of ["nlow","nmid","nhigh"]){ const r=fieldVals(PARAMS[k],i); if (r&&r.vals){ g=r.g; any=any||r.vals.some(x=>!isNaN(x));
       paintScalar(ctx,PARAMS[k],r.g,r.vals,Math.min(1,(op+0.15)*TR[k])); } }
   } else if (P){
     const r=fieldVals(P,i);
