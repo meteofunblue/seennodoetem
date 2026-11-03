@@ -362,7 +362,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 03/11/2026 09:50</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 03/11/2026 10:05</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -455,14 +455,18 @@ const SC = {
   period: S([[0,"#fde725"],[4,"#a0da39"],[7,"#4ac16d"],[10,"#1fa187"],[13,"#277f8e"],[16,"#365c8d"],[20,"#46327e"]]),
   rr: S([[0,"#ffffff",0],[0.09,"#c6dbef",0],[0.1,"#c6dbef"],[0.5,"#6baed6"],[1,"#2171b5"],[2,"#41ab5d"],[5,"#fec44f"],[10,"#e31a1c"],[20,"#a50f15"]]),
   cloud: S([[0,"#ffffff",0],[1,"#d9dee3",0.35],[4,"#aab4bd",0.7],[8,"#5f6b76",0.9]]),
-  temp: S([[-5,"#313695"],[0,"#4575b4"],[5,"#74add1"],[10,"#abd9e9"],[15,"#fee090"],[20,"#fdae61"],[25,"#f46d43"],[30,"#d73027"],[35,"#a50026"]]),
+  /* température : une couleur par pas de 2 °C (de −24 à 46 °C) */
+  temp: classes([[-24,"#400040",""],[-22,"#600060",""],[-20,"#aa00aa",""],[-18,"#801080",""],[-16,"#600040",""],[-14,"#303366",""],[-12,"#003399",""],[-10,"#0000cc",""],[-8,"#0000ff",""],[-6,"#0055ff",""],[-4,"#0099ff",""],[-2,"#33ccff",""],[0,"#66ffff",""],[2,"#66ff99",""],[4,"#66ff66",""],[6,"#66ff00",""],[8,"#bffa0e",""],[10,"#ffff09",""],[12,"#ffff86",""],[14,"#fde851",""],[16,"#ffcc00",""],[18,"#ff9900",""],[20,"#ff6900",""],[22,"#ff4d33",""],[24,"#ff3000",""],[26,"#ff0000",""],[28,"#e50000",""],[30,"#b20000",""],[32,"#990000",""],[34,"#6c0000",""],[36,"#800050",""],[38,"#a00077",""],[40,"#cc00cc",""],[42,"#ff00ff",""],[44,"#ff40ff",""],[46,"#ff80ff",""]], 50),
+  /* point de rosée : une couleur par pas de 2 °C (de −24 à 30 °C) */
+  td: classes([[-24,"#000010",""],[-22,"#000520",""],[-20,"#001040",""],[-18,"#003366",""],[-16,"#003399",""],[-14,"#0000cc",""],[-12,"#0000ff",""],[-10,"#0066ff",""],[-8,"#0099ff",""],[-6,"#33ccff",""],[-4,"#66ffff",""],[-2,"#66ff99",""],[0,"#66ff66",""],[2,"#66ff00",""],[4,"#bffa0e",""],[6,"#ffff09",""],[8,"#ffff86",""],[10,"#fde851",""],[12,"#ffcc00",""],[14,"#ff9900",""],[16,"#ff6900",""],[18,"#ff4d33",""],[20,"#ff3000",""],[22,"#ff0000",""],[24,"#cc0000",""],[26,"#990000",""],[28,"#6c0000",""],[30,"#4f0000",""]], 34),
   pmer: S([[960,"#4b2991"],[975,"#2f6fdc"],[990,"#6aaed6"],[1005,"#c9e3f2"],[1013,"#f4f4f2"],[1020,"#fde2b0"],[1030,"#f6b26b"],[1040,"#e0703a"],[1050,"#b23a2a"]]),
   /* étages nuageux : brun (bas), mauve-bordeaux (moyen), bleu pâle (haut) */
   nlow: S([[0,"#a0703f",0],[0.5,"#a0703f",0],[1,"#b08158",0.30],[4,"#8a5a2b",0.65],[8,"#5e3b1a",0.92]]),
   nmid: S([[0,"#a5679a",0],[0.5,"#a5679a",0],[1,"#b98ab0",0.30],[4,"#94467f",0.65],[8,"#6d1a45",0.92]]),
   nhigh: S([[0,"#6fa8e6",0],[0.5,"#6fa8e6",0],[1,"#8bb9ec",0.40],[4,"#4f8fdb",0.70],[8,"#2a62b8",0.90]]),   /* bleu soutenu : lisible sur le fond océan */
   cur: S([[0,"#eef3f7",0.15],[0.25,"#d4e6f1",0.5],[0.5,"#9ecae1"],[1,"#4daf7c"],[1.5,"#fee08b"],[2,"#fdae61"],[3,"#f46d43"],[4,"#d73027"],[6,"#7f0000"]]),
-  hu: S([[0,"#f6e7c8"],[30,"#e9c46a"],[50,"#c7d9a0"],[65,"#8cc5c0"],[80,"#4f97c8"],[90,"#2b62ad"],[100,"#18306e"]]),
+  /* humidité relative : une couleur par pas de 5 % */
+  hu: classes([[0,"#8c5a2b",""],[5,"#a86b33",""],[10,"#c27f3d",""],[15,"#d79a4c",""],[20,"#e6b45e",""],[25,"#f0cb73",""],[30,"#f6dd8c",""],[35,"#f2e8a6",""],[40,"#dfeeb0",""],[45,"#c3e6a8",""],[50,"#a3dca0",""],[55,"#7fd09a",""],[60,"#5cc39a",""],[65,"#3fb3a5",""],[70,"#2ea0b8",""],[75,"#2a8ac8",""],[80,"#2b72cf",""],[85,"#2f58c8",""],[90,"#2f3fb5",""],[95,"#2a2a8f",""]], 100),
   /* CAPE par classes : les faibles valeurs (25–250 J/kg, fréquentes en averses de traîne) restent bien visibles */
   /* nuages par étage : code 1 = bas, 2 = moyens, 4 = élevés, additionnés */
   ncombo: classes([[1,"#c98a3e","Bas",0.8],[2,"#b05fb0","Moyens",0.8],[3,"#7b3f2c","B+M",0.85],[4,"#4f9fe0","Élevés",0.75],
@@ -485,7 +489,7 @@ const PARAMS = {
   nmid:{label:"Nuages moyens", unit:"octas", src:"a", key:"cloud_cover_mid", conv:v=>v/12.5, scale:SC.nmid, dec:0},
   nhigh:{label:"Nuages élevés", unit:"octas", src:"a", key:"cloud_cover_high", conv:v=>v/12.5, scale:SC.nhigh, dec:0},
   t2:{label:"Température 2 m", unit:"°C", src:"a", key:"temperature_2m", scale:SC.temp, dec:0},
-  td:{label:"Point de rosée 2 m", unit:"°C", src:"a", key:"dew_point_2m", scale:SC.temp, dec:0},
+  td:{label:"Point de rosée 2 m", unit:"°C", src:"a", key:"dew_point_2m", scale:SC.td, dec:0},
   hu:{label:"Humidité relative 2 m", unit:"%", src:"a", key:"relative_humidity_2m", scale:SC.hu, dec:0},
   hs:{label:"Hauteur mer totale (Hs)", unit:"m", src:"m", key:"wave_height", dir:["wave_direction"], glyph:"arrow", scale:SC.wave, dec:1},
   tp:{label:"Période pic (mer totale)", unit:"s", src:"m", key:"wave_peak_period", dir:["wave_direction"], glyph:"arrow", scale:SC.period, dec:0},
@@ -1322,11 +1326,12 @@ function drawLegend(){
     return;
   }
   if (P.scale.classes){            /* échelle par classes : cases de même largeur, seuils et noms */
-    const C=P.scale.classes, n=C.length, w=(W-8)/n;
+    const C=P.scale.classes, n=C.length, w=(W-8)/n; drawLegend.lx=-99;
     ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="center";
     C.forEach((c,i)=>{ const x0=4+i*w; ctx.fillStyle=c.col; ctx.fillRect(x0,2,w,14);
       if (c.vide){ ctx.fillStyle=css("--panel"); ctx.fillRect(x0,2,w,14); }
-      ctx.fillStyle=css("--muted"); if (i && !P.cat) ctx.fillText(String(c.min).replace(".",","), x0, 27);
+      ctx.fillStyle=css("--muted");
+      if (i && !P.cat && x0-(drawLegend.lx||-99)>=24){ ctx.fillText(String(c.min).replace(".",","), x0, 27); drawLegend.lx=x0; }
       if (w>52){ const [r,g,b]=c.vide?[255,255,255]:hex(c.col); ctx.fillStyle=(0.299*r+0.587*g+0.114*b)/255>0.55?"#0d1b2a":"#ffffff";
         ctx.font="600 10px Barlow,sans-serif"; ctx.fillText(c.nom, x0+w/2, 12.5); ctx.font="10px 'JetBrains Mono',monospace"; } });
     ctx.strokeStyle=css("--line"); ctx.strokeRect(4,2,W-8,14);
