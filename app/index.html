@@ -857,6 +857,8 @@ const BASEMAPS = {
 /* version hors ligne (fichier autonome) : bibliothèques et traits de côte embarqués, voir hors_ligne.py */
 const HORS_LIGNE = !!window.HORS_LIGNE;
 if (HORS_LIGNE) document.querySelectorAll(".lienHL").forEach(e=>e.hidden=true);
+/* page ouverte depuis un fichier local (copie de l'appli) : le lien pointe vers le site, pas vers le disque */
+if (location.protocol==="file:") document.querySelectorAll('a[href="hors-ligne.html"]').forEach(a=>{ a.href=BASE+"hors-ligne.html"; a.target="_blank"; });
 const FALLBACK = ["ocean","osm","gris"];
 let tiles, baseKey = HORS_LIGNE && !navigator.onLine ? "aucun" : "ocean", tileErr = 0, tileOk = 0;
 function setTiles(key){
