@@ -125,7 +125,21 @@ body.drwL .drawerL{transform:none}
 .drwhead b{font:700 13px var(--f-display,sans-serif);text-transform:uppercase;letter-spacing:.08em}
 .drwhead button{min-height:28px;width:30px;padding:0;border-radius:8px;background:transparent;border:1px solid transparent;cursor:pointer;font-size:14px}
 .drwhead button:hover{border-color:var(--line);background:var(--panel)}
+.drwhead button.drwact{width:auto;padding:0 10px;font:600 12px var(--f-body,sans-serif);border:1px solid var(--line);background:var(--panel)}
+.drwhead button.drwact:hover{border-color:var(--accent)}
 .drwpin{opacity:.45} .drwpin.on{opacity:1;background:var(--panel)!important;border-color:var(--accent)!important}
+.affgrp{display:contents} .afftitre{display:none}
+#drawLbody .saverow{display:flex;width:100%;margin-right:0;justify-content:space-between}
+#drawLbody .saverow > span{white-space:nowrap;font-size:12px}
+#drawLbody .affgrp{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:color-mix(in srgb,var(--panel) 60%,transparent)}
+#drawLbody .afftitre{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:28px;padding:2px 0;border:0;background:transparent;cursor:pointer;
+  font:700 11px var(--f-display,sans-serif);text-transform:uppercase;letter-spacing:.08em;color:var(--ink)}
+#drawLbody .afftitre::after{content:"▾";font-size:13px;transition:transform .2s}
+#drawLbody .affgrp.ferme .afftitre::after{transform:rotate(-90deg)}
+#drawLbody .affgrp.ferme > :not(.afftitre){display:none!important}
+/* volet Outils : les choix déjà présents dans la barre flottante (modèles, paramètre, zone) n'y sont pas répétés */
+#drawLbody .ctl:has(> #model), #drawLbody .ctl:has(> #wmodel), #drawLbody .ctl:has(> #cmodel),
+#drawLbody .ctl:has(> #param), #drawLbody .ctl:has(#zone){display:none!important}
 #drawLbody header.bar{display:flex!important;flex-direction:column;align-items:stretch;gap:10px;background:transparent;border:0;padding:12px}
 #drawLbody header.bar .brand{display:none}
 #drawLbody header.bar .ctl{width:100%;max-width:none}
@@ -245,8 +259,8 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="zone">Zone</label><div class="zonerow"><select id="zone"></select><button class="primary" id="load" title="Charger (ou recharger) les modèles pour la zone">Charger</button></div></div>
   <div class="ctl" id="ctlRes"><label for="res">Maillage IFS</label>
     <select id="res"><option value="auto" selected>Auto (selon la zone)</option><option value="10">10 × 10</option><option value="14">14 × 14</option><option value="18">18 × 18</option><option value="24">24 × 24</option><option value="30">30 × 30</option></select></div>
-  <div class="ctl"><label for="gmode">Rafales</label>
-    <select id="gmode"><option value="heure" selected>Valeur à l'heure affichée</option><option value="max">Maximum sur le pas</option></select></div>
+
+  <div class="affgrp" id="affgrp"><button type="button" class="afftitre" id="affTitre" aria-expanded="true">Paramètres cartographie / affichage</button>
   <div class="ctl"><label for="basemap">Fond</label><select id="basemap"></select></div>
   <div class="ctl"><label for="opac">Opacité</label><input type="range" id="opac" min="0.2" max="1" step="0.05" value="0.6"></div>
   <label class="chk"><input type="checkbox" id="smooth" checked> Lissage</label>
@@ -257,6 +271,7 @@ footer a{color:var(--accent)}
   <label class="chk"><input type="checkbox" id="vals" checked> Valeurs</label>
   <select id="dens" aria-label="Densité des barbules et flèches" title="Densité des barbules, flèches et valeurs" style="min-height:30px;padding:3px 6px">
     <option value="30">Barbules serrées</option><option value="45" selected>Barbules normales</option><option value="70">Barbules espacées</option></select>
+  </div>
   <div class="grp">
     <button id="btnTransit" aria-expanded="false">Transit</button>
     <button id="btnSave" title="Enregistrer un ou plusieurs modèles de la zone dans un fichier, pour les rouvrir sans réseau">Enregistrer…</button>
@@ -362,7 +377,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 05/11/2026 11:00</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 05/11/2026 11:30</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -376,7 +391,10 @@ footer a{color:var(--accent)}
     <button class="drwx" data-side="L" type="button" title="Fermer">✕</button></div>
   <div id="drawLbody"></div>
 </aside>
-<div id="drawRhead" class="drwhead drwheadR" hidden><b>Graphiques</b><span style="flex:1"></span>
+<div id="drawRhead" class="drwhead drwheadR" hidden><b>Graphiques</b>
+  <button id="rRoute" type="button" class="drwact" title="Créer ou modifier une route (transit)">⛵ Route</button>
+  <button id="rSave" type="button" class="drwact" title="Enregistrer les modèles de la zone pour une utilisation hors ligne">⤓ Hors ligne</button>
+  <span style="flex:1"></span>
   <button class="drwpin" data-side="R" type="button" title="Garder le volet ouvert">📌</button>
   <button class="drwx" data-side="R" type="button" title="Fermer">✕</button></div>
 <div id="gripR" class="gripR" hidden title="Glisser pour élargir ou réduire les graphiques"></div>
@@ -479,7 +497,8 @@ const SC = {
 /* src : a = modèle d'atmosphère, m = modèle d'état de mer ; dir : variable(s) de direction (la première disponible) */
 const PARAMS = {
   wind:{label:"Vent moyen 10 m", unit:"kt", src:"a", key:"wind_speed_10m", dir:["wind_direction_10m"], glyph:"barb", scale:SC.wind, dec:0},
-  gust:{label:"Rafales 10 m", unit:"kt", src:"a", key:"wind_gusts_10m", dir:["wind_direction_10m"], glyph:"barb", scale:SC.wind, dec:0},
+  gust:{label:"Rafales max sur le pas", unit:"kt", src:"a", key:"wind_gusts_10m", dir:["wind_direction_10m"], glyph:"barb", scale:SC.wind, dec:0},
+  gusti:{label:"Rafales à l'heure affichée", unit:"kt", src:"a", key:"wind_gusts_10m_inst", dir:["wind_direction_10m"], glyph:"barb", scale:SC.wind, dec:0},
   pmer:{label:"Pression mer (Pmer)", unit:"hPa", src:"a", key:"pressure_msl", scale:SC.pmer, dec:0},
   rr:{label:"Précipitations (cumul sur le pas)", unit:"mm", src:"a", key:"precipitation", scale:SC.rr, dec:1},
   shw:{label:"Averses · précip. convectives (IFS)", unit:"mm", src:"a", key:"showers", scale:SC.rr, dec:1},
@@ -1068,8 +1087,9 @@ function gridOf(P){ return P.src==="m" ? st.gm : P.src==="c" ? st.gc : st.ga; }
 /* indice d'échéance du modèle du paramètre pour l'heure affichée (heures communes, pas d'interpolation) */
 function tiOf(g,i){ if (!g) return -1; const t=st.times[i]; const k=g.tindex.get(t); return k==null?-1:k; }
 /* Rafales : valeur à l'heure (IFS via Open-Meteo) ou maximum sur le pas (seule valeur fournie par Météo-France) */
-const gustMode = () => $("gmode").value;
-function keyOf(P,g){ return P.key==="wind_gusts_10m" && gustMode()==="heure" && g.get("wind_gusts_10m_inst") ? "wind_gusts_10m_inst" : P.key; }
+/* rafales : « à l'heure » si ce paramètre est choisi sur la carte (fourni par IFS / Open-Meteo), sinon maximum sur le pas */
+const gustMode = () => $("param").value==="gusti" ? "heure" : "max";
+function keyOf(P,g){ return P.key; }
 const gustInst = a => gustMode()==="heure" && !!a && hasData(a.wind_gusts_10m_inst);
 const gustArr = a => !a ? null : gustInst(a) ? a.wind_gusts_10m_inst : a.wind_gusts_10m;
 function gustLabel(D,j){ return gustInst(D.a) ? "Rafales (à l'heure)" : `Rafales max ${stepHours(D.times,j)} h`; }
@@ -1499,7 +1519,7 @@ function coherence(){
 function varsOf(val){
   if (!val) return [];
   const [kind,id]=val.split(":");
-  if (kind==="om") return OM_A[id]?VARS_A:OM_C[id]?C_VARS:VARS_M;
+  if (kind==="om") return OM_A[id]?VARS_A.concat(["wind_gusts_10m_inst"]):OM_C[id]?C_VARS:VARS_M;
   const m=modelInfo(id); return m && m.variables ? m.variables : null;
 }
 /* liste « Paramètre carte » : seuls les paramètres fournis par les modèles choisis sont proposés */
@@ -1514,7 +1534,8 @@ function updateParams(){
   for (const o of sel.querySelectorAll("option")){ const ok=dispo(PARAMS[o.value]); o.hidden=!ok; o.disabled=!ok; }
   for (const gp of sel.querySelectorAll("optgroup")) gp.hidden=![...gp.children].some(o=>!o.hidden);
   if (sel.selectedOptions[0] && sel.selectedOptions[0].disabled){
-    const first=[...sel.options].find(o=>!o.disabled); if (first){ sel.value=first.value; lastMissing=null; drawLegend(); drawField(); }
+    const proche={gusti:"gust"}[sel.value], alt=proche && [...sel.options].find(o=>o.value===proche && !o.disabled);
+    const first=alt || [...sel.options].find(o=>!o.disabled); if (first){ sel.value=first.value; lastMissing=null; drawLegend(); drawField(); }
   }
 }
 function syncModelUI(){
@@ -1677,7 +1698,7 @@ function setTime(i){
   $("time").value=st.tIdx;
   const t=st.times[st.tIdx];
   if (t){ const h=Math.round((tDate(t)-Date.now())/3.6e6); $("timeLbl").textContent=`${tLabel(t)} (${h>=0?"+":""}${h} h)`; }
-  if ($("param").value==="gust") drawLegend();
+  if ($("param").value==="gust" || $("param").value==="gusti") drawLegend();
   drawField(); drawMG(); renderReadout(); drawBoat();
 }
 
@@ -2599,6 +2620,14 @@ for (const side of ["L","R"]){
   panelOf(side).addEventListener("mouseenter",()=>clearTimeout(DRW.t[side]));
   if (side==="R"){ $("drawRhead").addEventListener("mouseleave",()=>{ if (document.body.classList.contains("mapfull")) leave(); }); $("drawRhead").addEventListener("mouseenter",()=>clearTimeout(DRW.t.R)); }
 }
+/* depuis le volet Graphiques : ouvrir le panneau Transit ou Enregistrer dans le volet Outils (épinglé le temps du travail) */
+function ouvrirOutil(btn, panel){
+  if ($(panel).hidden) $(btn).click();
+  DRW.pin.L=true; document.querySelectorAll('.drwpin[data-side="L"]').forEach(x=>x.classList.add("on"));
+  drawer("L",true); setTimeout(()=>$(panel).scrollIntoView({behavior:"smooth",block:"start"}),300);
+}
+$("rRoute").addEventListener("click",()=>ouvrirOutil("btnTransit","transitPanel"));
+$("rSave").addEventListener("click",()=>ouvrirOutil("btnSave","savePanel"));
 document.querySelectorAll(".drwpin").forEach(b=>b.addEventListener("click",()=>{ const s=b.dataset.side; DRW.pin[s]=!DRW.pin[s];
   document.querySelectorAll(`.drwpin[data-side="${s}"]`).forEach(x=>x.classList.toggle("on",DRW.pin[s])); }));
 document.querySelectorAll(".drwx").forEach(b=>b.addEventListener("click",()=>{ const s=b.dataset.side; DRW.pin[s]=false;
@@ -2615,6 +2644,7 @@ $("map").addEventListener("pointerdown",()=>{ if (!document.body.classList.conta
   g.addEventListener("mouseleave",()=>{ if (!g.classList.contains("on") && document.body.classList.contains("mapfull")) DRW.leave.R(); });
   g.addEventListener("dblclick",()=>{ document.documentElement.style.removeProperty("--drw"); store.set("largeur_volet_graphiques",null); drawMG(); }); }
 $("mClose").addEventListener("click",()=>mapFull(false));
+$("affTitre").addEventListener("click",()=>{ const g=$("affgrp"); g.classList.toggle("ferme"); $("affTitre").setAttribute("aria-expanded",!g.classList.contains("ferme")); });
 $("mMore").addEventListener("click",()=>$("dock").classList.toggle("compact"));
 if (innerWidth<700) $("dock").classList.add("compact");     /* téléphone : seul le paramètre est affiché, « ⋯ » pour le reste */
 $("mFs").addEventListener("click",()=>{
@@ -2666,7 +2696,7 @@ $("offQuit").addEventListener("click",()=>location.reload());
   for (const [k,p] of Object.entries(PARAMS)){ const o=document.createElement("option"); o.value=k; o.textContent=p.label; groups[p.src].appendChild(o); }
   $("param").append(groups.a, groups.m, groups.c);
 }
-$("param").addEventListener("change",()=>{ lastMissing=null; drawLegend(); drawField(); });
+$("param").addEventListener("change",()=>{ lastMissing=null; drawLegend(); drawField(); drawMG(); renderReadout(); });
 ["vals","coast","smooth","iso"].forEach(id=>$(id).addEventListener("change",drawField));
 $("dens").value=String(store.get("barbules_densite",45));
 $("dens").addEventListener("change",()=>{ store.set("barbules_densite",+$("dens").value); drawField(); });
@@ -2678,7 +2708,7 @@ $("run").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint();
 $("cmodel").addEventListener("change",()=>{ st.cNone=!$("cmodel").value; st.cManual=$("cmodel").value||null; loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("wmodel").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("res").addEventListener("change",()=>loadGrid());
-$("gmode").addEventListener("change",()=>{ drawLegend(); drawField(); drawMG(); renderReadout(); });
+
 $("time").addEventListener("input",e=>setTime(+e.target.value));
 $("load").addEventListener("click",()=>loadGrid());
 $("mLoad").addEventListener("click",()=>loadGrid());
@@ -2767,7 +2797,7 @@ function showHover(e){
     const {lat,lng}=e.latlng, A=(n)=>gridVal(st.ga,n,lat,lng), M=(n)=>gridVal(st.gm,n,lat,lng);
     const lines=[`<span class="pos">${dm(lat,true)} ${dm(lng,false)}</span>`];
     const P=PARAMS[$("param").value];
-    if (P && !P.layers && !["wind","gust","pmer","hs","t2","td","hu"].includes($("param").value)){
+    if (P && !P.layers && !["wind","gust","gusti","pmer","hs","t2","td","hu"].includes($("param").value)){
       const g=gridOf(P), v=g?gridVal(g,keyOf(P,g),lat,lng):null;
       lines.push(`${P.label} : <b>${v==null?"—":fmt(P.conv?P.conv(v):v,P.dec)} ${P.unit}</b>`);
     }
