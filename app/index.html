@@ -139,6 +139,9 @@ body.drwL .drawerL{transform:none}
 .drwhead button:hover{border-color:var(--line);background:var(--panel)}
 .drwhead button.drwact{width:auto;padding:0 10px;font:600 12px var(--f-body,sans-serif);border:1px solid var(--line);background:var(--panel)}
 .drwhead button.drwact:hover{border-color:var(--accent)}
+a.btnlien{display:inline-flex;align-items:center;min-height:34px;padding:4px 12px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel);color:var(--ink);text-decoration:none;font-size:14px}
+a.btnlien:hover{border-color:var(--accent)}
 .drwpin{opacity:.45} .drwpin.on{opacity:1;background:var(--panel)!important;border-color:var(--accent)!important}
 .affgrp{display:contents} .afftitre{display:none}
 #drawLbody .saverow{display:flex;width:100%;margin-right:0;justify-content:space-between}
@@ -202,7 +205,18 @@ body.mapfull #legend{height:28px}
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px;flex-wrap:wrap}
 #legendTitle{font:600 12px var(--f-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);white-space:nowrap}
 #legend{flex:1;min-width:200px;height:34px}
-#status{font-size:12px;color:var(--muted);width:100%}
+#status{display:none}
+#toasts{position:fixed;z-index:1200;right:16px;top:118px;display:flex;flex-direction:column;gap:8px;width:min(380px,calc(100vw - 32px));pointer-events:none}
+body:not(.mapfull) #toasts{top:auto;bottom:90px}
+.toast{pointer-events:auto;position:relative;padding:10px 34px 10px 12px;border-radius:12px;font:13px/1.4 var(--f-body,sans-serif);color:var(--ink);
+  background:rgba(255,255,255,.94);background:color-mix(in srgb,var(--panel) 94%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  border:1px solid color-mix(in srgb,var(--line) 70%,transparent);box-shadow:0 10px 30px rgba(13,27,42,.22);animation:dockIn .2s ease-out}
+.toast.err{border-left:4px solid var(--cursor)}
+.toast.info{border-left:4px solid var(--accent)}
+.toast .ta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.toast .ta:empty{display:none}
+.toast .ta button{min-height:28px;padding:3px 10px;font-size:12px;border-radius:8px}
+.toast .tx-x{position:absolute;top:6px;right:6px;width:24px;min-height:24px;padding:0;border:0;background:transparent;cursor:pointer;color:var(--muted)}
 #status.err{color:var(--cursor)}
 aside.mgcol{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:auto;background:var(--panel);scrollbar-gutter:stable}
 /* place de la barre de défilement toujours réservée : la largeur des graphiques ne bouge plus quand le contenu change de hauteur */
@@ -268,7 +282,7 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="wmodel">État de mer</label><select id="wmodel"></select></div>
   <div class="ctl"><label for="cmodel">Courant</label><select id="cmodel"></select></div>
   <div class="ctl"><label for="param">Paramètre carte</label><select id="param"></select></div>
-  <div class="ctl"><label for="zone">Zone</label><div class="zonerow"><select id="zone"></select><button class="primary" id="load" title="Charger (ou recharger) les modèles pour la zone">Charger</button></div></div>
+  <div class="ctl"><label for="zone">Zone</label><div class="zonerow"><select id="zone"></select></div></div>
   <div class="ctl" id="ctlRes"><label for="res">Maillage IFS</label>
     <select id="res"><option value="auto" selected>Auto (selon la zone)</option><option value="10">10 × 10</option><option value="14">14 × 14</option><option value="18">18 × 18</option><option value="24">24 × 24</option><option value="30">30 × 30</option></select></div>
 
@@ -288,6 +302,7 @@ footer a{color:var(--accent)}
     <button id="btnTransit" aria-expanded="false">Transit</button>
     <button id="btnSave" title="Enregistrer un ou plusieurs modèles de la zone dans un fichier, pour les rouvrir sans réseau">Enregistrer un jeu de données météorologiques…</button>
     <button id="btnOpen" title="Ouvrir un fichier .meteo enregistré">Ouvrir un jeu de données météorologiques…</button>
+    <a class="lienHL btnlien" href="hors-ligne.html" download="modeles-marine-hors-ligne.html" title="Télécharger l'appli en un seul fichier, pour l'utiliser sans Internet (à bord)">⬇ Télécharger la version hors ligne</a>
     <input type="file" id="fileOpen" accept=".meteo,.gz,application/gzip" hidden>
   </div>
 </header>
@@ -343,7 +358,7 @@ footer a{color:var(--accent)}
       <label><span>Atmosphère</span><select id="mModel" data-src="model"></select></label>
       <label><span>Mer</span><select id="mWmodel" data-src="wmodel"></select></label>
       <label><span>Courant</span><select id="mCmodel" data-src="cmodel"></select></label>
-      <label><span>Zone</span><span class="zonerow"><select id="mZone" data-src="zone"></select><button id="mLoad" type="button" class="primary" title="Charger les modèles pour la zone">Charger</button></span></label>
+      <label><span>Zone</span><span class="zonerow"><select id="mZone" data-src="zone"></select></span></label>
       <div class="dockbtns">
         <button id="mMore" type="button" class="glassbtn" title="Afficher / masquer les autres choix">⋯</button>
         <button id="mFs" type="button" class="glassbtn" title="Plein écran">⛶</button>
@@ -389,7 +404,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 05/11/2026 11:50</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 05/11/2026 12:10</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -584,7 +599,52 @@ function tLabel(s){ const d=tDate(s); return `${JOURS[d.getUTCDay()]} ${pad(d.ge
 const runLabel = r => { if (!r) return "?"; const d=new Date(r); return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)} ${pad(d.getUTCHours())} h UTC`; };
 const dir16 = d => d==null||isNaN(d) ? "" : ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(((d%360)+360)%360/22.5)%16];
 const stepHours = (times,j) => j>0 ? Math.round((tDate(times[j])-tDate(times[j-1]))/3.6e6) : (times.length>1 ? Math.round((tDate(times[1])-tDate(times[0]))/3.6e6) : 1);
-function setStatus(msg,err){ const s=$("status"); s.textContent=msg; s.classList.toggle("err",!!err); }
+/* ligne d'état : gardée pour l'information interne (masquée) ; les messages utiles passent par des fenêtres « toast » */
+function setStatus(msg,err){
+  const s=$("status"); s.textContent=msg; s.classList.toggle("err",!!err);
+  if (/…$/.test(msg)) toast("prog","info",msg,[],0);          /* progression (téléchargement, préparation du fichier) */
+  else { toastFermer("prog"); if (err) toast("etat","err",msg); }
+}
+/* ---------- Messages flottants (problèmes de téléchargement, avec solution proposée) ---------- */
+function toast(cle,genre,txt,actions=[],duree){
+  let box=$("toasts"); if (!box){ box=document.createElement("div"); box.id="toasts"; document.body.appendChild(box); }
+  let t=box.querySelector(`[data-cle="${cle}"]`);
+  if (!t){ t=document.createElement("div"); t.dataset.cle=cle; box.appendChild(t); }
+  t.className="toast "+genre;
+  t.innerHTML=`<div class="tx">${esc(txt)}</div><div class="ta"></div><button class="tx-x" title="Fermer" aria-label="Fermer">✕</button>`;
+  for (const [lbl,fn] of actions){ const b=document.createElement("button"); b.textContent=lbl; b.className="primary";
+    b.addEventListener("click",()=>{ t.remove(); fn(); }); t.querySelector(".ta").appendChild(b); }
+  t.querySelector(".tx-x").addEventListener("click",()=>t.remove());
+  clearTimeout(t._t); const d = duree!==undefined ? duree : (genre==="err"?0:6000);
+  if (d) t._t=setTimeout(()=>t.remove(),d);
+}
+function toastFermer(cle){ const t=document.querySelector(`#toasts [data-cle="${cle}"]`); if (t) t.remove(); }
+/* problèmes de chargement : message clair + solution(s) proposée(s) */
+function signalerProblemes(res,b,errGlobal){
+  ["pb_a","pb_m","pb_c","etat"].forEach(toastFermer);
+  const ops={a:"model",m:"wmodel",c:"cmodel"}, noms={a:"Atmosphère",m:"État de mer",c:"Courant"};
+  const choisir=(sel,val)=>()=>{ $(sel).value=val; if (sel==="cmodel"){ st.cManual=val; st.cNone=false; } $(sel).dispatchEvent(new Event("change")); };
+  const liste=res ? [["a",res[0]],["m",res[1]],["c",res[2]]].filter(([,r])=>r && r.status==="rejected") : [["a",{reason:errGlobal}]];
+  for (const [k,r] of liste){
+    const m=String(r.reason && r.reason.message || r.reason || "erreur"), sel=ops[k], prov=$(sel).selectedOptions[0];
+    const nom=prov?prov.textContent.split("·")[0].trim():noms[k];
+    let txt=`${noms[k]} · ${nom} : `, act=[["Réessayer",()=>loadGrid()]];
+    const vals=[...$(sel).options].map(o=>o.value);
+    const mondial = k==="a" ? (vals.includes("om:ecmwf_ifs")&&"om:ecmwf_ifs") : k==="m" ? (vals.includes("om:meteofrance_wave")&&"om:meteofrance_wave") : (vals.includes("om:smoc")&&"om:smoc");
+    const nomMondial = k==="a" ? "IFS (mondial)" : k==="m" ? "MFWAM global" : "le courant global";
+    if (/hors du domaine/.test(m)){ txt+="la zone sort du domaine couvert par ce modèle."; act=[]; }
+    else if (/trop grande/.test(m)){ txt+="la zone est trop grande pour ce modèle à cette résolution."; act=[]; }
+    else if (/HTTP 5\d\d|Failed to fetch|NetworkError|réseau/i.test(m)){ txt+="le serveur ne répond pas pour le moment."; }
+    else if (/HTTP 404/.test(m)){ txt+="données absentes (run en cours de publication ?)."; }
+    else if (/quota/i.test(m)){ txt+="quota Open-Meteo dépassé (connexion partagée)."; act=[["Réessayer dans une minute",()=>setTimeout(loadGrid,60000)]]; }
+    else txt+=m;
+    const couvre=[...$(sel).options].map(o=>o.value).find(v=>v.startsWith("mf:") && v!==$(sel).value && domOk(v.slice(3),b));
+    if (couvre) act.push([`Utiliser ${$(sel).querySelector(`option[value="${couvre}"]`).textContent.split("·")[0].trim()}`, choisir(sel,couvre)]);
+    if (mondial && mondial!==$(sel).value) act.push([`Utiliser ${nomMondial}`, choisir(sel,mondial)]);
+    if (/trop grande/.test(m)) act.push(["Réduire la zone (Iroise)",()=>{ $("zone").value="iroise"; onZoneChange(); }]);
+    toast("pb_"+k,"err",txt,act);
+  }
+}
 const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 /* Open-Meteo gratuit : quota par minute partagé par tous les postes d'une même connexion (salle de classe…).
@@ -1340,9 +1400,9 @@ function updateMissing(){
     const msg = !has ? `« ${P.label} » n'est pas fourni par ${g.prov.nom}.`
       : tiOf(g,st.tIdx)<0 ? `${g.prov.nom} n'a pas d'échéance à ${tLabel(st.times[st.tIdx])}.`
       : `Pas de valeur de « ${P.label} » dans la zone (terre ou hors domaine de ${g.prov.nom}).`;
-    setStatus(msg, true);
+    toast("manq","info",msg);
   }
-  else if (el.dataset.prev){ setStatus(el.dataset.prev); delete el.dataset.prev; }
+  else { toastFermer("manq"); if (el.dataset.prev) delete el.dataset.prev; }
 }
 function drawLegend(){
   const P=PARAMS[$("param").value], cv=$("legend"), dpr=window.devicePixelRatio||1;
@@ -1664,9 +1724,9 @@ async function loadGrid(){
   const b=currentBounds();
   if (!b){ setStatus("Zone personnalisée incomplète ou incohérente : vérifiez les quatre limites.", true); return; }
   if ($("zone").value!=="vue") map.fitBounds([[b.s,b.o],[b.n,b.e]]);
-  ["load","mLoad"].forEach(id=>$(id).classList.remove("pulse"));
+  toastFermer("vue");
   autoAtmo(); chooseCurrent(); pointDansZone(b);
-  const seq=++loadSeq; $("load").disabled=true;
+  const seq=++loadSeq;
   /* modèle de vagues du dépôt qui ne couvre pas le centre de la zone : on reprend le choix automatique */
   const w=$("wmodel").value, wi=w.startsWith("mf:")?modelInfo(w.slice(3)):null;
   if (wi){ const cy=(b.s+b.n)/2, cx=(b.o+b.e)/2, [s,n,o,e]=wi.domaine; if (!(cy>=s&&cy<n&&cx>=o&&cx<e)){ chooseWave(); syncModelUI(); } }
@@ -1686,16 +1746,17 @@ async function loadGrid(){
     delete $("status").dataset.prev; lastMissing=null;
     const times = st.ga ? st.ga.times : st.gm ? st.gm.times : [];
     if (!times.length) throw new Error(errs.join(" · ")||"aucune donnée");
-    st.loadMsg={txt:[desc(st.ga),desc(st.gm),desc(st.gc)].filter(Boolean).join(" · ")+(errs.length?" · "+errs.join(" · "):""), err:errs.length>0};
-    setStatus(st.loadMsg.txt, st.loadMsg.err);
+    st.loadMsg={txt:[desc(st.ga),desc(st.gm),desc(st.gc)].filter(Boolean).join(" · "), err:false};
+    setStatus(st.loadMsg.txt, false);
+    signalerProblemes([ra,rm,rc], b);
     setTimes(times);
     syncModelUI();
     /* le modèle de vagues a pu changer (choix automatique selon la zone) : météogramme du point à refaire */
     const ids=(st.provA?st.provA.id:"")+"|"+(st.provM?st.provM.id:"")+"|"+$("run").value+"|"+$("cmodel").value;
     if (st.point && st.point.ids!==ids && !st.offline) loadPoint();
   } catch(err){
-    if (seq===loadSeq) setStatus("Échec du chargement : "+err.message, true);
-  } finally { if (seq===loadSeq) $("load").disabled=false; }
+    if (seq===loadSeq){ setStatus("Échec du chargement : "+err.message, true); signalerProblemes(null,b,err); }
+  }
 }
 function setTimes(times){
   const prev=st.times[st.tIdx];
@@ -1736,7 +1797,7 @@ async function loadPoint(){
     if (ra.status==="rejected") throw ra.reason;
     const a=ra.value, m=rm.status==="fulfilled"?rm.value:null;
     if (!a) throw new Error("point hors du domaine du modèle d'atmosphère");
-    st.point={kind:"point", times:a.times, a:addHU(align(a.times,a)), m:align(a.times,m), c:align(a.times,c), provC:pc?pc.nom:null, glat:a.glat, glon:a.glon, mlat:m&&m.glat, mlon:m&&m.glon,
+    st.point={kind:"point", times:a.times, a:addHU(align(a.times,a)), m:align(a.times,m), c:align(a.times,c), provC:c&&pc?pc.nom:null, glat:a.glat, glon:a.glon, mlat:m&&m.glat, mlon:m&&m.glon,
       provA:pa.nom, provM:pm?pm.nom:"—", ids:pa.id+"|"+(pm?pm.id:"")+"|"+$("run").value+"|"+$("cmodel").value, runM:pm&&pm.meta?pm.meta.run:null};
     let txt=`Demandé ${dm(lat,true)} ${dm(lon,false)} · maille atmo ${dm(a.glat,true)} ${dm(a.glon,false)}`;
     txt += m ? ` · maille vagues ${dm(m.glat,true)} ${dm(m.glon,false)}` : " · vagues indisponibles ici";
@@ -2746,8 +2807,7 @@ $("wmodel").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint
 $("res").addEventListener("change",()=>loadGrid());
 
 $("time").addEventListener("input",e=>setTime(+e.target.value));
-$("load").addEventListener("click",()=>loadGrid());
-$("mLoad").addEventListener("click",()=>loadGrid());
+
 /* zone « Vue actuelle de la carte » : rechargement automatique après un déplacement (données du dépôt, légères) ;
    avec IFS / Open-Meteo, chargement à la demande pour ménager le quota partagé */
 let moveT=0;
@@ -2755,7 +2815,7 @@ map.on("moveend",()=>{
   if ($("zone").value!=="vue" || st.offline) return;
   const om=[st.provA,st.provM,st.provC].some(p=>p && p.kind==="om");
   clearTimeout(moveT);
-  if (om){ ["load","mLoad"].forEach(id=>$(id).classList.add("pulse")); setStatus("Carte déplacée : cliquez sur « Charger » pour mettre à jour (IFS / Open-Meteo : chargement à la demande).", false); return; }
+  if (om){ toast("vue","info","Carte déplacée : les données IFS / Open-Meteo sont chargées à la demande (quota partagé).",[["Mettre à jour pour cette vue",()=>loadGrid()]]); return; }
   moveT=setTimeout(()=>loadGrid(),800);
 });
 $("zone").addEventListener("change",onZoneChange);
