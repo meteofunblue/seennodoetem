@@ -404,7 +404,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 05/11/2026 16:00</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 05/11/2026 16:05</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -986,7 +986,8 @@ function setTiles(key){
 setTiles.tried = new Set();
 for (const [k,b] of Object.entries(BASEMAPS)){ const o=document.createElement("option"); o.value=k; o.textContent=b.label; $("basemap").appendChild(o); }
 $("basemap").value = baseKey;
-$("basemap").addEventListener("change",e=>{ setTiles.tried.clear(); setTiles(e.target.value); });
+$("basemap").addEventListener("change",e=>{ setTiles.tried.clear(); setTiles(e.target.value); if (!HORS_LIGNE) store.set("fond",e.target.value); });
+{ const f=store.get("fond",null); if (f && BASEMAPS[f] && !HORS_LIGNE && f!==baseKey){ $("basemap").value=f; setTiles(f); } }
 setTiles(); darkMQ.addEventListener?.("change",()=>{ drawField(); drawLegend(); drawMG(); });
 
 const FieldLayer = L.Layer.extend({
@@ -2797,12 +2798,15 @@ $("offQuit").addEventListener("click",()=>location.reload());
   $("param").append(groups.a, groups.m, groups.c);
 }
 $("param").addEventListener("change",()=>{ lastMissing=null; drawLegend(); drawField(); drawMG(); renderReadout(); });
-["vals","coast","smooth","iso"].forEach(id=>$(id).addEventListener("change",drawField));
+/* réglages d'affichage mémorisés dans le navigateur */
+["vals","coast","smooth","iso"].forEach(id=>{ const v=store.get("aff_"+id,null); if (v!==null) $(id).checked=!!v;
+  $(id).addEventListener("change",()=>{ store.set("aff_"+id,$(id).checked); drawField(); }); });
 $("dens").value=String(store.get("barbules_densite",45));
 $("dens").addEventListener("change",()=>{ store.set("barbules_densite",+$("dens").value); drawField(); });
 $("isoStep").value=String(store.get("isobares_pas",5));
 $("isoStep").addEventListener("change",()=>{ store.set("isobares_pas",+$("isoStep").value); drawField(); });
-$("opac").addEventListener("input",drawField);
+{ const o=store.get("opacite",null); if (o!==null && o>=0.2 && o<=1) $("opac").value=String(o); }
+$("opac").addEventListener("input",()=>{ store.set("opacite",+$("opac").value); drawField(); });
 $("model").addEventListener("change",()=>{ st.autoOM=false; fillRuns(); autoZone(); chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("run").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("cmodel").addEventListener("change",()=>{ st.cNone=!$("cmodel").value; st.cManual=$("cmodel").value||null; loadGrid(); loadPoint(); if (st.route) routeChanged(); });
