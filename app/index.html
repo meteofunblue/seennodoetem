@@ -288,6 +288,7 @@ footer a{color:var(--accent)}
 
   <div class="affgrp" id="affgrp"><button type="button" class="afftitre" id="affTitre" aria-expanded="true">Paramètres cartographie / affichage</button>
   <div class="ctl"><label for="basemap">Fond</label><select id="basemap"></select></div>
+  <div class="ctl"><label for="vunit">Unité du vent</label><select id="vunit"><option value="kt">nœuds (kt)</option><option value="kmh">km/h</option></select></div>
   <div class="ctl"><label for="opac">Opacité</label><input type="range" id="opac" min="0.2" max="1" step="0.05" value="0.6"></div>
   <label class="chk"><input type="checkbox" id="smooth" checked> Lissage</label>
   <label class="chk"><input type="checkbox" id="iso" checked> Isobares</label>
@@ -404,7 +405,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 05/11/2026 16:05</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 05/11/2026 16:35</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -491,6 +492,12 @@ function classes(defs, fin){
 function etatMer(h){ if (h==null||isNaN(h)) return ""; if (h<0.1) return "calme";
   const c=SC.wave.classes; for (let i=c.length-1;i>=0;i--) if (h>=c[i].min) return c[i].nom; return ""; }
 const S = (arr) => arr.map(([v,c,a]) => { const col = hex(c); if (a!==undefined) col[3]=a; return [v,col]; });
+/* unité du vent affichée : nœuds (par défaut) ou km/h ; les données restent en nœuds, la conversion se fait à l'affichage */
+const KMH = 1.852;
+const vU = () => { try{ return localStorage.getItem("unite_vent")==='"kmh"' ? "kmh" : "kt"; }catch(e){ return "kt"; } };
+const vF = () => vU()==="kmh" ? KMH : 1;
+const vL = () => vU()==="kmh" ? "km/h" : "kt";
+const vW = arr => !arr || vF()===1 ? arr : arr.map(v=>v==null?null:v*KMH);
 const SEUIL_NUAGE = 3;   /* octas : un étage est compté présent à partir de cette couverture */
 const SC = {
   /* vent et rafales : une couleur par tranche de 5 nœuds */
@@ -514,6 +521,9 @@ const SC = {
   /* humidité relative : une couleur par pas de 5 % */
   hu: classes([[0,"#8c5a2b",""],[5,"#a86b33",""],[10,"#c27f3d",""],[15,"#d79a4c",""],[20,"#e6b45e",""],[25,"#f0cb73",""],[30,"#f6dd8c",""],[35,"#f2e8a6",""],[40,"#dfeeb0",""],[45,"#c3e6a8",""],[50,"#a3dca0",""],[55,"#7fd09a",""],[60,"#5cc39a",""],[65,"#3fb3a5",""],[70,"#2ea0b8",""],[75,"#2a8ac8",""],[80,"#2b72cf",""],[85,"#2f58c8",""],[90,"#2f3fb5",""],[95,"#2a2a8f",""]], 100),
   /* CAPE par classes : les faibles valeurs (25–250 J/kg, fréquentes en averses de traîne) restent bien visibles */
+  /* vent en km/h : mêmes couleurs, une tranche par 10 km/h */
+  windkmh: classes([[0,"#e8f4fb",""],[10,"#b9def0",""],[20,"#7cc4e4",""],[30,"#4daf7c",""],[40,"#f3e04b",""],[50,"#f68a3c",""],
+                    [60,"#e8532f",""],[70,"#c9252b",""],[80,"#9b1532",""],[90,"#6e0f4f",""],[100,"#4a0a6b",""],[110,"#33075a",""],[120,"#1e0440",""]], 150),
   /* nuages par étage : code 1 = bas, 2 = moyens, 4 = élevés, additionnés */
   ncombo: classes([[1,"#c98a3e","Bas",0.8],[2,"#b05fb0","Moyens",0.8],[3,"#7b3f2c","B+M",0.85],[4,"#4f9fe0","Élevés",0.75],
                    [5,"#2e8b57","B+H",0.8],[6,"#3c4fb5","M+H",0.8],[7,"#2f2f3a","B+M+H",0.85]], 8),
@@ -552,6 +562,10 @@ const PARAMS = {
   cur:{label:"Courant de surface (marée incluse)", unit:"kt", src:"c", key:"current_speed", dir:["current_direction"], dirTo:true, glyph:"arrow", scale:SC.cur, dec:1}
 };
 const C_VARS = ["current_speed","current_direction"];
+function appliquerUniteVent(){
+  for (const k of ["wind","gust","gusti"]){ const P=PARAMS[k]; P.unit=vL(); P.scale=vU()==="kmh"?SC.windkmh:SC.wind; if (vU()==="kmh") P.conv=v=>v*KMH; else delete P.conv; }
+}
+appliquerUniteVent();
 const A_VARS = ["wind_speed_10m","wind_direction_10m","wind_gusts_10m","wind_gusts_10m_inst","precipitation","showers","cloud_cover","cloud_cover_low","cloud_cover_mid","cloud_cover_high","temperature_2m","dew_point_2m","pressure_msl","cape"];
 const M_VARS = ["wave_height","wave_direction","wave_period","wave_peak_period","wind_wave_height","wind_wave_direction","wind_wave_period",
   "swell_wave_height","swell_wave_direction","swell_wave_period","primary_swell_height","primary_swell_direction","primary_swell_period",
@@ -1349,7 +1363,7 @@ function drawField(){
   const showVals=$("vals").checked, dens=+$("dens").value||40, cp=cellPx(g);
   const target=showVals?Math.max(dens,38):dens;
   const dv=P.dir?dirVals(P,g,i):null;
-  let kt=null; if (P.glyph==="barb"){ const rw=fieldVals(PARAMS.wind,i); kt=rw&&rw.g===g?rw.vals:null; }
+  let kt=null; if (P.glyph==="barb"){ const rw=fieldVals(PARAMS.wind,i); kt=rw&&rw.g===g?(vF()===1?rw.vals:rw.vals.map(v=>v/KMH)):null; }   /* barbules toujours en nœuds */
   ctx.lineCap="round"; ctx.lineJoin="round";
   const glyph=(px,py,v,d,k,cell)=>{
     if (surTerre(px,py)) return;
@@ -1861,8 +1875,8 @@ function renderReadout(){
     rows.push(["Mer / route", rs==null?"—":`${Math.abs(Math.round(rs))}°${side(rs)} · ${mr.t}`]);
   }
   rows.push(
-    ["Vent 10 m", `${fmt(g(a,"wind_speed_10m"),0)} kt ${dir16(g(a,"wind_direction_10m"))}`],
-    [gustLabel(D,j), `${fmt(near(gustArr(a),j),0)} kt`],
+    ["Vent 10 m", `${fmt(g(a,"wind_speed_10m")==null?null:g(a,"wind_speed_10m")*vF(),0)} ${vL()} ${dir16(g(a,"wind_direction_10m"))}`],
+    [gustLabel(D,j), `${fmt(near(gustArr(a),j)==null?null:near(gustArr(a),j)*vF(),0)} ${vL()}`],
     ["Mer totale Hs", `${fmt(g(m,"wave_height"),1)} m ${dir16(g(m,"wave_direction"))}${g(m,"wave_height")!=null?" · "+etatMer(g(m,"wave_height")):""}`],
     ["Mer du vent", `${fmt(g(m,"wind_wave_height"),1)} m · ${fmt(g(m,"wind_wave_period"),0)} s`]);
   if (has("primary_swell_height")){
@@ -2059,13 +2073,14 @@ function drawMGto(cv,SOLO){
     drawBarb(ctx,X(i),y+18,a.wind_direction_10m&&a.wind_direction_10m[i],a.wind_speed_10m&&a.wind_speed_10m[i],15);
   }
   y+=26;
-  mx=niceMax(Math.max(maxOf(a.wind_speed_10m,gustArr(a)),smax(SE.vent),smax(SE.raf))*1.1);
-  yaxis(y,hV,0,mx,"l","kt"); vgrid(y,hV);
-  for (const [v,lbl] of [[22,"F6"],[34,"F8"],[48,"F10"]]) if (v<mx){ const yy=y+hV-v/mx*hV; ctx.strokeStyle=C.gust; ctx.globalAlpha=.35; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillStyle=C.gust; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(lbl,L0+pw+5,yy+3); }
-  seuil(a.wind_speed_10m,y,hV,0,mx,SE.vent,"vent","kt");
-  seuil(gustArr(a),y,hV,0,mx,SE.raf,"rafales","kt");
-  line(gustArr(a),y,hV,0,mx,C.gust,{dash:[5,3]});
-  line(a.wind_speed_10m,y,hV,0,mx,C.wind,{w:2.4,fill:.12});
+  const wsU=vW(a.wind_speed_10m), gsU=vW(gustArr(a));
+  mx=niceMax(Math.max(maxOf(wsU,gsU),smax(SE.vent),smax(SE.raf))*1.1);
+  yaxis(y,hV,0,mx,"l",vL()); vgrid(y,hV);
+  for (const [v0,lbl] of [[22,"F6"],[34,"F8"],[48,"F10"]]){ const v=v0*vF(); if (!(v<mx)) continue; const yy=y+hV-v/mx*hV; ctx.strokeStyle=C.gust; ctx.globalAlpha=.35; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillStyle=C.gust; ctx.font="10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(lbl,L0+pw+5,yy+3); }
+  seuil(wsU,y,hV,0,mx,SE.vent,"vent",vL());
+  seuil(gsU,y,hV,0,mx,SE.raf,"rafales",vL());
+  line(gsU,y,hV,0,mx,C.gust,{dash:[5,3]});
+  line(wsU,y,hV,0,mx,C.wind,{w:2.4,fill:.12});
   frame(y,hV); y+=hV+GAP;
 
   }
@@ -2805,6 +2820,15 @@ $("dens").value=String(store.get("barbules_densite",45));
 $("dens").addEventListener("change",()=>{ store.set("barbules_densite",+$("dens").value); drawField(); });
 $("isoStep").value=String(store.get("isobares_pas",5));
 $("isoStep").addEventListener("change",()=>{ store.set("isobares_pas",+$("isoStep").value); drawField(); });
+$("vunit").value=vU();
+$("vunit").addEventListener("change",()=>{
+  const avant=vF(); store.set("unite_vent",$("vunit").value); const apres=vF();
+  /* seuils de vent et de rafales convertis : ils gardent la même valeur physique */
+  for (const k of ["vent","raf"]){ for (const lv of ["o","r"]){ const el=$(`s_${k}_${lv}`); const v=parseFloat(String(el.value).replace(",","."));
+      if (v>0){ el.value=String(Math.round(v/avant*apres)); store.set(`seuil_${k}_${lv}`,el.value); } }
+    const sp=$("sl_"+k); if (sp) sp.textContent=`${k==="vent"?"Vent moyen":"Rafales"} (${vL()})`; }
+  appliquerUniteVent(); lastMissing=null; drawLegend(); drawField(); drawMG(); renderReadout();
+});
 { const o=store.get("opacite",null); if (o!==null && o>=0.2 && o<=1) $("opac").value=String(o); }
 $("opac").addEventListener("input",()=>{ store.set("opacite",+$("opac").value); drawField(); });
 $("model").addEventListener("change",()=>{ st.autoOM=false; fillRuns(); autoZone(); chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
@@ -2845,7 +2869,7 @@ document.addEventListener("keydown",e=>{
 let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ map.invalidateSize(); drawLegend(); drawMG(); },150); });
 
 /* ---------- Seuils réglables (météogramme) : niveau orange et niveau rouge ---------- */
-function sDefs(){ return [["vent","Vent moyen","kt",1],["raf","Rafales","kt",1],["hs","Hs","m",0.1],["rr","Précip.","mm",0.1],["hu","HU","%",1],["cur","Courant","kt",0.1]]; }
+function sDefs(){ return [["vent","Vent moyen",vL(),1],["raf","Rafales",vL(),1],["hs","Hs","m",0.1],["rr","Précip.","mm",0.1],["hu","HU","%",1],["cur","Courant","kt",0.1]]; }
 function seuils(){
   const o={};
   for (const [k] of sDefs()){ const S={};
@@ -2855,7 +2879,7 @@ function seuils(){
 }
 function seuilsResume(){
   const D=mgData(), SE=seuils(), el=$("seuilsTxt"); if (!D || !Object.keys(SE).length){ el.innerHTML=""; return; }
-  const a=D.a||{}, m=D.m||{}, arrs={vent:a.wind_speed_10m, raf:gustArr(a), hs:m.wave_height, rr:a.precipitation, hu:a.relative_humidity_2m, cur:(D.c||{}).current_speed};
+  const a=D.a||{}, m=D.m||{}, arrs={vent:vW(a.wind_speed_10m), raf:vW(gustArr(a)), hs:m.wave_height, rr:a.precipitation, hu:a.relative_humidity_2m, cur:(D.c||{}).current_speed};
   const periodes=(arr,val)=>{ const per=[]; let d=-1;
     for (let i=0;i<=D.times.length;i++){ const ok=i<D.times.length && arr[i]!=null && arr[i]>=val;
       if (ok && d<0) d=i; if (!ok && d>=0){ per.push([d,i-1]); d=-1; } } return per; };
@@ -2871,7 +2895,7 @@ function seuilsResume(){
 /* champs : un orange et un rouge par paramètre ; HU rouge à 98 % par défaut */
 {
   const box=$("seuilsGrid"); let html="<span></span><b style='color:#e8890c'>orange ≥</b><b style='color:#d1495b'>rouge ≥</b>";
-  for (const [k,nom,u,st_] of sDefs()) html+=`<span>${nom} (${u})</span><input type="number" id="s_${k}_o" min="0" step="${st_}" placeholder="—"><input type="number" id="s_${k}_r" min="0" step="${st_}" placeholder="—">`;
+  for (const [k,nom,u,st_] of sDefs()) html+=`<span id="sl_${k}">${nom} (${u})</span><input type="number" id="s_${k}_o" min="0" step="${st_}" placeholder="—"><input type="number" id="s_${k}_r" min="0" step="${st_}" placeholder="—">`;
   box.innerHTML=html;
   const ancien={vent:store.get("seuil_vent",null), raf:store.get("seuil_raf",null), hs:store.get("seuil_hs",null), rr:store.get("seuil_rr",null)};
   for (const [k] of sDefs()) for (const lv of ["o","r"]){
@@ -2907,7 +2931,7 @@ function showHover(e){
       lines.push(`${P.label} : <b>${v==null?"—":fmt(P.conv?P.conv(v):v,P.dec)} ${P.unit}</b>`);
     }
     const ws=A("wind_speed_10m"), wd=A("wind_direction_10m"), gu=st.ga?gridVal(st.ga,keyOf(PARAMS.gust,st.ga),lat,lng):null;
-    if (ws!=null) lines.push(`Vent <b>${dir16(wd)} ${fmt(ws,0)} kt</b>${gu!=null?` · raf. <b>${fmt(gu,0)}</b>`:""}`);
+    if (ws!=null) lines.push(`Vent <b>${dir16(wd)} ${fmt(ws*vF(),0)} ${vL()}</b>${gu!=null?` · raf. <b>${fmt(gu*vF(),0)}</b>`:""}`);
     const pm=A("pressure_msl"); if (pm!=null) lines.push(`Pmer <b>${fmt(pm,1)} hPa</b>`);
     const t2=A("temperature_2m"), td=A("dew_point_2m"), hu=A("relative_humidity_2m");
     if (t2!=null) lines.push(`T <b>${fmt(t2,1)} °C</b>${td!=null?` · Td <b>${fmt(td,1)} °C</b>`:""}${hu!=null?` · HU <b>${fmt(hu,0)} %</b>`:""}`);
