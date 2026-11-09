@@ -145,6 +145,7 @@ if os.path.exists(args.app):
     subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "hors_ligne.py"),
                     "--app", args.app, "--cote", os.path.join(os.path.dirname(args.app), "cote_fr.json"),
                     "--zonex", os.path.join(os.path.dirname(args.app), "zonex.json"),
+                    "--eaux", os.path.join(os.path.dirname(args.app), "eaux.json"),
                     "--sortie", os.path.join(args.site, "hors-ligne.html")], check=False)
 with open(os.path.join(args.site, "robots.txt"), "w") as f:
     f.write("User-agent: *\nDisallow: /\n")
