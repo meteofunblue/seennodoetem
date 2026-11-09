@@ -147,6 +147,19 @@ if os.path.exists(args.app):
                     "--zonex", os.path.join(os.path.dirname(args.app), "zonex.json"),
                     "--eaux", os.path.join(os.path.dirname(args.app), "eaux.json"),
                     "--sortie", os.path.join(args.site, "hors-ligne.html")], check=False)
+# bulletin grand large METAREA II (Météo-France, diffusé par l'OMM) : copie à chaque publication, sans bloquer
+try:
+    import urllib.request
+    req = urllib.request.Request("https://wwmiws.wmo.int/index.php/metareas/bulletinset_download/2/json",
+                                 headers={"User-Agent": "modeles-marine/1.0 (outil pedagogique)"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        d = json.loads(r.read().decode("utf-8"))
+    d["recupere"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+    with open(os.path.join(args.site, "metarea2.json"), "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False)
+    print(f"Bulletin METAREA II : {len(d.get('bulletin') or [])} parties, {d.get('date')}")
+except Exception as e:
+    print(f"Bulletin METAREA II non récupéré : {e}")
 with open(os.path.join(args.site, "robots.txt"), "w") as f:
     f.write("User-agent: *\nDisallow: /\n")
 
