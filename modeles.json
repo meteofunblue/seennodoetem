@@ -1,26 +1,787 @@
 {
-  "_aide": "Modèles téléchargés. actif=false pour en suspendre un. type : 'groupes' (fichiers par groupe d'échéances), 'echeances' (un fichier par échéance) ou 'fichier' (un seul NetCDF pour tout le run, WW3). pas_sortie : 1 ou 3 heures. tuiles : domaine [sud, nord, ouest, est] en degrés entiers, découpé en tuiles de 1°, et résolution des tuiles ; res_fin et zones_fines (facultatifs) : résolution plus fine dans ces rectangles [sud, nord, ouest, est] (côtes). vagues : modèles de vagues proposés par défaut dans l'appli (le premier qui couvre la zone affichée). force_par : modèle atmosphérique qui fournit le vent d'un modèle de vagues. min_echeances : en dessous, le run est jugé incomplet et ignoré. heures_runs (facultatif) : heures UTC des runs à traiter, les autres sont ignorés. runs_gardes (facultatif, 4 par défaut) : nombre de runs gardés sur le site.",
-  "arome": {"nom": "AROME", "actif": true, "api": "DPPaquetAROME", "modele": "AROME", "produit": "productARO", "grille": "0.025", "paquets": ["SP1", "SP2"], "type": "groupes", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 50, "heures_runs": [0, 6, 12, 18], "vagues": ["mfwam_fr", "ww3_med_aro"], "tuiles": {"domaine": [41, 52, -8, 10], "res": 0.05, "res_fin": 0.025, "zones_fines": [[48, 52, -6, 3], [43, 48, -6, -1], [42, 44, 3, 8], [41, 43, 8, 10]]}},
-  "aromeifs": {"nom": "AROME-IFS", "actif": true, "api": "DPPaquetAROMEIFS", "modele": "AROMEIFS", "produit": "productAROIFS", "grille": "0.025", "paquets": ["SP1", "SP2"], "type": "groupes", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 50, "vagues": [], "tuiles": {"domaine": [41, 52, -8, 10], "res": 0.05}},
-  "arpege": {"nom": "ARPEGE Europe", "actif": true, "api": "DPPaquetARPEGE", "modele": "ARPEGE", "produit": "productARP", "grille": "0.1", "paquets": ["SP1", "SP2"], "type": "groupes", "pas_sortie": 3, "parametres": "atmo", "min_echeances": 34, "vagues": ["ww3_atl", "mfwam_glob"], "tuiles": {"domaine": [35, 66, -30, 15], "res": 0.1}},
-  "mfwam_fr": {"nom": "MFWAM France (vent AROME)", "actif": true, "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM", "grille": "0.025", "paquets": ["SP1"], "type": "echeances", "pas_sortie": 1, "parametres": "vagues", "min_echeances": 45, "force_par": "arome", "tuiles": {"domaine": [41, 52, -8, 10], "res": 0.05}},
-  "mfwam_glob": {"nom": "MFWAM global (vent ARPEGE)", "actif": true, "api": "DPPaquetWAVESMODELS", "modele": "MFWAM", "produit": "productMFWAM", "grille": "0.1", "paquets": ["SP1"], "type": "echeances", "pas_sortie": 3, "parametres": "vagues", "min_echeances": 30, "force_par": "arpege", "tuiles": {"domaine": [35, 66, -30, 15], "res": 0.1}},
-  "ww3_atl": {"nom": "WW3 Atlantique-Manche (vent ARPEGE)", "actif": true, "api": "DPPaquetWAVESMODELS", "modele": "WW3-WARP", "produit": "productWWARP", "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc", "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40, "force_par": "arpege", "tuiles": {"domaine": [43, 53, -7, 5], "res": 0.05}},
-  "ww3_med": {"nom": "WW3 Méditerranée (vent ARPEGE)", "actif": false, "api": "DPPaquetWAVESMODELS", "modele": "WW3-MARP", "produit": "productWMARP", "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc", "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40, "force_par": "arpege", "tuiles": {"domaine": [40, 45, 3, 12], "res": 0.05}},
-  "ww3_med_aro": {"nom": "WW3 Méditerranée (vent AROME)", "actif": true, "api": "DPPaquetWAVESMODELS", "modele": "WW3-MARO", "produit": "productWMARO", "grille": "0.01", "paquets": ["SP1"], "type": "fichier", "format": "nc", "pas_sortie": 1, "parametres": "ww3", "min_echeances": 40, "force_par": "arome", "tuiles": {"domaine": [40, 45, 3, 12], "res": 0.05}},
-  "arome_antilles": {"nom": "AROME Antilles", "actif": true, "api": "DPPaquetAROME-OM", "modele": "AROME-OM-ANTIL", "produit": "productOMAN", "grille": "0.025", "paquets": ["SP1", "SP2", "SP3"], "type": "echeances", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 45, "heures_runs": [0, 6, 12, 18], "runs_gardes": 2, "vagues": [], "tuiles": {"domaine": [13, 19, -65, -58], "res": 0.05}},
-  "arome_guyane": {"nom": "AROME Guyane", "actif": true, "api": "DPPaquetAROME-OM", "modele": "AROME-OM-GUYANE", "produit": "productOMGU", "grille": "0.025", "paquets": ["SP1", "SP2", "SP3"], "type": "echeances", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 45, "heures_runs": [0, 6, 12, 18], "runs_gardes": 2, "vagues": [], "tuiles": {"domaine": [2, 9, -55, -47], "res": 0.05}},
-  "arome_indien": {"nom": "AROME Réunion-Mayotte", "actif": true, "api": "DPPaquetAROME-OM", "modele": "AROME-OM-INDIEN", "produit": "productOMOI", "grille": "0.025", "paquets": ["SP1", "SP2", "SP3"], "type": "echeances", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 45, "heures_runs": [0, 6, 12, 18], "runs_gardes": 2, "vagues": [], "tuiles": {"domaine": [-23, -11, 43, 58], "res": 0.05, "garder": [[-23, -19, 53, 58], [-14, -11, 43, 47]]}},
-  "arome_polynesie": {"nom": "AROME Polynésie", "actif": true, "api": "DPPaquetAROME-OM", "modele": "AROME-OM-POLYN", "produit": "productOMPF", "grille": "0.025", "paquets": ["SP1", "SP2", "SP3"], "type": "echeances", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 45, "heures_runs": [0, 6, 12, 18], "runs_gardes": 2, "vagues": [], "tuiles": {"domaine": [-20, -14, -153, -146], "res": 0.05}},
-  "arome_caledonie": {"nom": "AROME Nouvelle-Calédonie", "actif": true, "api": "DPPaquetAROME-OM", "modele": "AROME-OM-NCALED", "produit": "productOMNC", "grille": "0.025", "paquets": ["SP1", "SP2", "SP3"], "type": "echeances", "pas_sortie": 1, "parametres": "atmo", "min_echeances": 45, "heures_runs": [0, 6, 12, 18], "runs_gardes": 2, "vagues": [], "tuiles": {"domaine": [-24, -18, 162, 169], "res": 0.05}},
-  "courant_ibi": {"nom": "Courants IBI · Manche-Atlantique (marée incluse)", "source": "cmems", "actif": true, "heure_dispo": 15, "min_echeances": 24, "runs_gardes": 2, "dataset": "cmems_mod_ibi_phy_anfc_0.027deg-2D_PT1H-m", "horizon_h": 120, "tuiles": {"domaine": [43, 52, -7, 3], "res": 0.025}},
-  "courant_med": {"nom": "Courants Méditerranée (marée incluse)", "source": "cmems", "actif": true, "heure_dispo": 15, "min_echeances": 24, "runs_gardes": 2, "dataset": "cmems_mod_med_phy-cur_anfc_4.2km-2D_PT1H-m", "horizon_h": 96, "tuiles": {"domaine": [40, 45, 3, 12], "res": 0.05}},
-  "courant_atl": {"nom": "Courants global · Atlantique NE et Manche-Mer du Nord", "source": "cmems", "actif": true, "heure_dispo": 15, "min_echeances": 24, "runs_gardes": 2, "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i", "horizon_h": 96, "tuiles": {"domaine": [35, 66, -30, 15], "res": 0.1}},
-  "courant_antilles": {"nom": "Courants global · Antilles", "source": "cmems", "actif": true, "heure_dispo": 15, "min_echeances": 24, "runs_gardes": 2, "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i", "horizon_h": 96, "tuiles": {"domaine": [13, 19, -65, -58], "res": 0.1}},
-  "courant_guyane": {"nom": "Courants global · Guyane", "source": "cmems", "actif": true, "heure_dispo": 15, "min_echeances": 24, "runs_gardes": 2, "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i", "horizon_h": 96, "tuiles": {"domaine": [2, 9, -55, -47], "res": 0.1}},
-  "courant_indien": {"nom": "Courants global · Réunion-Mayotte", "source": "cmems", "actif": true, "heure_dispo": 15, "min_echeances": 24, "runs_gardes": 2, "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i", "horizon_h": 96, "tuiles": {"domaine": [-23, -11, 43, 58], "res": 0.1, "garder": [[-23, -19, 53, 58], [-14, -11, 43, 47]]}},
-  "courant_polynesie": {"nom": "Courants global · Polynésie", "source": "cmems", "actif": true, "heure_dispo": 15, "min_echeances": 24, "runs_gardes": 2, "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i", "horizon_h": 96, "tuiles": {"domaine": [-20, -14, -153, -146], "res": 0.1}},
-  "courant_caledonie": {"nom": "Courants global · Nouvelle-Calédonie", "source": "cmems", "actif": true, "heure_dispo": 15, "min_echeances": 24, "runs_gardes": 2, "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i", "horizon_h": 96, "tuiles": {"domaine": [-24, -18, 162, 169], "res": 0.1}},
-  "ifs": {"nom": "IFS (CEP, données ouvertes)", "source": "cep", "actif": true, "flux": "oper", "parametres": "atmo", "runs_gardes": 2, "simultanes": 6, "sorties": {"ifs_atl": {"nom": "IFS 0,25° (CEP) · Atlantique-Europe", "domaine": [35, 66, -30, 15], "vagues": ["wam_atl"]}, "ifs_antilles": {"nom": "IFS 0,25° (CEP) · Antilles", "domaine": [13, 19, -65, -58], "vagues": ["wam_antilles"]}, "ifs_guyane": {"nom": "IFS 0,25° (CEP) · Guyane", "domaine": [2, 9, -55, -47], "vagues": ["wam_guyane"]}, "ifs_indien": {"nom": "IFS 0,25° (CEP) · Réunion-Mayotte", "domaine": [-23, -11, 43, 58], "garder": [[-23, -19, 53, 58], [-14, -11, 43, 47]], "vagues": ["wam_indien"]}, "ifs_polynesie": {"nom": "IFS 0,25° (CEP) · Polynésie", "domaine": [-20, -14, -153, -146], "vagues": ["wam_polynesie"]}, "ifs_caledonie": {"nom": "IFS 0,25° (CEP) · Nouvelle-Calédonie", "domaine": [-24, -18, 162, 169], "vagues": ["wam_caledonie"]}}},
-  "wam": {"nom": "WAM (CEP, données ouvertes)", "source": "cep", "actif": true, "flux": "wave", "parametres": "vagues", "runs_gardes": 2, "simultanes": 6, "sorties": {"wam_atl": {"nom": "WAM 0,25° (CEP, vent IFS) · Atlantique-Europe", "domaine": [35, 66, -30, 15], "force_par": "ifs_atl"}, "wam_antilles": {"nom": "WAM 0,25° (CEP, vent IFS) · Antilles", "domaine": [13, 19, -65, -58], "force_par": "ifs_antilles"}, "wam_guyane": {"nom": "WAM 0,25° (CEP, vent IFS) · Guyane", "domaine": [2, 9, -55, -47], "force_par": "ifs_guyane"}, "wam_indien": {"nom": "WAM 0,25° (CEP, vent IFS) · Réunion-Mayotte", "domaine": [-23, -11, 43, 58], "garder": [[-23, -19, 53, 58], [-14, -11, 43, 47]], "force_par": "ifs_indien"}, "wam_polynesie": {"nom": "WAM 0,25° (CEP, vent IFS) · Polynésie", "domaine": [-20, -14, -153, -146], "force_par": "ifs_polynesie"}, "wam_caledonie": {"nom": "WAM 0,25° (CEP, vent IFS) · Nouvelle-Calédonie", "domaine": [-24, -18, 162, 169], "force_par": "ifs_caledonie"}}}
+ "_aide": "Modèles téléchargés. actif=false pour en suspendre un. type : 'groupes' (fichiers par groupe d'échéances), 'echeances' (un fichier par échéance) ou 'fichier' (un seul NetCDF pour tout le run, WW3). pas_sortie : 1 ou 3 heures. tuiles : domaine [sud, nord, ouest, est] en degrés entiers, découpé en tuiles de 1°, et résolution des tuiles ; res_fin et zones_fines (facultatifs) : résolution plus fine dans ces rectangles [sud, nord, ouest, est] (côtes). vagues : modèles de vagues proposés par défaut dans l'appli (le premier qui couvre la zone affichée). force_par : modèle atmosphérique qui fournit le vent d'un modèle de vagues. min_echeances : en dessous, le run est jugé incomplet et ignoré. heures_runs (facultatif) : heures UTC des runs à traiter, les autres sont ignorés. runs_gardes (facultatif, 4 par défaut) : nombre de runs gardés sur le site.",
+ "arome": {
+  "nom": "AROME",
+  "actif": true,
+  "api": "DPPaquetAROME",
+  "modele": "AROME",
+  "produit": "productARO",
+  "grille": "0.025",
+  "paquets": [
+   "SP1",
+   "SP2"
+  ],
+  "type": "groupes",
+  "pas_sortie": 1,
+  "parametres": "atmo",
+  "min_echeances": 50,
+  "heures_runs": [
+   0,
+   6,
+   12,
+   18
+  ],
+  "vagues": [
+   "mfwam_fr",
+   "ww3_med_aro"
+  ],
+  "tuiles": {
+   "domaine": [
+    41,
+    52,
+    -8,
+    10
+   ],
+   "res": 0.05,
+   "res_fin": 0.025,
+   "zones_fines": [
+    [
+     48,
+     52,
+     -6,
+     3
+    ],
+    [
+     43,
+     48,
+     -6,
+     -1
+    ],
+    [
+     42,
+     44,
+     3,
+     8
+    ],
+    [
+     41,
+     43,
+     8,
+     10
+    ]
+   ]
+  }
+ },
+ "aromeifs": {
+  "nom": "AROME-IFS",
+  "actif": true,
+  "api": "DPPaquetAROMEIFS",
+  "modele": "AROMEIFS",
+  "produit": "productAROIFS",
+  "grille": "0.025",
+  "paquets": [
+   "SP1",
+   "SP2"
+  ],
+  "type": "groupes",
+  "pas_sortie": 1,
+  "parametres": "atmo",
+  "min_echeances": 50,
+  "vagues": [],
+  "tuiles": {
+   "domaine": [
+    41,
+    52,
+    -8,
+    10
+   ],
+   "res": 0.05
+  }
+ },
+ "arpege": {
+  "nom": "ARPEGE Europe",
+  "actif": true,
+  "api": "DPPaquetARPEGE",
+  "modele": "ARPEGE",
+  "produit": "productARP",
+  "grille": "0.1",
+  "paquets": [
+   "SP1",
+   "SP2"
+  ],
+  "type": "groupes",
+  "pas_sortie": 3,
+  "parametres": "atmo",
+  "min_echeances": 34,
+  "vagues": [
+   "ww3_atl",
+   "mfwam_glob"
+  ],
+  "tuiles": {
+   "domaine": [
+    35,
+    66,
+    -30,
+    15
+   ],
+   "res": 0.1
+  }
+ },
+ "mfwam_fr": {
+  "nom": "MFWAM France (vent AROME)",
+  "actif": true,
+  "api": "DPPaquetWAVESMODELS",
+  "modele": "MFWAM",
+  "produit": "productMFWAM",
+  "grille": "0.025",
+  "paquets": [
+   "SP1"
+  ],
+  "type": "echeances",
+  "pas_sortie": 1,
+  "parametres": "vagues",
+  "min_echeances": 45,
+  "force_par": "arome",
+  "tuiles": {
+   "domaine": [
+    41,
+    52,
+    -8,
+    10
+   ],
+   "res": 0.05
+  }
+ },
+ "mfwam_glob": {
+  "nom": "MFWAM global (vent ARPEGE)",
+  "actif": true,
+  "api": "DPPaquetWAVESMODELS",
+  "modele": "MFWAM",
+  "produit": "productMFWAM",
+  "grille": "0.1",
+  "paquets": [
+   "SP1"
+  ],
+  "type": "echeances",
+  "pas_sortie": 3,
+  "parametres": "vagues",
+  "min_echeances": 30,
+  "force_par": "arpege",
+  "tuiles": {
+   "domaine": [
+    35,
+    66,
+    -30,
+    15
+   ],
+   "res": 0.1
+  }
+ },
+ "ww3_atl": {
+  "nom": "WW3 Atlantique-Manche (vent ARPEGE)",
+  "actif": true,
+  "api": "DPPaquetWAVESMODELS",
+  "modele": "WW3-WARP",
+  "produit": "productWWARP",
+  "grille": "0.01",
+  "paquets": [
+   "SP1"
+  ],
+  "type": "fichier",
+  "format": "nc",
+  "pas_sortie": 1,
+  "parametres": "ww3",
+  "min_echeances": 40,
+  "force_par": "arpege",
+  "tuiles": {
+   "domaine": [
+    43,
+    53,
+    -7,
+    5
+   ],
+   "res": 0.05
+  }
+ },
+ "ww3_med": {
+  "nom": "WW3 Méditerranée (vent ARPEGE)",
+  "actif": false,
+  "api": "DPPaquetWAVESMODELS",
+  "modele": "WW3-MARP",
+  "produit": "productWMARP",
+  "grille": "0.01",
+  "paquets": [
+   "SP1"
+  ],
+  "type": "fichier",
+  "format": "nc",
+  "pas_sortie": 1,
+  "parametres": "ww3",
+  "min_echeances": 40,
+  "force_par": "arpege",
+  "tuiles": {
+   "domaine": [
+    40,
+    45,
+    3,
+    12
+   ],
+   "res": 0.05
+  }
+ },
+ "ww3_med_aro": {
+  "nom": "WW3 Méditerranée (vent AROME)",
+  "actif": true,
+  "api": "DPPaquetWAVESMODELS",
+  "modele": "WW3-MARO",
+  "produit": "productWMARO",
+  "grille": "0.01",
+  "paquets": [
+   "SP1"
+  ],
+  "type": "fichier",
+  "format": "nc",
+  "pas_sortie": 1,
+  "parametres": "ww3",
+  "min_echeances": 40,
+  "force_par": "arome",
+  "tuiles": {
+   "domaine": [
+    40,
+    45,
+    3,
+    12
+   ],
+   "res": 0.05
+  }
+ },
+ "arome_antilles": {
+  "nom": "AROME Antilles",
+  "actif": true,
+  "api": "DPPaquetAROME-OM",
+  "modele": "AROME-OM-ANTIL",
+  "produit": "productOMAN",
+  "grille": "0.025",
+  "paquets": [
+   "SP1",
+   "SP2",
+   "SP3"
+  ],
+  "type": "echeances",
+  "pas_sortie": 1,
+  "parametres": "atmo",
+  "min_echeances": 45,
+  "heures_runs": [
+   0,
+   6,
+   12,
+   18
+  ],
+  "runs_gardes": 2,
+  "vagues": [],
+  "tuiles": {
+   "domaine": [
+    13,
+    19,
+    -65,
+    -58
+   ],
+   "res": 0.05
+  }
+ },
+ "arome_guyane": {
+  "nom": "AROME Guyane",
+  "actif": true,
+  "api": "DPPaquetAROME-OM",
+  "modele": "AROME-OM-GUYANE",
+  "produit": "productOMGU",
+  "grille": "0.025",
+  "paquets": [
+   "SP1",
+   "SP2",
+   "SP3"
+  ],
+  "type": "echeances",
+  "pas_sortie": 1,
+  "parametres": "atmo",
+  "min_echeances": 45,
+  "heures_runs": [
+   0,
+   6,
+   12,
+   18
+  ],
+  "runs_gardes": 2,
+  "vagues": [],
+  "tuiles": {
+   "domaine": [
+    2,
+    9,
+    -55,
+    -47
+   ],
+   "res": 0.05
+  }
+ },
+ "arome_indien": {
+  "nom": "AROME Réunion-Mayotte",
+  "actif": true,
+  "api": "DPPaquetAROME-OM",
+  "modele": "AROME-OM-INDIEN",
+  "produit": "productOMOI",
+  "grille": "0.025",
+  "paquets": [
+   "SP1",
+   "SP2",
+   "SP3"
+  ],
+  "type": "echeances",
+  "pas_sortie": 1,
+  "parametres": "atmo",
+  "min_echeances": 45,
+  "heures_runs": [
+   0,
+   6,
+   12,
+   18
+  ],
+  "runs_gardes": 2,
+  "vagues": [],
+  "tuiles": {
+   "domaine": [
+    -23,
+    -11,
+    43,
+    58
+   ],
+   "res": 0.05,
+   "garder": [
+    [
+     -23,
+     -19,
+     53,
+     58
+    ],
+    [
+     -14,
+     -11,
+     43,
+     47
+    ]
+   ]
+  }
+ },
+ "arome_polynesie": {
+  "nom": "AROME Polynésie",
+  "actif": true,
+  "api": "DPPaquetAROME-OM",
+  "modele": "AROME-OM-POLYN",
+  "produit": "productOMPF",
+  "grille": "0.025",
+  "paquets": [
+   "SP1",
+   "SP2",
+   "SP3"
+  ],
+  "type": "echeances",
+  "pas_sortie": 1,
+  "parametres": "atmo",
+  "min_echeances": 45,
+  "heures_runs": [
+   0,
+   6,
+   12,
+   18
+  ],
+  "runs_gardes": 2,
+  "vagues": [],
+  "tuiles": {
+   "domaine": [
+    -20,
+    -14,
+    -153,
+    -146
+   ],
+   "res": 0.05
+  }
+ },
+ "arome_caledonie": {
+  "nom": "AROME Nouvelle-Calédonie",
+  "actif": true,
+  "api": "DPPaquetAROME-OM",
+  "modele": "AROME-OM-NCALED",
+  "produit": "productOMNC",
+  "grille": "0.025",
+  "paquets": [
+   "SP1",
+   "SP2",
+   "SP3"
+  ],
+  "type": "echeances",
+  "pas_sortie": 1,
+  "parametres": "atmo",
+  "min_echeances": 45,
+  "heures_runs": [
+   0,
+   6,
+   12,
+   18
+  ],
+  "runs_gardes": 2,
+  "vagues": [],
+  "tuiles": {
+   "domaine": [
+    -24,
+    -18,
+    162,
+    169
+   ],
+   "res": 0.05
+  }
+ },
+ "courant_ibi": {
+  "nom": "Courants IBI · Manche-Atlantique (marée incluse)",
+  "source": "cmems",
+  "actif": true,
+  "heure_dispo": 15,
+  "min_echeances": 24,
+  "runs_gardes": 2,
+  "dataset": "cmems_mod_ibi_phy_anfc_0.027deg-2D_PT1H-m",
+  "horizon_h": 120,
+  "tuiles": {
+   "domaine": [
+    43,
+    52,
+    -7,
+    3
+   ],
+   "res": 0.025
+  }
+ },
+ "courant_med": {
+  "nom": "Courants Méditerranée (marée incluse)",
+  "source": "cmems",
+  "actif": true,
+  "heure_dispo": 15,
+  "min_echeances": 24,
+  "runs_gardes": 2,
+  "dataset": "cmems_mod_med_phy-cur_anfc_4.2km-2D_PT1H-m",
+  "horizon_h": 96,
+  "tuiles": {
+   "domaine": [
+    40,
+    45,
+    3,
+    12
+   ],
+   "res": 0.05
+  },
+  "dataset_temperature": "cmems_mod_med_phy-tem_anfc_4.2km-2D_PT1H-m"
+ },
+ "courant_atl": {
+  "nom": "Courants global · Atlantique NE et Manche-Mer du Nord",
+  "source": "cmems",
+  "actif": true,
+  "heure_dispo": 15,
+  "min_echeances": 24,
+  "runs_gardes": 2,
+  "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i",
+  "horizon_h": 96,
+  "tuiles": {
+   "domaine": [
+    35,
+    66,
+    -30,
+    15
+   ],
+   "res": 0.1
+  },
+  "dataset_temperature": "cmems_mod_glo_phy_anfc_0.083deg_PT1H-m"
+ },
+ "courant_antilles": {
+  "nom": "Courants global · Antilles",
+  "source": "cmems",
+  "actif": true,
+  "heure_dispo": 15,
+  "min_echeances": 24,
+  "runs_gardes": 2,
+  "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i",
+  "horizon_h": 96,
+  "tuiles": {
+   "domaine": [
+    13,
+    19,
+    -65,
+    -58
+   ],
+   "res": 0.1
+  },
+  "dataset_temperature": "cmems_mod_glo_phy_anfc_0.083deg_PT1H-m"
+ },
+ "courant_guyane": {
+  "nom": "Courants global · Guyane",
+  "source": "cmems",
+  "actif": true,
+  "heure_dispo": 15,
+  "min_echeances": 24,
+  "runs_gardes": 2,
+  "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i",
+  "horizon_h": 96,
+  "tuiles": {
+   "domaine": [
+    2,
+    9,
+    -55,
+    -47
+   ],
+   "res": 0.1
+  },
+  "dataset_temperature": "cmems_mod_glo_phy_anfc_0.083deg_PT1H-m"
+ },
+ "courant_indien": {
+  "nom": "Courants global · Réunion-Mayotte",
+  "source": "cmems",
+  "actif": true,
+  "heure_dispo": 15,
+  "min_echeances": 24,
+  "runs_gardes": 2,
+  "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i",
+  "horizon_h": 96,
+  "tuiles": {
+   "domaine": [
+    -23,
+    -11,
+    43,
+    58
+   ],
+   "res": 0.1,
+   "garder": [
+    [
+     -23,
+     -19,
+     53,
+     58
+    ],
+    [
+     -14,
+     -11,
+     43,
+     47
+    ]
+   ]
+  },
+  "dataset_temperature": "cmems_mod_glo_phy_anfc_0.083deg_PT1H-m"
+ },
+ "courant_polynesie": {
+  "nom": "Courants global · Polynésie",
+  "source": "cmems",
+  "actif": true,
+  "heure_dispo": 15,
+  "min_echeances": 24,
+  "runs_gardes": 2,
+  "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i",
+  "horizon_h": 96,
+  "tuiles": {
+   "domaine": [
+    -20,
+    -14,
+    -153,
+    -146
+   ],
+   "res": 0.1
+  },
+  "dataset_temperature": "cmems_mod_glo_phy_anfc_0.083deg_PT1H-m"
+ },
+ "courant_caledonie": {
+  "nom": "Courants global · Nouvelle-Calédonie",
+  "source": "cmems",
+  "actif": true,
+  "heure_dispo": 15,
+  "min_echeances": 24,
+  "runs_gardes": 2,
+  "dataset": "cmems_mod_glo_phy_anfc_merged-uv_PT1H-i",
+  "horizon_h": 96,
+  "tuiles": {
+   "domaine": [
+    -24,
+    -18,
+    162,
+    169
+   ],
+   "res": 0.1
+  },
+  "dataset_temperature": "cmems_mod_glo_phy_anfc_0.083deg_PT1H-m"
+ },
+ "ifs": {
+  "nom": "IFS (CEP, données ouvertes)",
+  "source": "cep",
+  "actif": true,
+  "flux": "oper",
+  "parametres": "atmo",
+  "runs_gardes": 2,
+  "simultanes": 6,
+  "sorties": {
+   "ifs_atl": {
+    "nom": "IFS 0,25° (CEP) · Atlantique-Europe",
+    "domaine": [
+     35,
+     66,
+     -30,
+     15
+    ],
+    "vagues": [
+     "wam_atl"
+    ]
+   },
+   "ifs_antilles": {
+    "nom": "IFS 0,25° (CEP) · Antilles",
+    "domaine": [
+     13,
+     19,
+     -65,
+     -58
+    ],
+    "vagues": [
+     "wam_antilles"
+    ]
+   },
+   "ifs_guyane": {
+    "nom": "IFS 0,25° (CEP) · Guyane",
+    "domaine": [
+     2,
+     9,
+     -55,
+     -47
+    ],
+    "vagues": [
+     "wam_guyane"
+    ]
+   },
+   "ifs_indien": {
+    "nom": "IFS 0,25° (CEP) · Réunion-Mayotte",
+    "domaine": [
+     -23,
+     -11,
+     43,
+     58
+    ],
+    "garder": [
+     [
+      -23,
+      -19,
+      53,
+      58
+     ],
+     [
+      -14,
+      -11,
+      43,
+      47
+     ]
+    ],
+    "vagues": [
+     "wam_indien"
+    ]
+   },
+   "ifs_polynesie": {
+    "nom": "IFS 0,25° (CEP) · Polynésie",
+    "domaine": [
+     -20,
+     -14,
+     -153,
+     -146
+    ],
+    "vagues": [
+     "wam_polynesie"
+    ]
+   },
+   "ifs_caledonie": {
+    "nom": "IFS 0,25° (CEP) · Nouvelle-Calédonie",
+    "domaine": [
+     -24,
+     -18,
+     162,
+     169
+    ],
+    "vagues": [
+     "wam_caledonie"
+    ]
+   }
+  }
+ },
+ "wam": {
+  "nom": "WAM (CEP, données ouvertes)",
+  "source": "cep",
+  "actif": true,
+  "flux": "wave",
+  "parametres": "vagues",
+  "runs_gardes": 2,
+  "simultanes": 6,
+  "sorties": {
+   "wam_atl": {
+    "nom": "WAM 0,25° (CEP, vent IFS) · Atlantique-Europe",
+    "domaine": [
+     35,
+     66,
+     -30,
+     15
+    ],
+    "force_par": "ifs_atl"
+   },
+   "wam_antilles": {
+    "nom": "WAM 0,25° (CEP, vent IFS) · Antilles",
+    "domaine": [
+     13,
+     19,
+     -65,
+     -58
+    ],
+    "force_par": "ifs_antilles"
+   },
+   "wam_guyane": {
+    "nom": "WAM 0,25° (CEP, vent IFS) · Guyane",
+    "domaine": [
+     2,
+     9,
+     -55,
+     -47
+    ],
+    "force_par": "ifs_guyane"
+   },
+   "wam_indien": {
+    "nom": "WAM 0,25° (CEP, vent IFS) · Réunion-Mayotte",
+    "domaine": [
+     -23,
+     -11,
+     43,
+     58
+    ],
+    "garder": [
+     [
+      -23,
+      -19,
+      53,
+      58
+     ],
+     [
+      -14,
+      -11,
+      43,
+      47
+     ]
+    ],
+    "force_par": "ifs_indien"
+   },
+   "wam_polynesie": {
+    "nom": "WAM 0,25° (CEP, vent IFS) · Polynésie",
+    "domaine": [
+     -20,
+     -14,
+     -153,
+     -146
+    ],
+    "force_par": "ifs_polynesie"
+   },
+   "wam_caledonie": {
+    "nom": "WAM 0,25° (CEP, vent IFS) · Nouvelle-Calédonie",
+    "domaine": [
+     -24,
+     -18,
+     162,
+     169
+    ],
+    "force_par": "ifs_caledonie"
+   }
+  }
+ }
 }
