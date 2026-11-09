@@ -586,7 +586,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 00:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 00:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -688,6 +688,9 @@ const vW = arr => !arr || vF()===1 ? arr : arr.map(v=>v==null?null:v*KMH);
 const SEUIL_NUAGE = 3;   /* octas : un étage est compté présent à partir de cette couverture */
 const SC = {
   /* mer croisée : 0 non, 1 mer croisée, 2 marquée */
+  /* écart air – mer (T 2 m − T mer) : bleu = air plus froid (instable), rouge = air plus chaud (stable, brouillard d'advection) */
+  airmer: classes([[-99,"#1d3f8f","≤ −6 instable",0.85],[-6,"#3b73c4","−6 à −3",0.8],[-3,"#9cc3ea","−3 à −1",0.7],[-1,"#f2f2f2","−1 à +1",0.5],
+    [1,"#f6c58e","+1 à +3",0.7],[3,"#e8743b","+3 à +6",0.8],[6,"#b2182b","≥ +6 stable",0.85]], 99),
   croisee: classes([[0,"#7fc98f","non",0.35],[1,"#f59e0b","mer croisée",0.85],[2,"#dc2626","marquée",0.9]], 3),
   /* vent et rafales : une couleur par tranche de 5 nœuds */
   wind: classes([[0,"#e8f4fb",""],[5,"#b9def0",""],[10,"#7cc4e4",""],[15,"#4daf7c",""],[20,"#f3e04b",""],[25,"#f68a3c",""],
@@ -749,9 +752,11 @@ const PARAMS = {
   sw2p:{label:"Houle secondaire · période (WW3)", unit:"s", src:"m", key:"secondary_swell_period", dir:["secondary_swell_direction"], glyph:"arrow", scale:SC.period, dec:0},
   /* courant : direction VERS laquelle il porte (convention océanographique) */
   croisee:{label:"Mer croisée (indicateur)", unit:"", src:"m", key:"wind_wave_height", scale:SC.croisee, cat:true, dec:0, novals:true, calc:i=>croiseeGrille(i)},
+  sst:{label:"Température de la mer (surface)", unit:"°C", src:"c", key:"sea_surface_temperature", scale:SC.temp, dec:1},
+  airmer:{label:"Écart air – mer (T 2 m − T mer)", unit:"°C", src:"c", key:"sea_surface_temperature", scale:SC.airmer, dec:1, calc:i=>airMerGrille(i)},
   cur:{label:"Courant de surface (marée incluse)", unit:"kt", src:"c", key:"current_speed", dir:["current_direction"], dirTo:true, glyph:"arrow", scale:SC.cur, dec:1}
 };
-const C_VARS = ["current_speed","current_direction"];
+const C_VARS = ["current_speed","current_direction","sea_surface_temperature"];
 function appliquerUniteVent(){
   for (const k of ["wind","gust","gusti"]){ const P=PARAMS[k]; P.unit=vL(); P.scale=vU()==="kmh"?SC.windkmh:SC.wind; if (vU()==="kmh") P.conv=v=>v*KMH; else delete P.conv; }
 }
@@ -772,7 +777,8 @@ const ISO = {
   wws:{label:"Mer du vent · hauteur", pas:[0.5,1,0.25], u:"m"},
   swt:{label:"Houle totale · hauteur", pas:[0.5,1,0.25], u:"m"},
   swtp:{label:"Houle totale · période", pas:[2,1], u:"s"},
-  cur:{label:"Courant", pas:[0.5,0.25,1], u:"kt"}
+  cur:{label:"Courant", pas:[0.5,0.25,1], u:"kt"},
+  sst:{label:"Température de la mer", pas:[1,2,0.5], u:"°C"}
 };
 const SYM = {
   wind:{label:"Vent moyen 10 m · barbules", p:"wind"},
@@ -1635,6 +1641,18 @@ function croiseeTexte(r,long){
   const sys=x=>`${x.nom} ${fmt(x.h,1)} m ${dir16(x.d)}`;
   return `${r.niv===2?"⚠ marquée":"oui"} · ${Math.round(r.ang)}°`+(long?` (${dir16(r.A.d)} / ${dir16(r.B.d)})`:` (${sys(r.A)} / ${sys(r.B)})`);
 }
+/* écart air – mer sur la grille du modèle de courant (température de l'air interpolée depuis la grille atmosphère) */
+function airMerGrille(i){
+  const g=st.gc, ga=st.ga; if (!g) return null; const ti=tiOf(g,i), ta=tiOf(ga,i); if (ti<0) return {g,vals:null};
+  const N=g.ny*g.nx, sst=g.get("sea_surface_temperature"); if (!sst || !ga || ta<0) return {g,vals:null};
+  const Na=ga.ny*ga.nx, t2a=ga.get("temperature_2m"); if (!t2a) return {g,vals:null};
+  const t2=t2a.subarray(ta*Na,(ta+1)*Na), s0=sst.subarray(ti*N,(ti+1)*N), out=new Float32Array(N);
+  for (let y=0;y<g.ny;y++) for (let x=0;x<g.nx;x++){ const n=y*g.nx+x, sv=s0[n]; if (isNaN(sv)){ out[n]=NaN; continue; }
+    const fx=(gLon(g,x)-ga.lon0)/ga.dlon, fy=(gLat(g,y)-ga.lat0)/ga.dlat;
+    const ta2 = fx<-0.5||fy<-0.5||fx>ga.nx-0.5||fy>ga.ny-0.5 ? NaN : sampleGrid(t2,ga.nx,ga.ny,fx,fy);
+    out[n]=ta2-sv; }
+  return {g,vals:out};
+}
 /* carte : indicateur maille par maille sur la grille du modèle de vagues */
 function croiseeGrille(i){
   const g=st.gm; if (!g) return null; const ti=tiOf(g,i); if (ti<0) return {g,vals:null};
@@ -2354,6 +2372,8 @@ function renderReadout(){
   rows.push(["CAPE", `${fmt(g(a,"cape"),0)} J/kg`], ["T 2 m", `${fmt(g(a,"temperature_2m"),1)} °C`]);
   if (a.dew_point_2m && a.dew_point_2m.some(v=>v!=null)) rows.push(["Td 2 m", `${fmt(g(a,"dew_point_2m"),1)} °C`]);
   if (a.relative_humidity_2m && a.relative_humidity_2m.some(v=>v!=null)) rows.push(["HU 2 m", `${fmt(g(a,"relative_humidity_2m"),0)} %`]);
+  { const cc=D.c||{}; if (hasData(cc.sea_surface_temperature)){ const sm=g(cc,"sea_surface_temperature"), t=g(a,"temperature_2m"), td=g(a,"dew_point_2m");
+    rows.push(["T mer", `${fmt(sm,1)} °C`], ["Air − mer", sm==null||t==null?"—":`${t-sm>0?"+":""}${fmt(t-sm,1)} °C${td!=null&&td>=sm?" · Td ≥ T mer : brouillard possible":t-sm<=-3?" · air instable":t-sm>=3?" · air stable":""}`]); } }
   el.innerHTML=`<div class="t">${tLabel(D.times[j])}</div>`+rows.map(([k,v])=>`<div><span>${k}</span><br><b>${v}</b></div>`).join("");
   /* hauteur du tableau : jamais réduite tant qu'on lit les mêmes données (survol), pour éviter les sauts */
   const cle=D.kind+"|"+(D.provA||"")+"|"+(D.glat||"")+"|"+(D.glon||"")+"|"+D.times.length+"|"+(el.clientWidth>>4);
@@ -2645,13 +2665,19 @@ function drawMGto(cv,SOLO){
   }
   /* 7. Température, point de rosée (°C, à gauche) et humidité relative (%, à droite) */
   if (show("temp")){ const z0=y;
-  title("T, Td et HU à 2 m",[["T",C.t],["Td",C.td]].concat(hasData(a.relative_humidity_2m)?[["HU",C.hu,[4,3]]]:[]),"temp");
-  const tv=[...(a.temperature_2m||[]),...(a.dew_point_2m||[])].filter(v=>v!=null);
+  const sstA=(D.c||{}).sea_surface_temperature, aSst=hasData(sstA);
+  title(aSst?"T, Td, HU à 2 m et T mer":"T, Td et HU à 2 m",[["T",C.t],["Td",C.td]].concat(aSst?[["T mer","#7c3aed"]]:[]).concat(hasData(a.relative_humidity_2m)?[["HU",C.hu,[4,3]]]:[]),"temp");
+  const tv=[...(a.temperature_2m||[]),...(a.dew_point_2m||[]),...(aSst?sstA:[])].filter(v=>v!=null);
   vgrid(y,hT);
   if (hasData(a.relative_humidity_2m)){ yaxis(y,hT,0,100,"r","%",C.hu); seuil(a.relative_humidity_2m,y,hT,0,100,SE.hu,"HU","%");
     line(a.relative_humidity_2m,y,hT,0,100,C.hu,{w:1.4,dash:[4,3],fill:.08}); }
   if (tv.length){ const tmin=Math.floor(Math.min(...tv)-1), tmax=Math.ceil(Math.max(...tv)+1);
-    yaxis(y,hT,tmin,tmax,"l","°C"); line(a.temperature_2m,y,hT,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,hT,tmin,tmax,C.td,{w:1.8}); }
+    yaxis(y,hT,tmin,tmax,"l","°C");
+    /* Td ≥ T mer : risque de brouillard d'advection (l'air se refroidit et se sature au contact de la mer) */
+    if (aSst && a.dew_point_2m){ for (let i=0;i<n;i++){ const td=a.dew_point_2m[i], sm=sstA[i]; if (td==null||sm==null||td<sm) continue;
+      const x0=Math.max(L0,X(i)-halfL(i)), x1=Math.min(L0+pw,X(i)+halfR(i)); ctx.fillStyle="rgba(120,130,150,.22)"; ctx.fillRect(x0,y,x1-x0+0.5,hT); } }
+    line(a.temperature_2m,y,hT,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,hT,tmin,tmax,C.td,{w:1.8});
+    if (aSst) line(sstA,y,hT,tmin,tmax,"#7c3aed",{w:2,dash:[6,3]}); }
   frame(y,hT); y+=hT+GAP; ZN.push({k:"temp",y0:z0,y1:y});
 
   }
@@ -2715,7 +2741,9 @@ function bulleLignes(k,D,j,C){
     const n=v(a,"cloud_cover"); add("nébulosité",C.nn,n==null?null:n/12.5,"octas",0); }
   if (k==="nuages"){ for (const [nom,n] of [["nuages hauts","cloud_cover_high"],["nuages moyens","cloud_cover_mid"],["nuages bas","cloud_cover_low"]]){ const x=v(a,n); add(nom,null,x==null?null:x/12.5,"octas",0); } }
   if (k==="pmer") add("Pmer",C.ink,v(a,"pressure_msl"),"hPa",1);
-  if (k==="temp"){ add("T 2 m",C.t,v(a,"temperature_2m"),"°C",1); add("Td 2 m",C.td,v(a,"dew_point_2m"),"°C",1); add("HU 2 m",C.hu,v(a,"relative_humidity_2m"),"%",0); }
+  if (k==="temp"){ add("T 2 m",C.t,v(a,"temperature_2m"),"°C",1); add("Td 2 m",C.td,v(a,"dew_point_2m"),"°C",1); add("HU 2 m",C.hu,v(a,"relative_humidity_2m"),"%",0);
+    const sm=v(c,"sea_surface_temperature"); add("T mer","#7c3aed",sm,"°C",1);
+    const t=v(a,"temperature_2m"); if (sm!=null && t!=null) out.push({nom:"air − mer",col:null,t:`${t-sm>0?"+":""}${fmt(t-sm,1)} °C`,ecart:true}); }
   return out;
 }
 function mgIndex(e){
@@ -4417,6 +4445,8 @@ function showHover(e){
     } else if (st.gm && ws!=null) lines.push(`<span class="pos">pas de vagues ici</span>`);
     const cs=gridVal(st.gc,"current_speed",lat,lng);
     if (cs!=null) lines.push(`Courant <b>${fmt(cs,1)} kt vers ${dir16(gridVal(st.gc,"current_direction",lat,lng))}</b>`);
+    { const sm=st.gc?gridVal(st.gc,"sea_surface_temperature",lat,lng):null; if (sm!=null && !isNaN(sm)){ const t=st.ga?gridVal(st.ga,"temperature_2m",lat,lng):null;
+      lines.push(`T mer <b>${fmt(sm,1)} °C</b>${t!=null&&!isNaN(t)?` · air − mer <b>${t-sm>0?"+":""}${fmt(t-sm,1)} °C</b>`:""}`); } }
     if (lines.length===1){ hoverEl.hidden=true; return; }
     if (MS && MS.actif && MS.pts.length){ const o=MS.mode==="ref"?MS.pts[0]:MS.pts[MS.pts.length-1], r=loxo(o,{lat,lon:lng});
       lines.splice(1,0,`📐 <b>${az3(r.az)}</b> · <b>${fmt(r.d,r.d<10?2:1)} Nq</b> depuis ${MS.mode==="ref"?"la référence":"le dernier point"}`); }
