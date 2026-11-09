@@ -453,7 +453,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 09/11/2026 15:00</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 09/11/2026 15:30</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -3307,7 +3307,7 @@ function showHover(e){
     if (cs!=null) lines.push(`Courant <b>${fmt(cs,1)} kt vers ${dir16(gridVal(st.gc,"current_direction",lat,lng))}</b>`);
     if (lines.length===1){ hoverEl.hidden=true; return; }
     for (const z of zonexA(lat,lng).slice(0,3))
-      lines.push(`<span style="color:${zxCouleur(z.c)}">■</span> Zone <b>${esc(z.n||"sans nom")}</b> · ${esc((ZX.cats||{})[z.c]||"zone d'exercice")}${z.i?`<br><span class="pos">${esc(z.i.slice(0,120))}</span>`:""}`);
+      lines.push(`<span style="color:${zxCouleur(z.c)}">■</span> Zone <b>${esc(z.n||"sans nom")}</b> · ${esc(z.i ? z.i.slice(0,120) : ((ZX.cats||{})[z.c]||"zone d'exercice"))}`);
     hoverEl.innerHTML=lines.join("<br>"); hoverEl.hidden=false;
     const sz=map.getSize(), p=e.containerPoint, w=hoverEl.offsetWidth, h=hoverEl.offsetHeight;
     hoverEl.style.left=Math.min(p.x+14, sz.x-w-4)+"px"; hoverEl.style.top=(p.y+h+18>sz.y ? p.y-h-10 : p.y+14)+"px";
