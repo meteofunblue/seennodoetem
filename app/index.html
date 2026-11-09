@@ -510,7 +510,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 19:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 19:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -2304,6 +2304,7 @@ function drawMGto(cv,SOLO){
   const smax=S=>S?Math.max(S.o||0,S.r||0):0;
   const SE=seuils();
 
+  const ZN=[];
   if (CP){ y=cmpDessin(ctx,D,CP,{y,gy:()=>y,sy:v=>{y=v;},cv,SOLO,L0,pw,n,X,halfL,halfR,title,yaxis,line,frame,vgrid,empty,C,SE:seuils(),GAP}); }
   else {
   /* 0. Route : allure (vent / route) et mer / route */
@@ -2323,7 +2324,7 @@ function drawMGto(cv,SOLO){
   let mx;
   const ww3 = hasData(m.primary_swell_height);
   /* 1. Vent */
-  if (show("vent")){
+  if (show("vent")){ const z0=y;
   title("Vent 10 m",[["moyen",C.wind],[gustInst(a)?"rafales à l'heure":"rafales max sur le pas",C.gust,[5,3]]],"vent");
   ctx.lineCap="round"; ctx.lineJoin="round";
   for (const i of glyphIdx){
@@ -2339,11 +2340,11 @@ function drawMGto(cv,SOLO){
   seuil(gsU,y,hV,0,mx,SE.raf,"rafales",vL());
   line(gsU,y,hV,0,mx,C.gust,{dash:[5,3]});
   line(wsU,y,hV,0,mx,C.wind,{w:2.4,fill:.12});
-  frame(y,hV); y+=hV+GAP;
+  frame(y,hV); y+=hV+GAP; ZN.push({k:"vent",y0:z0,y1:y});
 
   }
   /* 2. État de la mer */
-  if (show("mer")){
+  if (show("mer")){ const z0=y;
   const seaLeg=[["mer totale",C.hs],["mer du vent",C.wws]].concat(ww3?[["houle prim.",C.sw],["houle sec.",C.sw2,[4,3]]]:[["houle totale",C.sw]]);
   title("État de la mer",seaLeg,"mer");
   if (hasData(m.wave_height)){
@@ -2356,11 +2357,11 @@ function drawMGto(cv,SOLO){
     if (ww3){ line(m.primary_swell_height,y,hM,0,mx,C.sw); line(m.secondary_swell_height,y,hM,0,mx,C.sw2,{dash:[4,3]}); }
     else line(m.swell_wave_height,y,hM,0,mx,C.sw);
   } else empty(y,hM, isRoute?"Pas de données de vagues sur la route (hors domaine ou au-delà de l'échéance).":"Pas de données de vagues pour ce point (terre ou hors domaine).");
-  frame(y,hM); y+=hM+GAP;
+  frame(y,hM); y+=hM+GAP; ZN.push({k:"mer",y0:z0,y1:y});
 
   }
   /* 3. Houle : direction + période */
-  if (show("houle")){
+  if (show("houle")){ const z0=y;
   const dKey = ww3?"primary_swell_direction":"swell_wave_direction", pKey = ww3?"primary_swell_period":"swell_wave_period";
   title(ww3?"Houles · direction et période":"Houle totale · direction et période", ww3?[["primaire",C.sw],["secondaire",C.sw2,[4,3]]]:[["période",C.sw]],"houle");
   if (hasData(m[pKey])){
@@ -2375,11 +2376,11 @@ function drawMGto(cv,SOLO){
     line(m[pKey],y,hH,0,mx,C.sw,{w:2.2,gaps:true});
     if (ww3) line(m.secondary_swell_period,y,hH,0,mx,C.sw2,{dash:[4,3],gaps:true});
   }
-  frame(y,hH); y+=hH+GAP;
+  frame(y,hH); y+=hH+GAP; ZN.push({k:"houle",y0:z0,y1:y});
 
   }
   /* 3 bis. Courant de surface : flèches (vers où il porte), vitesse, périodes de vent contre courant */
-  if (show("cour") && hasCur){
+  if (show("cour") && hasCur){ const z0=y;
     title("Courant de surface",[["vitesse",C.cur],["vent contre courant","rgba(232,137,12,.9)"]],"cour");
     ctx.strokeStyle=C.ink; ctx.fillStyle=C.ink; ctx.lineWidth=1.3;
     for (const i of glyphIdx){ const d=near(cc.current_direction,i); if (d!=null) drawArrow(ctx,X(i),y+11,(d+180)%360,14); }
@@ -2393,11 +2394,11 @@ function drawMGto(cv,SOLO){
       const x0=Math.max(L0,X(i)-halfL(i)), x1=Math.min(L0+pw,X(k)+halfR(k)); ctx.fillRect(x0,y,x1-x0,hC); i=k; }
     seuil(cc.current_speed,y,hC,0,mx,SE.cur,"courant","kt");
     line(cc.current_speed,y,hC,0,mx,C.cur,{w:2.2,fill:.15,gaps:true});
-    frame(y,hC); y+=hC+GAP;
+    frame(y,hC); y+=hC+GAP; ZN.push({k:"cour",y0:z0,y1:y});
   }
 
   /* 4. Précipitations + nébulosité */
-  if (show("precip")){
+  if (show("precip")){ const z0=y;
   const hasShw = hasData(a.showers);
   title("Précip. et nébulosité",[["nébul.",C.nn],["précip. sur le pas",C.rr]].concat(hasShw?[["averses",C.ink]]:[]),"precip");
   vgrid(y,hR);
@@ -2410,11 +2411,11 @@ function drawMGto(cv,SOLO){
   ctx.fillStyle=C.rr;
   for (let i=0;i<n;i++){ const v=a.precipitation&&a.precipitation[i]; if (v>0){ const hh=Math.min(hR,v/mx*hR), [bx,w]=barX(i); ctx.fillRect(bx,y+hR-hh,w,hh); } }
   if (hasShw){ ctx.fillStyle=C.ink; ctx.globalAlpha=.55; for (let i=0;i<n;i++){ const v=a.showers[i]; if (v>0){ const hh=Math.min(hR,v/mx*hR), [bx,w]=barX(i); ctx.fillRect(bx+w/4,y+hR-hh,w/2,hh); } } ctx.globalAlpha=1; }
-  frame(y,hR); y+=hR+GAP;
+  frame(y,hR); y+=hR+GAP; ZN.push({k:"precip",y0:z0,y1:y});
 
   }
   /* 5. Nuages par étage : bandes B / M / H, teinte proportionnelle aux octas */
-  if (show("nuages")){
+  if (show("nuages")){ const z0=y;
   title("Nuages par étage",[],"nuages");
   vgrid(y,hN);
   const layers=[["H","cloud_cover_high",PARAMS.nhigh.scale],["M","cloud_cover_mid",PARAMS.nmid.scale],["B","cloud_cover_low",PARAMS.nlow.scale]];
@@ -2426,22 +2427,22 @@ function drawMGto(cv,SOLO){
     if (r) { ctx.strokeStyle=C.line; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); }
   });
   if (!layers.some(([,k])=>hasData(a[k]))) empty(y,hN,"Non fourni par ce modèle.");
-  frame(y,hN); y+=hN+GAP;
+  frame(y,hN); y+=hN+GAP; ZN.push({k:"nuages",y0:z0,y1:y});
 
   }
   /* 6. Pression mer */
-  if (show("pmer")){
+  if (show("pmer")){ const z0=y;
   title("Pression mer (Pmer)",[["Pmer",C.ink]],"pmer");
   const pv=(a.pressure_msl||[]).filter(v=>v!=null);
   if (pv.length){
     const pmin=Math.floor(Math.min(...pv)-1), pmax=Math.ceil(Math.max(...pv)+1);
     yaxis(y,hP,pmin,pmax,"l","hPa"); vgrid(y,hP); line(a.pressure_msl,y,hP,pmin,pmax,C.ink,{w:2});
   }
-  frame(y,hP); y+=hP+GAP;
+  frame(y,hP); y+=hP+GAP; ZN.push({k:"pmer",y0:z0,y1:y});
 
   }
   /* 7. Température, point de rosée (°C, à gauche) et humidité relative (%, à droite) */
-  if (show("temp")){
+  if (show("temp")){ const z0=y;
   title("T, Td et HU à 2 m",[["T",C.t],["Td",C.td]].concat(hasData(a.relative_humidity_2m)?[["HU",C.hu,[4,3]]]:[]),"temp");
   const tv=[...(a.temperature_2m||[]),...(a.dew_point_2m||[])].filter(v=>v!=null);
   vgrid(y,hT);
@@ -2449,7 +2450,7 @@ function drawMGto(cv,SOLO){
     line(a.relative_humidity_2m,y,hT,0,100,C.hu,{w:1.4,dash:[4,3],fill:.08}); }
   if (tv.length){ const tmin=Math.floor(Math.min(...tv)-1), tmax=Math.ceil(Math.max(...tv)+1);
     yaxis(y,hT,tmin,tmax,"l","°C"); line(a.temperature_2m,y,hT,tmin,tmax,C.t,{w:2.2}); line(a.dew_point_2m,y,hT,tmin,tmax,C.td,{w:1.8}); }
-  frame(y,hT); y+=hT+GAP;
+  frame(y,hT); y+=hT+GAP; ZN.push({k:"temp",y0:z0,y1:y});
 
   }
   }
@@ -2483,6 +2484,36 @@ function drawMGto(cv,SOLO){
     }
   }
   if (MULTI && cv._cmpTip) cv._cmpTip();
+  /* graphique agrandi (point ou route) : bulle des valeurs à l'heure survolée */
+  if (!MULTI && SOLO && st.hover!=null && st.hoverY!=null && st.hoverCv===cv.id){
+    const z=ZN.find(z=>st.hoverY>=z.y0 && st.hoverY<=z.y1);
+    if (z) infobulle(ctx,tLabel(D.times[st.hover]),bulleLignes(z.k,D,st.hover,C),X(st.hover),st.hoverY,L0,pw);
+  }
+}
+/* lignes de la bulle d'un graphique du météogramme (un seul modèle) */
+function bulleLignes(k,D,j,C){
+  const a=D.a||{}, m=D.m||{}, c=D.c||{}, v=(o,n)=>o[n]?o[n][j]:null, out=[];
+  const add=(nom,col,val,u,dec,suf,tir)=>{ if (val==null) return; out.push({nom,col,t:`${fmt(val,dec)}${u?" "+u:""}${suf||""}`}); };
+  const ww3=hasData(m.primary_swell_height);
+  if (k==="vent"){ const w=v(a,"wind_speed_10m"), g=gustArr(a);
+    add("vent moyen",C.wind,w==null?null:w*vF(),vL(),0," "+dir16(v(a,"wind_direction_10m")));
+    add(gustInst(a)?"rafales à l'heure":"rafales max sur le pas",C.gust,g&&g[j]!=null?g[j]*vF():null,vL(),0);
+    const r=g&&g[j]!=null&&w? g[j]/w : null; if (r) out.push({nom:"facteur de rafale",col:null,t:fmt(r,1),ecart:true}); }
+  if (k==="mer"){ add("mer totale (Hs)",C.hs,v(m,"wave_height"),"m",1," "+dir16(v(m,"wave_direction")));
+    add("mer du vent",C.wws,v(m,"wind_wave_height"),"m",1," "+dir16(v(m,"wind_wave_direction")));
+    if (ww3){ add("houle primaire",C.sw,v(m,"primary_swell_height"),"m",1," "+dir16(v(m,"primary_swell_direction"))); add("houle secondaire",C.sw2,v(m,"secondary_swell_height"),"m",1," "+dir16(v(m,"secondary_swell_direction"))); }
+    else add("houle totale",C.sw,v(m,"swell_wave_height"),"m",1," "+dir16(v(m,"swell_wave_direction")));
+    if (v(m,"wave_height")!=null) out.push({nom:"état de la mer",col:null,t:etatMer(v(m,"wave_height")),ecart:true}); }
+  if (k==="houle"){ if (ww3){ add("période houle prim.",C.sw,v(m,"primary_swell_period"),"s",0," "+dir16(v(m,"primary_swell_direction"))); add("période houle sec.",C.sw2,v(m,"secondary_swell_period"),"s",0," "+dir16(v(m,"secondary_swell_direction"))); }
+    else add("période houle",C.sw,v(m,"swell_wave_period"),"s",0," "+dir16(v(m,"swell_wave_direction")));
+    add("période mer du vent",C.wws,v(m,"wind_wave_period"),"s",0); }
+  if (k==="cour"){ add("courant",C.cur,v(c,"current_speed"),"kt",1," vers "+dir16(v(c,"current_direction"))); }
+  if (k==="precip"){ add(`précip. ${stepHours(D.times,j)} h`,C.rr,v(a,"precipitation"),"mm",1); add("averses",C.ink,v(a,"showers"),"mm",1);
+    const n=v(a,"cloud_cover"); add("nébulosité",C.nn,n==null?null:n/12.5,"octas",0); }
+  if (k==="nuages"){ for (const [nom,n] of [["nuages hauts","cloud_cover_high"],["nuages moyens","cloud_cover_mid"],["nuages bas","cloud_cover_low"]]){ const x=v(a,n); add(nom,null,x==null?null:x/12.5,"octas",0); } }
+  if (k==="pmer") add("Pmer",C.ink,v(a,"pressure_msl"),"hPa",1);
+  if (k==="temp"){ add("T 2 m",C.t,v(a,"temperature_2m"),"°C",1); add("Td 2 m",C.td,v(a,"dew_point_2m"),"°C",1); add("HU 2 m",C.hu,v(a,"relative_humidity_2m"),"%",0); }
+  return out;
 }
 function mgIndex(e){
   const cv=e.currentTarget, g=cv._geo; if (!g) return null;
@@ -2704,12 +2735,17 @@ function cmpInfobulle(ctx,D,p,j,x,y,L0,pw,actif){
   const txt=o=> p.dir ? `${az3(o.v)} ${dir16(o.v)}` : `${fmt(o.v,dec)} ${u}`;
   const lignes=L.map(o=>({nom:o.s.nom, col:o.s.col, t:txt(o), gras:actif.includes(o.s.val)}));
   if (!p.dir && L.length>1){ const e=L[0].v-L[L.length-1].v; lignes.push({nom:"écart", col:null, t:`${fmt(e,dec)} ${u}`, ecart:true}); }
+  infobulle(ctx,tLabel(D.times[j]),lignes,x,y,L0,pw);
+}
+/* bulle de valeurs dessinée sur un graphique : titre (heure) puis une ligne par courbe */
+function infobulle(ctx,titre,lignes,x,y,L0,pw){
+  if (!lignes.length) return;
   ctx.save();
   ctx.font="600 11px 'JetBrains Mono',monospace";
   const wN=Math.max(...lignes.map(l=>{ ctx.font=(l.gras?"700 ":"500 ")+"12px Barlow,sans-serif"; return ctx.measureText(l.nom).width; }));
   ctx.font="600 12px 'JetBrains Mono',monospace";
   const wV=Math.max(...lignes.map(l=>ctx.measureText(l.t).width));
-  const titre=tLabel(D.times[j]); ctx.font="700 12px 'JetBrains Mono',monospace";
+  ctx.font="700 12px 'JetBrains Mono',monospace";
   const W=Math.max(ctx.measureText(titre).width, 22+wN+14+wV)+16, H=24+lignes.length*17+4;
   let bx = x+14+W > L0+pw ? x-14-W : x+14; bx=Math.max(L0+2,bx);
   let by = Math.max(4, Math.min(y-H/2, ctx.canvas.height/(window.devicePixelRatio||1)-H-4));
