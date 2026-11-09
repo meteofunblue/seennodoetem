@@ -76,7 +76,8 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
   font:12.5px/1.45 var(--f-mono);white-space:pre-wrap;color:var(--ink)}
 body.projo .bultexte{font-size:16px}
 .bultexte .g1{color:#d97706;font-weight:700} .bultexte .g2{color:#dc2626;font-weight:700} .bultexte .g3{color:#7b2cbf;font-weight:700}
-.bultexte .zn{background:rgba(31,111,209,.12);font-weight:700}
+.bultexte .zn{background:rgba(31,111,209,.12);font-weight:700;cursor:pointer;border-radius:3px}
+.bultexte .zn:hover{background:rgba(31,111,209,.3)}
 .mtab{width:100%;border-collapse:collapse;font:12.5px var(--f-mono);margin-top:4px}
 .mtab td,.mtab th{padding:3px 6px 3px 0;border-bottom:1px solid var(--grid);text-align:left;vertical-align:top}
 .mtab th{font:600 11px var(--f-display,sans-serif);text-transform:uppercase;color:var(--muted)}
@@ -356,6 +357,8 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="grat">Graticule</label><select id="grat">
     <option value="0">Aucun</option><option value="auto">Auto (selon le zoom)</option><option value="20">20°</option><option value="10">10°</option>
     <option value="5">5°</option><option value="2">2°</option><option value="1">1°</option></select></div>
+  <div class="ctl"><label for="zbul">Zones grand large (METAREA II)</label><select id="zbul">
+    <option value="non">Non affichées</option><option value="contours">Contours et noms</option><option value="avis">Avis en cours (force max)</option></select></div>
   <div class="ctl"><label for="zonex">Zones d'exercices (ZONEX)</label><select id="zonex">
     <option value="non">Non affichées</option><option value="tout">Exercices et tir</option><option value="tir">Zones de tir seules</option></select></div>
   <label class="chk"><input type="checkbox" id="coast" checked> Côte</label>
@@ -574,7 +577,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 23:20</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 23:45</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1556,7 +1559,7 @@ function drawField(){
   const c=field._c; if (!c) return;
   const ctx=c.getContext("2d"), dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,c.width,c.height);
-  if (!st.ga && !st.gm){ drawCoast(ctx); drawGraticule(ctx); drawZonex(ctx); drawMesure(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
+  if (!st.ga && !st.gm){ drawCoast(ctx); drawGraticule(ctx); drawZonesBul(ctx); drawZonex(ctx); drawMesure(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
   const P=PARAMS[$("param").value], i=idxCouche("c"), op=+$("opac").value;
   let any=false, g=null, vals=null;
   if (P && P.layers){
@@ -1585,6 +1588,7 @@ function drawField(){
   const ik=isoP(); if (ik) drawIsolines(ctx,idxCouche("i"),ik);
   updateMissing();
   drawSymbols(ctx,idxCouche("s"),P,g,vals,surTerre,ik);
+  drawZonesBul(ctx);
   drawZonex(ctx);
   drawMesure(ctx);
 }
@@ -3895,8 +3899,10 @@ function bulAfficher(){
   t=t.replace(/\b(VIOLENT STORM|HURRICANE FORCE|HURRICANE|FORCE 1[12])\b/g,'<span class="g3">$1</span>')
      .replace(/\b(SEVERE GALE|STORM|FORCE (?:9|10))\b(?![^<]*<\/span>)/g,'<span class="g2">$1</span>')
      .replace(/\b(GALE|NEAR GALE|FORCE 8)\b(?![^<]*<\/span>)/g,'<span class="g1">$1</span>')
-     .replace(/^([A-Z][A-Z ,.'\-]{2,40}\.)$/gm,'<span class="zn">$1</span>');
+     .replace(ZB_RE(),m=>{ const z=zbZone(m); return z?`<span class="zn" data-z="${z.n}" title="Voir ${z.n} sur la carte">${m}</span>`:m; });
   $("bulTexte").innerHTML=t;
+  ZB.avis=zbAvis();
+  if ($("zbul").value==="avis") drawField();
   $("bulInfo").textContent=`${b.label} · ${(bulTexte(b).split("\n")[0]||"").trim()} · obtenu ${d.date?d.date.replace(" "," à ")+" UTC":""} (${BUL.src})`;
 }
 $("bulAvis").addEventListener("click",()=>{ BUL.vue="avis"; bulAfficher(); });
@@ -3912,6 +3918,90 @@ $("btnBulletins").addEventListener("click",()=>{
 for (const [b,pn] of [["btnTransit","transitPanel"],["btnSave","savePanel"],["btnFormes","formPanel"],["btnMesure","mesurePanel"]])
   $(b).addEventListener("click",()=>{ if (!$(pn).hidden && !$("bulletinPanel").hidden) $("btnBulletins").click(); });
 $("gBulletins").addEventListener("click",()=>ouvrirOutil("btnBulletins","bulletinPanel"));
+
+/* ---------- Zones grand large METAREA II (limites de la carte 6 du Guide marine de Météo-France 2026) ----------
+   [nom, [ouest, est, sud, nord], [lon, lat] de l'étiquette, autres noms dans le bulletin, approx]
+   Les zones sont fermées à l'est par la côte : le rectangle déborde sur la terre, masquée au dessin. */
+const ZB_DEF=[
+  ["Faraday",[-35,-22,45,48.45],[-28.5,46.7]], ["Romeo",[-22,-12,45,48.45],[-17,46.7]], ["Pazenn",[-12,-6,45,48.45],[-9,46.7]],
+  ["Iroise",[-6,0,47.5,48.45],[-5.45,47.95]], ["Yeu",[-6,0,46.5,47.5],[-4.4,46.95]], ["Rochebonne",[-6,0,45,46.5],[-3.6,45.7]],
+  ["Altaïr",[-35,-22,40,45],[-28.5,42.5],["ALTAIR"]], ["Charcot",[-22,-12,40,45],[-17,42.5]],
+  ["Cantabrico",[-7,0,43,45],[-4,44.25],["CANTABRICO","CANTABRIAN"]], ["Finisterre",[-12,-7,41+50/60,45],[-10.4,43.4],["FINISTERRE"]],
+  ["Porto",[-12,-5,39,41+50/60],[-10.4,40.4]],
+  ["Açores",[-35,-22,35,40],[-28.5,37.5],["ACORES","AZORES"]], ["Josephine",[-22,-12,35,40],[-17,37.5]],
+  ["Sao Vicente",[-12,-7.5,35,39],[-10,37],["SAO VICENTE"]],
+  ["Cadiz",[-7.5,-6,35.6,37.4],[-6.9,36.6],["CADIZ"],true], ["Gibraltar Strait",[-6,-5.25,35.75,36.2],[-5.6,35.95],["GIBRALTAR STRAIT","STRAIT OF GIBRALTAR","ESTRECHO"],true],
+  ["Irving",[-35,-22,30,35],[-28.5,32.5]], ["Madeira",[-22,-13,30,35],[-17.5,32.5]],
+  ["Casablanca",[-13,-5,32,35],[-10.6,33.4]], ["Agadir",[-13,-5,30,32],[-11.2,31]],
+  ["Meteor",[-35,-22,25,30],[-28.5,27.5]], ["Canarias",[-22,-13,25,30],[-19,27.5],["CANARIAS","CANARY","CANARIES"]], ["Tarfaya",[-13,-5,25,30],[-11.8,28.9]],
+  ["Cape Verde",[-35,-22,15,25],[-28.5,20],["CAPE VERDE","CABO VERDE"]], ["Cap Blanc",[-22,-10,20,25],[-19.5,22.5],["CAP BLANC","CAPE BLANC"]],
+  ["Cap Timiris",[-22,-10,15,20],[-19.5,17.5],["CAP TIMIRIS","CAPE TIMIRIS"]],
+  ["Sierra Leone",[-35,-5,7,15],[-24,11]], ["Gulf of Guinea",[-20,15,0,7],[-8,3.5],["GULF OF GUINEA","GOLFE DE GUINEE"]],
+  ["Pointe Noire",[-20,15,-6,0],[-8,-3],["POINTE NOIRE","POINTE-NOIRE"]]
+].map(([n,b,lab,al,approx])=>({n,o:b[0],e:b[1],s:b[2],no:b[3],lab,approx:!!approx,
+  al:[...new Set([n.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase(),...(al||[])])]}));
+var ZB={hl:null, avis:null};
+let _zbRe=null;
+function ZB_RE(){ if (!_zbRe){ const a=ZB_DEF.flatMap(z=>z.al).sort((x,y)=>y.length-x.length).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&").replace(/ /g,"[ -]"));
+  _zbRe=new RegExp(`\\b(?:${a.join("|")})\\b`,"g"); } _zbRe.lastIndex=0; return _zbRe; }
+function zbZone(txt){ const t=txt.toUpperCase().replace(/-/g," "); return ZB_DEF.find(z=>z.al.some(a=>a===t)) || null; }
+function zbA(lat,lon){ if (!$("zbul") || $("zbul").value==="non") return null; return ZB_DEF.find(z=>lon>=z.o&&lon<z.e&&lat>=z.s&&lat<z.no)||null; }
+const zbMot=f=>f>=12?"HURRICANE FORCE":f>=11?"VIOLENT STORM":f>=10?"STORM":f>=9?"SEVERE GALE":f>=8?"GALE":"force";
+const zbCoul=f=>!f?null:f>=11?"#7b2cbf":f>=9?"#dc2626":f>=8?"#f59e0b":null;
+/* force maximale annoncée par zone dans l'avis (WARNING) : une ligne qui commence par une ou plusieurs zones ouvre leur section */
+function zbAvis(){
+  const d=BUL.d; if (!d || !d.bulletin) return null;
+  const b=d.bulletin.find(x=>/WARNING/i.test(x.label)); if (!b) return {};
+  const lignes=bulTexte(b).split("\n"), out={};
+  const al=ZB_DEF.flatMap(z=>z.al).sort((x,y)=>y.length-x.length).map(x=>x.replace(/ /g,"[ -]")).join("|");
+  const tete=new RegExp(`^\\s*((?:${al})(?:\\s*(?:,|AND|ET|\\/)\\s*(?:${al}))*)\\s*[.:]\\s*(.*)$`,"i");
+  const force=/\b(?:NORTH|SOUTH|EAST|WEST|NORTHEAST|NORTHWEST|SOUTHEAST|SOUTHWEST|NORTHERLY|SOUTHERLY|EASTERLY|WESTERLY|VARIABLE|CYCLONIC|GALE|STORM|FORCE|HURRICANE|TO|OR|LOCALLY|OCCASIONALLY|TEMPORARILY|VEERING|BACKING|INCREASING|DECREASING)\s+(\d{1,2})\b(?!\s*(?:HOURS?|H\b|UTC|Z\b|\/|:|NM|MILES))/gi;
+  let cour=[];
+  for (const L of lignes){
+    const m=L.toUpperCase().match(tete);
+    let txt=L;
+    if (m){ cour=[...m[1].matchAll(ZB_RE())].map(x=>zbZone(x[0])).filter(Boolean).map(z=>z.n); txt=m[2]||""; }
+    if (!cour.length) continue;
+    for (const f of txt.toUpperCase().matchAll(force)){ const v=+f[1]; if (v>=1 && v<=12) for (const z of cour) out[z]=Math.max(out[z]||0,v); }
+  }
+  return out;
+}
+function drawZonesBul(ctx){
+  const mode=$("zbul")?$("zbul").value:"non"; if (mode==="non") return;
+  if (mode==="avis" && !BUL.d && !BUL.charge){ BUL.charge=true; bulCharger(false).then(()=>{ ZB.avis=zbAvis(); drawField(); }); }
+  if (mode==="avis" && BUL.d && !ZB.avis) ZB.avis=zbAvis();
+  const sz=map.getSize(), bb=map.getBounds();
+  const vis=ZB_DEF.filter(z=>z.e>=bb.getWest()&&z.o<=bb.getEast()&&z.no>=bb.getSouth()&&z.s<=bb.getNorth()); if (!vis.length) return;
+  const dpr=window.devicePixelRatio||1, c2=document.createElement("canvas"); c2.width=sz.x*dpr; c2.height=sz.y*dpr;
+  const x=c2.getContext("2d"); x.setTransform(dpr,0,0,dpr,0,0);
+  const R=z=>{ const a=map.latLngToContainerPoint([z.no,z.o]), b=map.latLngToContainerPoint([z.s,z.e]); return [a.x,a.y,b.x-a.x,b.y-a.y]; };
+  for (const z of vis){
+    const r=R(z), f=mode==="avis"&&ZB.avis?ZB.avis[z.n]:0, col=zbCoul(f);
+    if (col){ x.globalAlpha=0.34; x.fillStyle=col; x.fillRect(...r); x.globalAlpha=1; }
+    if (ZB.hl===z.n){ x.globalAlpha=0.25; x.fillStyle="#1f6fd1"; x.fillRect(...r); x.globalAlpha=1; }
+    x.setLineDash(z.approx?[6,4]:[]); x.strokeStyle=ZB.hl===z.n?"#1f6fd1":"rgba(20,45,90,.85)"; x.lineWidth=(ZB.hl===z.n?3:1.6)*PJ(); x.strokeRect(...r); x.setLineDash([]);
+  }
+  maskLand(x);                       /* les zones s'arrêtent à la côte */
+  ctx.drawImage(c2,0,0,sz.x,sz.y);
+  ctx.save(); ctx.textAlign="center"; ctx.textBaseline="middle";
+  for (const z of vis){
+    const r=R(z); if (Math.min(r[2],Math.abs(r[3]))<26) continue;
+    const p=map.latLngToContainerPoint([z.lab[1],z.lab[0]]), f=mode==="avis"&&ZB.avis?ZB.avis[z.n]:0;
+    ctx.font=`700 ${Math.round(12*PJ())}px 'Barlow Condensed',sans-serif`;
+    const t=z.n+(z.approx?" ≈":""); ctx.lineWidth=3.5; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(t,p.x,p.y); ctx.fillStyle="#14305a"; ctx.fillText(t,p.x,p.y);
+    if (f){ const t2=`${zbMot(f)} ${f}`; ctx.font=`700 ${Math.round(11*PJ())}px 'JetBrains Mono',monospace`;
+      ctx.strokeText(t2,p.x,p.y+14*PJ()); ctx.fillStyle=zbCoul(f)||"#14305a"; ctx.fillText(t2,p.x,p.y+14*PJ()); }
+  }
+  ctx.restore();
+}
+$("zbul").value=store.get("zones_bul","non");
+$("zbul").addEventListener("change",()=>{ store.set("zones_bul",$("zbul").value); if ($("zbul").value==="avis" && !BUL.d) bulCharger(false).then(()=>{ ZB.avis=zbAvis(); drawField(); legendPlus(); }); drawField(); legendPlus(); });
+/* bulletin <-> carte : survol d'un nom de zone = zone mise en évidence ; clic = carte centrée dessus */
+$("bulTexte").addEventListener("mouseover",e=>{ const s=e.target.closest(".zn"); const n=s&&s.dataset.z||null; if (n!==ZB.hl){ ZB.hl=n; if (n && $("zbul").value==="non"){ $("zbul").value="contours"; store.set("zones_bul","contours"); } drawField(); } });
+$("bulTexte").addEventListener("mouseout",e=>{ if (e.target.closest(".zn") && ZB.hl){ ZB.hl=null; drawField(); } });
+$("bulTexte").addEventListener("click",e=>{ const s=e.target.closest(".zn"); if (!s) return; const z=ZB_DEF.find(q=>q.n===s.dataset.z); if (!z) return;
+  if ($("zbul").value==="non"){ $("zbul").value="contours"; store.set("zones_bul","contours"); }
+  ZB.hl=z.n; map.fitBounds([[z.s,Math.max(z.o,-40)],[z.no,Math.min(z.e,z.o+15)]],{padding:[30,30]}); drawField(); });
 
 /* ---------- Export de la carte en image PNG ---------- */
 async function exporterPNG(){
@@ -4162,6 +4252,7 @@ function legendPlus(){
   const fg=k=>st.fige&&st.fige[k]?` <span style="background:#ffd23f;color:#0d1b2a;border-radius:3px;padding:0 3px">🔒 ${tLabel(st.fige[k])}</span>`:"";
   if (ik) parts.push(`Isolignes <b>${ISO[ik].label}</b> · ${$("isoStep").selectedOptions[0]?$("isoStep").selectedOptions[0].text:""}${fg("i")}`);
   if (sk) parts.push(`Symboles <b>${SYM[sk].label.split(" · ")[0]}</b>${PARAMS[SYM[sk].p].glyph==="barb"?" (kt)":""}${fg("s")}`);
+  if ($("zbul") && $("zbul").value==="avis") parts.push(`<b>Avis METAREA II</b> <span style="color:#f59e0b">GALE</span> / <span style="color:#dc2626">STORM</span>`);
   if ($("zonex").value!=="non" && ZX.liste) parts.push(`<b>ZONEX</b> <span style="color:#d62828">tir</span> / <span style="color:#1d4ed8">exercice</span>`);
   $("legendPlus").innerHTML=parts.join(" &nbsp;|&nbsp; ");
 }
@@ -4318,6 +4409,8 @@ function showHover(e){
     if (lines.length===1){ hoverEl.hidden=true; return; }
     if (MS && MS.actif && MS.pts.length){ const o=MS.mode==="ref"?MS.pts[0]:MS.pts[MS.pts.length-1], r=loxo(o,{lat,lon:lng});
       lines.splice(1,0,`📐 <b>${az3(r.az)}</b> · <b>${fmt(r.d,r.d<10?2:1)} Nq</b> depuis ${MS.mode==="ref"?"la référence":"le dernier point"}`); }
+    { const zb=zbA(lat,lng); if (zb){ const f=ZB.avis&&ZB.avis[zb.n];
+      lines.push(`<span style="color:${zbCoul(f)||"#1f4e8c"}">■</span> Zone grand large <b>${esc(zb.n)}</b>${f?` · avis : <b>${zbMot(f)} ${f}</b>`:ZB.avis?" · pas d'avis":""}${zb.approx?' <span class="pos">(limites approximatives)</span>':""}`); } }
     for (const z of zonexA(lat,lng).slice(0,3))
       lines.push(`<span style="color:${zxCouleur(z.c)}">■</span> Zone <b>${esc(z.n||"sans nom")}</b> · ${esc(z.i ? z.i.slice(0,120) : ((ZX.cats||{})[z.c]||"zone d'exercice"))}`);
     hoverEl.innerHTML=lines.join("<br>"); hoverEl.hidden=false;
