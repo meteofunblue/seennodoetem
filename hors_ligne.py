@@ -10,6 +10,7 @@ fonctionne comme le site (données à jour).
 """
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -30,6 +31,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--app", default="app/index.html")
     ap.add_argument("--cote", default="app/cote_fr.json")
+    ap.add_argument("--zonex", default="app/zonex.json")
     ap.add_argument("--sortie", default="site/hors-ligne.html")
     args = ap.parse_args()
     html = open(args.app, encoding="utf-8").read()
@@ -38,9 +40,11 @@ def main():
     m = re.search(r'"(https://cdn\.jsdelivr\.net/npm/world-atlas@[^"]+/land-10m\.json)"', html)
     land = telecharger(m.group(1))
     cote = open(args.cote, encoding="utf-8").read() if args.cote else "null"
+    zonex = open(args.zonex, encoding="utf-8").read() if args.zonex and os.path.exists(args.zonex) else "null"
     genere = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     donnees = ("<script>\nwindow.HORS_LIGNE=true;\nwindow.LAND10M=" + sans_fin_script(land) +
-               ";\nwindow.COTE_FR=" + sans_fin_script(cote) + ";\n</script>\n")
+               ";\nwindow.COTE_FR=" + sans_fin_script(cote) +
+               ";\nwindow.ZONEX=" + sans_fin_script(zonex) + ";\n</script>\n")
     i = html.index("<script>")          # seul script en ligne de l'appli (les bibliothèques sont en src=)
     html = html[:i] + donnees + html[i:]
     # feuille de style Leaflet
