@@ -510,7 +510,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 18:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 19:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -2304,7 +2304,7 @@ function drawMGto(cv,SOLO){
   const smax=S=>S?Math.max(S.o||0,S.r||0):0;
   const SE=seuils();
 
-  if (CP){ y=cmpDessin(ctx,D,CP,{y,gy:()=>y,sy:v=>{y=v;},L0,pw,n,X,halfL,halfR,title,yaxis,line,frame,vgrid,empty,C,SE:seuils(),GAP}); }
+  if (CP){ y=cmpDessin(ctx,D,CP,{y,gy:()=>y,sy:v=>{y=v;},cv,SOLO,L0,pw,n,X,halfL,halfR,title,yaxis,line,frame,vgrid,empty,C,SE:seuils(),GAP}); }
   else {
   /* 0. Route : allure (vent / route) et mer / route */
   if (band0){
@@ -2482,6 +2482,7 @@ function drawMGto(cv,SOLO){
       ctx.restore();
     }
   }
+  if (MULTI && cv._cmpTip) cv._cmpTip();
 }
 function mgIndex(e){
   const cv=e.currentTarget, g=cv._geo; if (!g) return null;
@@ -2629,9 +2630,12 @@ function cmpPanneaux(D){
 function cmpDessin(ctx,D,CP,G){
   let {y}=G; const {L0,pw,n,X,halfL,halfR,yaxis,line,frame,vgrid,empty,C,SE,GAP}=G;
   const title=(t,lg,k)=>{ G.sy(y); G.title(t,lg,k); y=G.gy(); };
-  const actif=[$("model").value,$("wmodel").value,$("cmodel").value];
+  const actif=[$("model").value,$("wmodel").value,$("cmodel").value], zones=[];
+  G.cv._cmpTip=null;
   for (const p of CP){
-    title(p.t,[],p.k);
+    /* graphique agrandi : légende des modèles à côté du titre */
+    title(p.t, G.SOLO ? p.L.filter(s=>hasData(s.v[p.key])).map(s=>[s.nom,s.col]) : [], p.k);
+    zones.push({p,y0:y,y1:y+p.h});
     const h=p.h, arrs=p.L.map(s=>{ let d=s.v[p.key]; if (!d) return null; d = p.vent ? vW(d) : p.f ? d.map(x=>x==null?null:p.f(x)) : d; return {s,d}; }).filter(Boolean);
     vgrid(y,h);
     if (p.dir){
@@ -2682,7 +2686,42 @@ function cmpDessin(ctx,D,CP,G){
     for (const {s,d} of ord) line(d,y,h,mn,mx,s.col,{w:actif.includes(s.val)?2.8:1.8});
     frame(y,h); y+=h+GAP;
   }
+  /* infobulle : valeurs de chaque modèle à l'heure survolée, pour le graphique sous la souris */
+  const j=st.hover, hy=st.hoverY;
+  if (j!=null && hy!=null && st.hoverCv===G.cv.id){
+    const z=zones.find(z=>hy>=z.y0-4 && hy<=z.y1+4);
+    if (z) G.cv._cmpTip=()=>cmpInfobulle(ctx,D,z.p,j,X(j),hy,L0,pw,actif);
+  }
   return y;
+}
+function cmpInfobulle(ctx,D,p,j,x,y,L0,pw,actif){
+  const dec = p.k==="vent"||p.k==="raf" ? 0 : p.k==="nn" ? 1 : 1;
+  const val=s=>{ const a=s.v[p.key]; if (!a) return null; let v=a[j]; if (v==null) return null; if (p.vent) v*=vF(); if (p.f) v=p.f(v); return v; };
+  let L=p.L.map(s=>({s,v:val(s)})).filter(o=>o.v!=null);
+  if (!L.length) return;
+  const u = p.vent ? vL() : p.u || "";
+  L = p.dir ? L : L.sort((A,B)=>B.v-A.v);
+  const txt=o=> p.dir ? `${az3(o.v)} ${dir16(o.v)}` : `${fmt(o.v,dec)} ${u}`;
+  const lignes=L.map(o=>({nom:o.s.nom, col:o.s.col, t:txt(o), gras:actif.includes(o.s.val)}));
+  if (!p.dir && L.length>1){ const e=L[0].v-L[L.length-1].v; lignes.push({nom:"écart", col:null, t:`${fmt(e,dec)} ${u}`, ecart:true}); }
+  ctx.save();
+  ctx.font="600 11px 'JetBrains Mono',monospace";
+  const wN=Math.max(...lignes.map(l=>{ ctx.font=(l.gras?"700 ":"500 ")+"12px Barlow,sans-serif"; return ctx.measureText(l.nom).width; }));
+  ctx.font="600 12px 'JetBrains Mono',monospace";
+  const wV=Math.max(...lignes.map(l=>ctx.measureText(l.t).width));
+  const titre=tLabel(D.times[j]); ctx.font="700 12px 'JetBrains Mono',monospace";
+  const W=Math.max(ctx.measureText(titre).width, 22+wN+14+wV)+16, H=24+lignes.length*17+4;
+  let bx = x+14+W > L0+pw ? x-14-W : x+14; bx=Math.max(L0+2,bx);
+  let by = Math.max(4, Math.min(y-H/2, ctx.canvas.height/(window.devicePixelRatio||1)-H-4));
+  ctx.shadowColor="rgba(0,0,0,.18)"; ctx.shadowBlur=8; ctx.fillStyle=css("--panel")||"#fff";
+  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx,by,W,H,8); else ctx.rect(bx,by,W,H); ctx.fill(); ctx.shadowBlur=0;
+  ctx.strokeStyle=css("--line"); ctx.lineWidth=1; ctx.stroke();
+  ctx.fillStyle=css("--accent")||"#0d1b2a"; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(titre,bx+8,by+12);
+  lignes.forEach((l,k)=>{ const yy=by+28+k*17;
+    if (l.col){ ctx.strokeStyle=l.col; ctx.lineWidth=l.gras?3.2:2.2; ctx.beginPath(); ctx.moveTo(bx+8,yy); ctx.lineTo(bx+24,yy); ctx.stroke(); }
+    ctx.font=(l.gras?"700 ":"500 ")+"12px Barlow,sans-serif"; ctx.fillStyle=l.ecart?css("--accent"):css("--ink"); ctx.textAlign="left"; ctx.fillText(l.nom,bx+30,yy);
+    ctx.font="600 12px 'JetBrains Mono',monospace"; ctx.textAlign="right"; ctx.fillText(l.t,bx+W-8,yy); });
+  ctx.restore();
 }
 function cmpReadout(D,el){
   let j = st.hover!=null ? st.hover : pIdx(st.tIdx); if (j<0) j=0;
