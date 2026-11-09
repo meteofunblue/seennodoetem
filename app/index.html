@@ -453,7 +453,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 09/11/2026 15:30</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 09/11/2026 16:00</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1471,7 +1471,8 @@ async function chargerZonex(){
         for (let i=2;i<enc.length;i+=2){ x+=enc[i]; y+=enc[i+1]; pts.push([x*k,y*k]); } return pts; });
       let w=180,e=-180,so=90,n=-90; for (const r of rings) for (const [a,b] of r){ if(a<w)w=a; if(a>e)e=a; if(b<so)so=b; if(b>n)n=b; }
       /* étiquette : centre de gravité du plus grand anneau (centre de l'emprise s'il tombe dehors) */
-      const big=rings.reduce((m,r)=>r.length>m.length?r:m,rings[0]); let A=0,cx=0,cy=0;
+      const aire=r=>{ let a=0; for (let i=0,j=r.length-1;i<r.length;j=i++) a+=r[j][0]*r[i][1]-r[i][0]*r[j][1]; return Math.abs(a); };
+      const big=rings.reduce((m,r)=>aire(r)>aire(m)?r:m,rings[0]); let A=0,cx=0,cy=0;
       for (let i=0,j=big.length-1;i<big.length;j=i++){ const f=big[j][0]*big[i][1]-big[i][0]*big[j][1]; A+=f; cx+=(big[j][0]+big[i][0])*f; cy+=(big[j][1]+big[i][1])*f; }
       let lab = Math.abs(A)>1e-12 ? [cx/(3*A), cy/(3*A)] : [(w+e)/2,(so+n)/2];
       if (!dansAnneaux(rings,lab[0],lab[1])) lab=[(w+e)/2,(so+n)/2];
@@ -1508,10 +1509,15 @@ function drawZonex(ctx){
   const posees=[];
   for (const z of vis){
     if (!z.n) continue;
-    const a=map.latLngToContainerPoint([z.nn,z.w]), b=map.latLngToContainerPoint([z.s,z.e]);
-    if (Math.max(b.x-a.x,b.y-a.y)<28) continue;
-    const p=map.latLngToContainerPoint([z.lab[1],z.lab[0]]), t=z.n.length>14?z.n.slice(0,13)+"…":z.n, w=ctx.measureText(t).width;
-    if (posees.some(q=>Math.abs(q[0]-p.x)<(w+q[2])/2+4 && Math.abs(q[1]-p.y)<15)) continue;
+    const a=map.latLngToContainerPoint([z.nn,z.w]), b=map.latLngToContainerPoint([z.s,z.e]), zw=b.x-a.x, zh=b.y-a.y;
+    if (Math.max(zw,zh)<10) continue;                       /* zone minuscule à l'écran : nom au survol seulement */
+    const t=z.n.length>14?z.n.slice(0,13)+"…":z.n;
+    ctx.font="700 11px 'JetBrains Mono',monospace"; let w=ctx.measureText(t).width;
+    let p;
+    if (zw>=w+6 && zh>=16) p=map.latLngToContainerPoint([z.lab[1],z.lab[0]]);     /* le nom tient dans la zone : au centre */
+    else { ctx.font="700 10px 'JetBrains Mono',monospace"; w=ctx.measureText(t).width;
+      p={x:(a.x+b.x)/2, y:a.y-8}; }                          /* sinon : juste au-dessus du tracé, centré sur lui */
+    if (posees.some(q=>Math.abs(q[0]-p.x)<(w+q[2])/2+3 && Math.abs(q[1]-p.y)<13)) continue;
     posees.push([p.x,p.y,w]);
     ctx.lineWidth=3.5; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(t,p.x,p.y);
     ctx.fillStyle=zxCouleur(z.c); ctx.fillText(t,p.x,p.y);
