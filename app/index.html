@@ -536,7 +536,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 20:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 21:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1671,6 +1671,7 @@ function drawSymbols(ctx,i,P,g,vals,surTerre,ik){
 
 let lastMissing=null;
 function updateMissing(){
+  if (!PARAMS[$("param").value]){ toastFermer("manq"); lastMissing=null; return; }      /* « aucune palette » */
   const P=PARAMS[$("param").value], g=gridOf(P), key=$("param").value+"|"+$("model").value+"|"+$("wmodel").value+"|"+!!st.missing+"|"+st.tIdx;
   if (key===lastMissing) return; lastMissing=key;
   const el=$("status");
@@ -1686,6 +1687,8 @@ function updateMissing(){
 }
 function drawLegend(){
   const P=PARAMS[$("param").value], cv=$("legend"), dpr=window.devicePixelRatio||1;
+  if (!P){ $("legendTitle").textContent="Pas de palette de couleurs"; const c2=cv.getContext("2d"); c2.clearRect(0,0,cv.width,cv.height); cv.style.visibility="hidden"; return; }
+  cv.style.visibility="";
   $("legendTitle").textContent = `${P.label}${P.key==="wind_gusts_10m"?" · "+gustDesc():""} (${P.unit})`;
   const W=cv.clientWidth||300, H=34; cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
@@ -1893,7 +1896,7 @@ function updateParams(){
   }
   if (typeof legendPlus==="function") legendPlus();
   const sel=$("param");
-  for (const o of sel.querySelectorAll("option")){ const ok=dispo(PARAMS[o.value]); o.hidden=!ok; o.disabled=!ok; }
+  for (const o of sel.querySelectorAll("option")){ if (!PARAMS[o.value]) continue; const ok=dispo(PARAMS[o.value]); o.hidden=!ok; o.disabled=!ok; }
   for (const gp of sel.querySelectorAll("optgroup")) gp.hidden=![...gp.children].some(o=>!o.hidden);
   if (sel.selectedOptions[0] && sel.selectedOptions[0].disabled){
     const proche={gusti:"gust"}[sel.value], alt=proche && [...sel.options].find(o=>o.value===proche && !o.disabled);
@@ -3865,6 +3868,7 @@ $("offQuit").addEventListener("click",()=>location.reload());
   const groups={a:document.createElement("optgroup"), m:document.createElement("optgroup"), c:document.createElement("optgroup")};
   groups.a.label="Atmosphère"; groups.m.label="État de mer"; groups.c.label="Courant";
   for (const [k,p] of Object.entries(PARAMS)){ const o=document.createElement("option"); o.value=k; o.textContent=p.label; groups[p.src].appendChild(o); }
+  { const o=document.createElement("option"); o.value="none"; o.textContent="— aucune palette —"; $("param").appendChild(o); }
   $("param").append(groups.a, groups.m, groups.c);
   const remplir=(sel,defs)=>{ const gr={a:document.createElement("optgroup"), m:document.createElement("optgroup"), c:document.createElement("optgroup")};
     gr.a.label="Atmosphère"; gr.m.label="État de mer"; gr.c.label="Courant";
@@ -3900,7 +3904,7 @@ $("zonex").value=store.get("zonex","non");
 $("zonex").addEventListener("change",()=>{ store.set("zonex",$("zonex").value); if (zxMode()!=="non") chargerZonex(); legendPlus(); drawField(); });
 majIsoStep(); legendPlus();
 if (zxMode()!=="non") chargerZonex();
-{ const pc=store.get("couche_couleurs",null); if (pc && PARAMS[pc]) $("param").value=pc; }
+{ const pc=store.get("couche_couleurs",null); if (pc && (PARAMS[pc] || pc==="none")) $("param").value=pc; }
 $("param").addEventListener("change",()=>{ store.set("couche_couleurs",$("param").value); lastMissing=null; drawLegend(); drawField(); drawMG(); renderReadout(); });
 /* réglages d'affichage mémorisés dans le navigateur */
 ["vals","coast","smooth"].forEach(id=>{ const v=store.get("aff_"+id,null); if (v!==null) $(id).checked=!!v;
