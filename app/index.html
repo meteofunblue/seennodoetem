@@ -536,7 +536,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 20:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 20:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -3648,7 +3648,9 @@ async function autoCalculer(){
   $("aGo").disabled=true; note.textContent="Calcul de la route…";
   await new Promise(r=>setTimeout(r,30));
   try{
-    if (opt.eaux!=="non"){ opt.E=await chargerEaux(); if (!opt.E){ note.textContent="Limites des eaux étrangères pas encore publiées (action « Eaux étrangères » sur GitHub) : calcul sans en tenir compte."; opt.eaux="non"; } }
+    let sansEaux=false;
+    if (opt.eaux!=="non"){ opt.E=await chargerEaux(); if (!opt.E){ sansEaux=true; opt.eaux="non";
+      toast("eaux","err","Limites des eaux étrangères introuvables sur le site (eaux.json) : la route est calculée SANS les éviter. Attendez la fin de la publication après l'action « Eaux étrangères », puis Ctrl + F5.",[],15000); } }
     if ($("aZonex").value!=="non"){ await chargerZonex(); for (const z of (ZX.liste||[])) if ($("aZonex").value==="tout" || ZX_TIR.has(z.c)) for (const r of z.rings) opt.evit.push(r.map(([x,y])=>[y,x])); }
     if ($("aFormes").checked) for (const f of F.liste) if (f.type!=="ligne") opt.evit.push(ptsForme(f));
     /* emprise : A, B et une marge ; agrandie tant qu'aucun passage n'est trouvé (contourner une péninsule, un continent) */
@@ -3687,7 +3689,8 @@ async function autoCalculer(){
     routeChanged(true);
     map.fitBounds([[Math.min(...pts.map(p=>p.lat)),Math.min(...pts.map(p=>p.lon))],[Math.max(...pts.map(p=>p.lat)),Math.max(...pts.map(p=>p.lon))]],{padding:[40,40]});
     note.textContent=`Route calculée : ${R.wps.length} points (dont ${R.wps.length-2} points tournants), ${fmt(tot,0)} Nq`+
-      (opt.eaux!=="non" ? ` · dans les eaux étrangères : ${fmt(etr,0)} Nq${etr>0.5?" (départ, arrivée ou passage inévitable)":""}` : "")+
+      (opt.eaux!=="non" ? ` · dans les eaux étrangères : ${fmt(etr,0)} Nq${etr>0.5?" (départ, arrivée ou passage inévitable)":""}`
+       : sansEaux ? " · ⚠ eaux étrangères NON prises en compte (fichier des limites absent)" : " · eaux étrangères ignorées (option)")+
       `. Les points se déplacent à la souris. Vérifiez la route sur une carte marine (profondeurs, DST).`;
   } catch(err){ note.textContent="Échec du tracé : "+err.message; }
   finally{ $("aGo").disabled=false; }
