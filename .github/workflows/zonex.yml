@@ -1,0 +1,36 @@
+name: Zones ZONEX
+
+# Zones d'exercices et de tir du Shom (cartes ZONEX) -> app/zonex.json, publié avec le site.
+# Lancement à la main (onglet Actions → Zones ZONEX → Run workflow), puis automatiquement le 3 de chaque mois.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 4 3 * *"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  zonex:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests pyshp py7zr
+      - name: Construire les zones
+        run: python zonex.py --sortie app/zonex.json
+      - name: Enregistrer dans le dépôt
+        id: git
+        run: |
+          git config user.name "robot"
+          git config user.email "robot@users.noreply.github.com"
+          git add app/zonex.json
+          if git commit -m "zones ZONEX"; then git push; echo "change=oui" >> "$GITHUB_OUTPUT"; else echo "Pas de changement."; fi
+      - name: Republier le site
+        if: steps.git.outputs.change == 'oui'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run modeles.yml -f modeles=arome -f forcer=true
