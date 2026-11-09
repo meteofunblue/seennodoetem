@@ -311,6 +311,8 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="opac">Opacité</label><input type="range" id="opac" min="0.2" max="1" step="0.05" value="0.6"></div>
   <label class="chk"><input type="checkbox" id="smooth" checked> Lissage</label>
   <div class="ctl"><label for="isoStep">Écart des isolignes</label><select id="isoStep"></select></div>
+  <div class="ctl"><label for="zonex">Zones d'exercices (ZONEX)</label><select id="zonex">
+    <option value="non">Non affichées</option><option value="tout">Exercices et tir</option><option value="tir">Zones de tir seules</option></select></div>
   <label class="chk"><input type="checkbox" id="coast" checked> Côte</label>
   <label class="chk"><input type="checkbox" id="vals" checked> Valeurs</label>
   <select id="dens" aria-label="Densité des barbules et flèches" title="Densité des barbules, flèches et valeurs" style="min-height:30px;padding:3px 6px">
@@ -451,7 +453,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 09/11/2026 14:00</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 09/11/2026 15:00</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1418,7 +1420,7 @@ function drawField(){
   const c=field._c; if (!c) return;
   const ctx=c.getContext("2d"), dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,c.width,c.height);
-  if (!st.ga && !st.gm){ drawCoast(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
+  if (!st.ga && !st.gm){ drawCoast(ctx); drawZonex(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
   const P=PARAMS[$("param").value], i=st.tIdx, op=+$("opac").value;
   let any=false, g=null, vals=null;
   if (P && P.layers){
@@ -1446,6 +1448,75 @@ function drawField(){
   const ik=isoP(); if (ik) drawIsolines(ctx,i,ik);
   updateMissing();
   drawSymbols(ctx,i,P,g,vals,surTerre,ik);
+  drawZonex(ctx);
+}
+/* ---------- Zones d'exercices et de tir (Shom, cartes ZONEX) : calque à la demande ---------- */
+var ZX={liste:null, charge:false};
+var ZX_TIR=new Set([4,6]);
+function zxCouleur(c){ return ZX_TIR.has(c) ? "#d62828" : c===3 ? "#7b2cbf" : (c===2||c===5) ? "#d97706" : "#1d4ed8"; }
+function zxMode(){ return $("zonex").value; }
+function zxVisibles(){ if (!ZX || !ZX.liste || zxMode()==="non") return []; return zxMode()==="tir" ? ZX.liste.filter(z=>ZX_TIR.has(z.c)) : ZX.liste; };
+async function chargerZonex(){
+  if (ZX.charge) return; ZX.charge=true;
+  try{
+    let d=window.ZONEX;
+    if (!d && HORS_LIGNE){ toast("zonex","info","Zones ZONEX absentes de cette version hors ligne."); return; }
+    if (!d){ const r=await fetch(`${BASE}zonex.json`,{cache:"no-cache"});
+      if (!r.ok){ ZX.charge=false; toast("zonex","info","Les zones ZONEX ne sont pas encore publiées sur le site : lancer l'action « Zones ZONEX » sur GitHub (onglet Actions)."); return; }
+      d=await r.json(); }
+    const k=1/d.echelle;
+    ZX.cats=d.categories||{}; ZX.source=d.source;
+    ZX.liste=d.zones.map(z=>{
+      const rings=z.r.map(enc=>{ const pts=[]; let x=enc[0], y=enc[1]; pts.push([x*k,y*k]);
+        for (let i=2;i<enc.length;i+=2){ x+=enc[i]; y+=enc[i+1]; pts.push([x*k,y*k]); } return pts; });
+      let w=180,e=-180,so=90,n=-90; for (const r of rings) for (const [a,b] of r){ if(a<w)w=a; if(a>e)e=a; if(b<so)so=b; if(b>n)n=b; }
+      /* étiquette : centre de gravité du plus grand anneau (centre de l'emprise s'il tombe dehors) */
+      const big=rings.reduce((m,r)=>r.length>m.length?r:m,rings[0]); let A=0,cx=0,cy=0;
+      for (let i=0,j=big.length-1;i<big.length;j=i++){ const f=big[j][0]*big[i][1]-big[i][0]*big[j][1]; A+=f; cx+=(big[j][0]+big[i][0])*f; cy+=(big[j][1]+big[i][1])*f; }
+      let lab = Math.abs(A)>1e-12 ? [cx/(3*A), cy/(3*A)] : [(w+e)/2,(so+n)/2];
+      if (!dansAnneaux(rings,lab[0],lab[1])) lab=[(w+e)/2,(so+n)/2];
+      return {n:z.n, c:z.c, i:z.i, rings, w, e, s:so, nn:n, lab};
+    });
+    legendPlus(); drawField();
+  } catch(e){ ZX.charge=false; toast("zonex","erreur","Zones ZONEX illisibles : "+e.message); }
+}
+function dansAnneaux(rings,x,y){
+  let dedans=false;
+  for (const r of rings) for (let i=0,j=r.length-1;i<r.length;j=i++){
+    const [xi,yi]=r[i], [xj,yj]=r[j];
+    if ((yi>y)!==(yj>y) && x<(xj-xi)*(y-yi)/(yj-yi)+xi) dedans=!dedans;
+  }
+  return dedans;
+}
+function zonexA(lat,lon){ return zxVisibles().filter(z=>lon>=z.w&&lon<=z.e&&lat>=z.s&&lat<=z.nn&&dansAnneaux(z.rings,lon,lat)); }
+function drawZonex(ctx){
+  const L=zxVisibles(); if (!L.length) return;
+  const bb=map.getBounds(), W=bb.getWest(), E=bb.getEast(), S=bb.getSouth(), N=bb.getNorth();
+  const vis=L.filter(z=>z.e>=W&&z.w<=E&&z.nn>=S&&z.s<=N);
+  ctx.save(); ctx.lineJoin="round";
+  for (const z of vis){
+    const col=zxCouleur(z.c);
+    ctx.beginPath();
+    for (const r of z.rings){ r.forEach(([x,y],k)=>{ const p=map.latLngToContainerPoint([y,x]); k?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y); }); ctx.closePath(); }
+    ctx.globalAlpha=0.08; ctx.fillStyle=col; ctx.fill("evenodd"); ctx.globalAlpha=1;
+    ctx.setLineDash([]); ctx.strokeStyle="rgba(255,255,255,.75)"; ctx.lineWidth=3.4; ctx.stroke();
+    ctx.setLineDash([7,4]); ctx.strokeStyle=col; ctx.lineWidth=1.7; ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  /* noms des zones (46E, 46F…) quand la zone est assez grande à l'écran, sans chevauchement */
+  ctx.font="700 11px 'JetBrains Mono',monospace"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  const posees=[];
+  for (const z of vis){
+    if (!z.n) continue;
+    const a=map.latLngToContainerPoint([z.nn,z.w]), b=map.latLngToContainerPoint([z.s,z.e]);
+    if (Math.max(b.x-a.x,b.y-a.y)<28) continue;
+    const p=map.latLngToContainerPoint([z.lab[1],z.lab[0]]), t=z.n.length>14?z.n.slice(0,13)+"…":z.n, w=ctx.measureText(t).width;
+    if (posees.some(q=>Math.abs(q[0]-p.x)<(w+q[2])/2+4 && Math.abs(q[1]-p.y)<15)) continue;
+    posees.push([p.x,p.y,w]);
+    ctx.lineWidth=3.5; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(t,p.x,p.y);
+    ctx.fillStyle=zxCouleur(z.c); ctx.fillText(t,p.x,p.y);
+  }
+  ctx.restore();
 }
 /* ③ symboles (barbules / flèches) et valeurs du paramètre en couleurs, sur un même quadrillage :
    points du modèle (un sur n) quand la grille est fine, quadrillage de l'écran (valeurs interpolées) sinon */
@@ -3088,11 +3159,15 @@ function legendPlus(){
   const ik=isoP(), sk=symP(), parts=[];
   if (ik) parts.push(`Isolignes <b>${ISO[ik].label}</b> · ${$("isoStep").selectedOptions[0]?$("isoStep").selectedOptions[0].text:""}`);
   if (sk) parts.push(`Symboles <b>${SYM[sk].label.split(" · ")[0]}</b>${PARAMS[SYM[sk].p].glyph==="barb"?" (kt)":""}`);
+  if ($("zonex").value!=="non" && ZX.liste) parts.push(`<b>ZONEX</b> <span style="color:#d62828">tir</span> / <span style="color:#1d4ed8">exercice</span>`);
   $("legendPlus").innerHTML=parts.join(" &nbsp;|&nbsp; ");
 }
 $("isoParam").addEventListener("change",()=>{ store.set("couche_iso",$("isoParam").value); majIsoStep(); legendPlus(); drawField(); });
 $("symParam").addEventListener("change",()=>{ store.set("couche_symboles",$("symParam").value); legendPlus(); drawField(); });
+$("zonex").value=store.get("zonex","non");
+$("zonex").addEventListener("change",()=>{ store.set("zonex",$("zonex").value); if (zxMode()!=="non") chargerZonex(); legendPlus(); drawField(); });
 majIsoStep(); legendPlus();
+if (zxMode()!=="non") chargerZonex();
 { const pc=store.get("couche_couleurs",null); if (pc && PARAMS[pc]) $("param").value=pc; }
 $("param").addEventListener("change",()=>{ store.set("couche_couleurs",$("param").value); lastMissing=null; drawLegend(); drawField(); drawMG(); renderReadout(); });
 /* réglages d'affichage mémorisés dans le navigateur */
@@ -3231,6 +3306,8 @@ function showHover(e){
     const cs=gridVal(st.gc,"current_speed",lat,lng);
     if (cs!=null) lines.push(`Courant <b>${fmt(cs,1)} kt vers ${dir16(gridVal(st.gc,"current_direction",lat,lng))}</b>`);
     if (lines.length===1){ hoverEl.hidden=true; return; }
+    for (const z of zonexA(lat,lng).slice(0,3))
+      lines.push(`<span style="color:${zxCouleur(z.c)}">■</span> Zone <b>${esc(z.n||"sans nom")}</b> · ${esc((ZX.cats||{})[z.c]||"zone d'exercice")}${z.i?`<br><span class="pos">${esc(z.i.slice(0,120))}</span>`:""}`);
     hoverEl.innerHTML=lines.join("<br>"); hoverEl.hidden=false;
     const sz=map.getSize(), p=e.containerPoint, w=hoverEl.offsetWidth, h=hoverEl.offsetHeight;
     hoverEl.style.left=Math.min(p.x+14, sz.x-w-4)+"px"; hoverEl.style.top=(p.y+h+18>sz.y ? p.y-h-10 : p.y+14)+"px";
