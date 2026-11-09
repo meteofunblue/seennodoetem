@@ -5,8 +5,10 @@ Appelé par convertir.py pour les entrées de modeles.json qui ont "source": "cm
 Identifiants : variables d'environnement COPERNICUSMARINE_SERVICE_USERNAME et COPERNICUSMARINE_SERVICE_PASSWORD
 (secrets GitHub CMEMS_USER et CMEMS_PASS), jamais écrits dans un fichier.
 
-Variables publiées : current_speed (kt) et current_direction (°, direction VERS laquelle porte le courant,
-convention océanographique). Marée incluse dans les jeux horaires IBI, MED et global (merged-uv).
+Variables publiées : current_speed (kt), current_direction (°, direction VERS laquelle porte le courant,
+convention océanographique) et sea_surface_temperature (°C, « thetao » au premier niveau), quand elle est disponible :
+dans le jeu des courants (IBI), sinon dans le jeu indiqué par "dataset_temperature" (global : 0.083deg_PT1H-m).
+Marée incluse dans les jeux horaires IBI, MED et global (merged-uv).
 """
 import glob
 import json
@@ -28,6 +30,50 @@ def run_du_jour(cfg, maintenant=None):
     if t.hour < cfg.get("heure_dispo", 15):
         j -= timedelta(days=1)
     return j
+
+
+def temperature_autre(cfg, run_dt, horizon, lats, lons, res, heures, marge):
+    """Température de surface prise dans un second jeu (ex. global horaire 0.083deg_PT1H-m), ramenée sur la grille
+    et les heures des courants (plus proche voisin, moyennes horaires rattachées à l'heure qui les termine)."""
+    import copernicusmarine
+    import numpy as np
+    S_, N_, O_, E_ = cfg["tuiles"]["domaine"]
+    print(f"  température de surface : {cfg['dataset_temperature']}", flush=True)
+    ds = copernicusmarine.open_dataset(
+        dataset_id=cfg["dataset_temperature"], variables=["thetao"],
+        minimum_longitude=O_ - marge, maximum_longitude=E_ + marge, minimum_latitude=S_ - marge, maximum_latitude=N_ + marge,
+        minimum_depth=0, maximum_depth=1,
+        start_datetime=(run_dt - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S"),
+        end_datetime=(run_dt + timedelta(hours=horizon + 1)).strftime("%Y-%m-%dT%H:%M:%S"))
+    ds = ds[["thetao"]]
+    if "depth" in ds.dims:
+        ds = ds.isel(depth=0)
+    lat_n = "latitude" if "latitude" in ds.coords else "lat"
+    lon_n = "longitude" if "longitude" in ds.coords else "lon"
+    src_lat, src_lon = ds[lat_n].values, ds[lon_n].values
+    tol = max(res, float(np.median(np.abs(np.diff(src_lat))))) * 0.75
+
+    def proches(src, cible):
+        ordre = np.argsort(src)
+        s = src[ordre]
+        k = np.clip(np.searchsorted(s, cible), 1, len(s) - 1)
+        k = np.where(np.abs(s[k - 1] - cible) <= np.abs(s[k] - cible), k - 1, k)
+        return ordre[k], np.abs(s[k] - cible) <= tol
+
+    i_lat, ok_lat = proches(src_lat, lats)
+    i_lon, ok_lon = proches(src_lon, lons)
+    ds = ds.isel({lat_n: i_lat, lon_n: i_lon})
+    t_src = ds["time"].values.astype("datetime64[m]").astype(datetime)
+    h_src = {(t + timedelta(minutes=30)).replace(minute=0, second=0, microsecond=0, tzinfo=timezone.utc): i for i, t in enumerate(t_src)}
+    val = ds["thetao"].transpose("time", lat_n, lon_n).values.astype(np.float32)
+    out = np.full((len(heures), len(lats), len(lons)), np.nan, dtype=np.float32)
+    for k, h in enumerate(heures):
+        i = h_src.get(h)
+        if i is not None:
+            out[k] = val[i]
+    out[:, ~(ok_lat[:, None] & ok_lon[None, :])] = np.nan
+    print(f"  température : {sum(h in h_src for h in heures)}/{len(heures)} heures trouvées", flush=True)
+    return out
 
 
 def convertir_courant(args, cfg, ecrire_tuiles, ecrire_sortie):
@@ -62,7 +108,8 @@ def convertir_courant(args, cfg, ecrire_tuiles, ecrire_sortie):
     if not nu or not nv:
         raise SystemExit(f"Composantes du courant introuvables dans {cfg['dataset']} (cherché {CAND_U} / {CAND_V}).")
     print(f"  composantes retenues : {nu}, {nv}", flush=True)
-    ds = ds[[nu, nv]]
+    nt = "thetao" if "thetao" in ds.data_vars else None
+    ds = ds[[nu, nv] + ([nt] if nt else [])]
     if "depth" in ds.dims:                       # surface : premier niveau
         ds = ds.isel(depth=0)
     lat_n = "latitude" if "latitude" in ds.coords else "lat"
@@ -103,18 +150,33 @@ def convertir_courant(args, cfg, ecrire_tuiles, ecrire_sortie):
     v = ds[nv].transpose("time", lat_n, lon_n).values.astype(np.float32)
     u[:, hors] = np.nan
     v[:, hors] = np.nan
+    temp = None
+    if nt:
+        temp = ds[nt].transpose("time", lat_n, lon_n).values.astype(np.float32)
+        print("  température de surface : thetao du même jeu", flush=True)
+    elif cfg.get("dataset_temperature"):
+        try:
+            temp = temperature_autre(cfg, run_dt, horizon, lats, lons, res, heures, marge)
+        except Exception as e:                                   # la température ne bloque jamais les courants
+            print(f"  température de surface non récupérée ({cfg['dataset_temperature']}) : {type(e).__name__} : {str(e)[:200]}", flush=True)
     vit = np.hypot(u, v) * KT
     direc = (np.degrees(np.arctan2(u, v)) + 360) % 360            # vers où porte le courant
     direc = np.where(np.isfinite(vit), direc, np.nan).astype(np.float32)
-    for nom, c in (("vitesse", vit), ("direction", direc)):
+    if temp is not None:
+        temp[~np.isfinite(vit)] = np.nan                        # même trait de côte que les courants
+    for nom, c in (("vitesse", vit), ("direction", direc)) + ((("T mer", temp),) if temp is not None else ()):
         ok = np.isfinite(c)
         print(f"    [{nom:10s}] min {np.nanmin(c):6.2f}  moy {np.nanmean(c):6.2f}  max {np.nanmax(c):6.2f}  ({100 * ok.mean():.0f} % de mer)",
               flush=True)
 
     variables = [{"nom": "current_speed", "unite": "kt", "ech": 0.01, "off": 0},
                  {"nom": "current_direction", "unite": "° vers", "ech": 1, "off": 0}]
+    champs = [vit, direc]
+    if temp is not None and np.isfinite(temp).any():
+        variables.append({"nom": "sea_surface_temperature", "unite": "°C", "ech": 0.01, "off": 0})
+        champs.append(temp)
     sortie = os.path.join(args.sortie, args.modele)
-    nb, octets, _ = ecrire_tuiles(sortie, [vit, direc], variables, lats, lons, res, res, (), cfg["tuiles"].get("garder"))
+    nb, octets, _ = ecrire_tuiles(sortie, champs, variables, lats, lons, res, res, (), cfg["tuiles"].get("garder"))
     print(f"  {nb} tuiles de 1° à {res}°, {len(heures)} échéances, {octets / 1e6:.1f} Mo compressés", flush=True)
 
     genere = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
