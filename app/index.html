@@ -68,6 +68,9 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .mtab tr.tot td{font-weight:700;color:var(--accent)}
 .mcoord{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 8px;align-items:center;width:100%}
 .mcoord input{width:100%}
+#autoBloc{margin-top:6px;padding-top:6px;border-top:1px solid var(--grid)}
+#autoBloc summary{font-weight:600;cursor:pointer}
+#autoBloc .arow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:flex-end;margin:6px 0}
 .fsep{width:100%;height:0;border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
 .fcoord summary{cursor:pointer;font-size:13px;color:var(--accent);margin:2px 0 6px}
 .fcoord textarea{width:100%;font:12px var(--f-mono,monospace);padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);margin-bottom:6px}
@@ -428,6 +431,29 @@ footer a{color:var(--accent)}
   <button id="tCsv" type="button">CSV route</button>
   <p class="note" id="tNote">Cliquez « Ajouter des points », puis cliquez sur la carte pour poser les points tournants dans l'ordre. Les points se déplacent à la souris ; la vitesse se règle par tronçon dans le tableau. Routes loxodromiques.</p>
   <div class="legs" id="legs"></div>
+  <details class="fcoord auto" id="autoBloc" style="width:100%"><summary>🧭 Tracer automatiquement (contourne la terre)</summary>
+    <div class="mcoord">
+      <b>A</b><input type="text" id="aALat" placeholder="48°21,5' N"><input type="text" id="aALon" placeholder="004°33' W">
+      <b>B</b><input type="text" id="aBLat" placeholder="64°09' N"><input type="text" id="aBLon" placeholder="021°57' W">
+    </div>
+    <div class="arow">
+      <button id="aPick" type="button">Choisir A puis B sur la carte</button>
+      <button id="aFromRoute" type="button" title="Départ et arrivée de la route en cours">Reprendre la route en cours</button>
+    </div>
+    <div class="arow">
+      <div class="ctl"><label for="aMarge">Marge à la côte (Nq)</label><input type="number" id="aMarge" min="0" max="10" step="0.5" value="2" style="width:5em"></div>
+      <div class="ctl"><label for="aEaux">Eaux étrangères</label><select id="aEaux">
+        <option value="12">Limite officielle des 12 Nq + 3 Nq (recommandé)</option>
+        <option value="15">15 Nq du rivage</option>
+        <option value="non">Ne pas en tenir compte</option></select></div>
+      <div class="ctl"><label for="aZonex">Zones ZONEX</label><select id="aZonex">
+        <option value="non">Ne pas éviter</option><option value="tir">Éviter les zones de tir</option><option value="tout">Éviter toutes les zones</option></select></div>
+      <label class="chk"><input type="checkbox" id="aFormes"> Éviter mes formes</label>
+    </div>
+    <button id="aGo" type="button" class="primary">Calculer la route</button>
+    <p class="note" id="aNote">La route évite la terre (avec la marge choisie) et reste hors des eaux étrangères sauf quand c'est inévitable
+      (départ, arrivée, détroits). Les eaux françaises sont autorisées. Ne tient compte ni des profondeurs ni des DST : route indicative, à vérifier sur la carte marine.</p>
+  </details>
 </section>
 
 <section class="tpanel" id="savePanel" hidden aria-label="Enregistrer une situation">
@@ -510,7 +536,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 19:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 20:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1167,6 +1193,7 @@ const field = new FieldLayer();
 field.addTo(map);
 const ptMarker = L.circleMarker([st.pt.lat,st.pt.lon],{radius:7,weight:3,color:"#d1495b",fillColor:"#fff",fillOpacity:1}).addTo(map);
 map.on("click", e => {
+  if (autoPickClick(e)) return;      /* clic utilisé pour choisir A / B du tracé automatique */
   if (mesureClick(e)) return;        /* clic utilisé pour la mesure azimut / distance */
   if (formeClick(e)) return;         /* clic utilisé pour tracer une forme */
   if (zoneDrawClick(e)) return;      /* clic utilisé pour tracer une zone */
@@ -3435,6 +3462,238 @@ $("gSave").addEventListener("click",()=>ouvrirOutil("btnSave","savePanel"));
 $("gFormes").addEventListener("click",()=>ouvrirOutil("btnFormes","formPanel"));
 $("gMesure").addEventListener("click",()=>ouvrirOutil("btnMesure","mesurePanel"));
 
+/* ---------- Tracé automatique d'un transit (contournement de la terre, eaux étrangères) ---------- */
+var AUTO={A:null, B:null, pick:null, eaux:null};
+function autoChamps(){
+  const f=(v,lat)=>v==null?"":dm(v,lat);
+  if (AUTO.A){ $("aALat").value=f(AUTO.A.lat,true); $("aALon").value=f(AUTO.A.lon,false); }
+  if (AUTO.B){ $("aBLat").value=f(AUTO.B.lat,true); $("aBLon").value=f(AUTO.B.lon,false); }
+}
+function autoLire(){
+  const g=(a,b)=>{ const la=parseCoord($(a).value,true), lo=parseCoord($(b).value,false); return la==null||lo==null||isNaN(la)||isNaN(lo)?null:{lat:la,lon:lo}; };
+  AUTO.A=g("aALat","aALon"); AUTO.B=g("aBLat","aBLon");
+}
+function autoPickClick(e){
+  if (!AUTO.pick) return false;
+  const p={lat:e.latlng.lat, lon:e.latlng.lng};
+  if (AUTO.pick==="A"){ AUTO.A=p; AUTO.pick="B"; $("aPick").textContent="Cliquez B (arrivée)…"; }
+  else { AUTO.B=p; AUTO.pick=null; $("aPick").textContent="Choisir A puis B sur la carte"; $("aPick").classList.remove("on"); $("map").classList.remove("drawing"); }
+  autoChamps(); drawField(); return true;
+}
+function drawAutoAB(ctx){
+  if (!AUTO || $("transitPanel").hidden) return;
+  for (const [k,p] of [["A",AUTO.A],["B",AUTO.B]]){ if (!p) continue;
+    const q=map.latLngToContainerPoint([p.lat,p.lon]);
+    ctx.save(); ctx.fillStyle="#2e8b57"; ctx.strokeStyle="#fff"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(q.x,q.y,8,0,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#fff"; ctx.font="700 11px 'Barlow Condensed',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(k,q.x,q.y+0.5);
+    ctx.restore(); }
+}
+$("aPick").addEventListener("click",()=>{
+  if (AUTO.pick){ AUTO.pick=null; $("aPick").textContent="Choisir A puis B sur la carte"; $("aPick").classList.remove("on"); $("map").classList.remove("drawing"); return; }
+  stopRouteAdd(); AUTO.pick="A"; $("aPick").textContent="Cliquez A (départ)…"; $("aPick").classList.add("on"); $("map").classList.add("drawing");
+});
+$("aFromRoute").addEventListener("click",()=>{ if (R.wps.length<2){ $("aNote").textContent="Pas de route en cours : posez au moins deux points, ou choisissez A et B."; return; }
+  AUTO.A=Object.assign({},R.wps[0]); AUTO.B=Object.assign({},R.wps[R.wps.length-1]); autoChamps(); drawField(); });
+for (const id of ["aALat","aALon","aBLat","aBLon"]) $(id).addEventListener("change",()=>{ autoLire(); drawField(); });
+for (const id of ["aMarge","aEaux","aZonex"]){ const k="auto_"+id; const v=store.get(k,null); if (v!=null) $(id).value=v; $(id).addEventListener("change",()=>store.set(k,$(id).value)); }
+$("aFormes").checked=store.get("auto_formes",false); $("aFormes").addEventListener("change",()=>store.set("auto_formes",$("aFormes").checked));
+
+async function chargerEaux(){
+  if (AUTO.eaux) return AUTO.eaux;
+  let d=window.EAUX;
+  if (!d && !HORS_LIGNE){ const r=await fetch(`${BASE}eaux.json`,{cache:"no-cache"}).catch(()=>null); if (r && r.ok) d=await r.json(); }
+  if (!d) return null;
+  const k=1/d.echelle, dec=enc=>{ const pts=[]; let x=enc[0], y=enc[1]; pts.push([x*k,y*k]); for (let i=2;i<enc.length;i+=2){ x+=enc[i]; y+=enc[i+1]; pts.push([x*k,y*k]); }
+    let w=180,e=-180,so=90,n=-90; for (const [a,b] of pts){ if(a<w)w=a; if(a>e)e=a; if(b<so)so=b; if(b>n)n=b; } return {pts,w,e,s:so,n}; };
+  AUTO.eaux={mer12:(d.mer12||[]).map(dec), terres:(d.terres||[]).map(dec), regions:d.regions};
+  return AUTO.eaux;
+}
+/* grille de coût en projection équirectangulaire : terre interdite, marge côtière, eaux étrangères et zones à éviter pénalisées */
+function autoGrille(b,res,opt){
+  const nx=Math.max(4,Math.ceil((b.e-b.o)/res)), ny=Math.max(4,Math.ceil((b.n-b.s)/res)), N=nx*ny;
+  const cv=document.createElement("canvas"); cv.width=nx; cv.height=ny;
+  const ctx=cv.getContext("2d",{willReadFrequently:true});
+  const P=(lon,lat)=>[(lon-b.o)/res,(b.n-lat)/res];
+  const remplir=(liste,key,coul,clip)=>{ ctx.save(); if (clip) clip(); ctx.fillStyle=coul; ctx.beginPath();
+    for (const r of liste){ if (r.e<b.o||r.w>b.e||r.n<b.s||r.s>b.n) continue; let px=null;
+      for (const pt of r[key]){ const x=pt[0], y=pt[1], q=P(x,y); (px===null||Math.abs(x-px)>180)?ctx.moveTo(q[0],q[1]):ctx.lineTo(q[0],q[1]); px=x; } ctx.closePath(); }
+    ctx.fill("nonzero"); ctx.restore(); };
+  const lire=()=>{ const d=ctx.getImageData(0,0,nx,ny).data, m=new Uint8Array(N); for (let i=0;i<N;i++) m[i]=d[i*4+3]>127?1:0; ctx.clearRect(0,0,nx,ny); return m; };
+  /* terre : polygones fins (OSM) dans leur emprise, Natural Earth ailleurs */
+  const F=coast.fine, emp=F&&F.polys&&F.polys.length?F.emp:null;
+  const empClip=inv=>()=>{ const [s0,n0,o0,e0]=emp, a=P(o0,n0), c=P(e0,s0); ctx.beginPath(); if (inv) ctx.rect(-1,-1,nx+2,ny+2); ctx.rect(a[0],a[1],c[0]-a[0],c[1]-a[1]); ctx.clip(inv?"evenodd":"nonzero"); };
+  if (coast.rings) remplir(coast.rings,"ring","#000",emp?empClip(true):null);
+  if (emp) remplir(F.polys,"pts","#000",empClip(false));
+  const terre=lire();
+  let etr=null, mer12=null;
+  if (opt.eaux!=="non" && opt.E){ remplir(opt.E.terres,"pts","#000"); etr=lire();
+    if (opt.eaux==="12" && opt.E.mer12.length){ remplir(opt.E.mer12,"pts","#000"); mer12=lire(); } }
+  let evit=null;
+  if (opt.evit && opt.evit.length){ ctx.fillStyle="#000"; ctx.beginPath();
+    for (const ring of opt.evit){ ring.forEach(([lat,lon],k)=>{ const q=P(lon,lat); k?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]); }); ctx.closePath(); }
+    ctx.fill(); evit=lire(); }
+  /* distances (Nq) aux masques, par chanfrein 3×3 avec mailles anisotropes */
+  const dy=res*60, latRow=j=>b.n-(j+0.5)*res, dxR=new Float32Array(ny); for (let j=0;j<ny;j++) dxR[j]=res*60*Math.cos(latRow(j)*Math.PI/180);
+  const dist=(m,lim)=>{ const D=new Float32Array(N).fill(1e9); for (let i=0;i<N;i++) if (m[i]) D[i]=0;
+    for (let j=0;j<ny;j++){ const dx=dxR[j], dg=Math.hypot(dx,dy); for (let i=0;i<nx;i++){ const k=j*nx+i; let v=D[k];
+      if (i>0) v=Math.min(v,D[k-1]+dx); if (j>0){ v=Math.min(v,D[k-nx]+dy); if (i>0) v=Math.min(v,D[k-nx-1]+dg); if (i<nx-1) v=Math.min(v,D[k-nx+1]+dg); } D[k]=v; } }
+    for (let j=ny-1;j>=0;j--){ const dx=dxR[j], dg=Math.hypot(dx,dy); for (let i=nx-1;i>=0;i--){ const k=j*nx+i; let v=D[k];
+      if (i<nx-1) v=Math.min(v,D[k+1]+dx); if (j<ny-1){ v=Math.min(v,D[k+nx]+dy); if (i<nx-1) v=Math.min(v,D[k+nx+1]+dg); if (i>0) v=Math.min(v,D[k+nx-1]+dg); } D[k]=v; } }
+    return D; };
+  const cout=new Float32Array(N), etranger=new Uint8Array(N);
+  const dT=opt.marge>0?dist(terre):null, dE=etr?dist(etr):null, dM=mer12?dist(mer12):null, dV=evit?dist(evit):null;
+  for (let i=0;i<N;i++){
+    if (terre[i]){ cout[i]=Infinity; continue; }
+    let c=1;
+    if (dT && dT[i]<opt.marge) c+=199;                                   /* trop près de la côte */
+    const fe=(dE && dE[i]<15) || (dM && dM[i]<3);
+    if (fe){ c+=39; etranger[i]=1; }                                      /* eaux étrangères (+ marge) */
+    if (dV && dV[i]<0.5) c+=400;                                          /* ZONEX / formes à éviter (+ 0,5 Nq) */
+    cout[i]=c;
+  }
+  return {b,res,nx,ny,N,cout,etranger,dxR,dy,
+    cell:(lat,lon)=>{ const i=Math.floor((lon-b.o)/res), j=Math.floor((b.n-lat)/res); return i<0||j<0||i>=nx||j>=ny?-1:j*nx+i; },
+    ll:k=>({lat:b.n-(Math.floor(k/nx)+0.5)*res, lon:b.o+(k%nx+0.5)*res})};
+}
+/* composantes connexes navigables (8-voisinage) */
+function autoComposantes(G){
+  const {nx,ny,N,cout}=G, lab=new Int32Array(N).fill(-1), taille=[]; const pile=new Int32Array(N);
+  for (let s0=0;s0<N;s0++){ if (lab[s0]>=0 || !isFinite(cout[s0])) continue; const id=taille.length; let sp=0, n=0; pile[sp++]=s0; lab[s0]=id;
+    while (sp){ const k=pile[--sp]; n++; const i=k%nx, j=(k-i)/nx;
+      for (let dj=-1;dj<=1;dj++) for (let di=-1;di<=1;di++){ if (!di&&!dj) continue; const a=i+di, c=j+dj; if (a<0||c<0||a>=nx||c>=ny) continue; const q=c*nx+a;
+        if (lab[q]<0 && isFinite(cout[q])){ lab[q]=id; pile[sp++]=q; } } }
+    taille.push(n); }
+  return {lab,taille};
+}
+function autoProche(G,lab,cible,k0){   /* cellule de la composante cible la plus proche (en mailles) */
+  const {nx,ny}=G, i0=k0%nx, j0=(k0-i0)/nx;
+  for (let r=0;r<Math.max(nx,ny);r++){ let best=-1, bd=1e18;
+    for (let j=j0-r;j<=j0+r;j++) for (let i=i0-r;i<=i0+r;i++){ if (Math.max(Math.abs(i-i0),Math.abs(j-j0))!==r || i<0||j<0||i>=nx||j>=ny) continue; const q=j*nx+i;
+      if (lab[q]===cible){ const d=(i-i0)**2+(j-j0)**2; if (d<bd){ bd=d; best=q; } } }
+    if (best>=0) return best; }
+  return -1;
+}
+function autoAstar(G,s0,t0){
+  const {nx,ny,N,cout,dxR,dy}=G, g=new Float32Array(N).fill(Infinity), from=new Int32Array(N).fill(-1), ferme=new Uint8Array(N);
+  const ti=t0%nx, tj=(t0-ti)/nx, dxMin=Math.min(...dxR);
+  const h=k=>{ const i=k%nx, j=(k-i)/nx; return Math.hypot((i-ti)*dxMin,(j-tj)*dy); };      /* heuristique admissible */
+  /* 16 directions (pas de cavalier compris) : moins de zigzags que 8 directions */
+  const V=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1],[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
+  let hk=new Int32Array(1024), hf=new Float32Array(1024), hn=0;
+  const push=(k,f)=>{ if (hn>=hk.length){ const a=new Int32Array(hk.length*2); a.set(hk); hk=a; const c=new Float32Array(hf.length*2); c.set(hf); hf=c; }
+    let i=hn++; while (i>0){ const p=(i-1)>>1; if (hf[p]<=f) break; hk[i]=hk[p]; hf[i]=hf[p]; i=p; } hk[i]=k; hf[i]=f; };
+  const pop=()=>{ const k=hk[0], lk=hk[--hn], lf=hf[hn]; let i=0; while (true){ let c=2*i+1; if (c>=hn) break; if (c+1<hn && hf[c+1]<hf[c]) c++; if (hf[c]>=lf) break; hk[i]=hk[c]; hf[i]=hf[c]; i=c; } hk[i]=lk; hf[i]=lf; return k; };
+  g[s0]=0; push(s0,h(s0));
+  while (hn){ const k=pop(); if (ferme[k]) continue; ferme[k]=1; if (k===t0) break;
+    const i=k%nx, j=(k-i)/nx;
+    for (const [di,dj] of V){ const a=i+di, c=j+dj; if (a<0||c<0||a>=nx||c>=ny) continue;
+      const q=c*nx+a; if (ferme[q] || !isFinite(cout[q])) continue;
+      let cm=(cout[k]+cout[q])/2;
+      if (Math.abs(di)+Math.abs(dj)===3){          /* pas de cavalier : les deux mailles traversées doivent être en mer */
+        const m1=Math.abs(di)===2 ? j*nx+i+di/2 : (j+dj/2)*nx+i, m2=Math.abs(di)===2 ? c*nx+i+di/2 : (j+dj/2)*nx+a;
+        if (!isFinite(cout[m1])||!isFinite(cout[m2])) continue; cm=(cout[k]+cout[q]+cout[m1]+cout[m2])/4; }
+      const L=Math.hypot(di*(dxR[j]+dxR[c])/2,dj*dy), ng=g[k]+L*cm;
+      if (ng<g[q]){ g[q]=ng; from[q]=k; push(q,ng+h(q)); } } }
+  if (!isFinite(g[t0])) return null;
+  const path=[]; for (let k=t0;k>=0;k=from[k]){ path.push(k); if (k===s0) break; } path.reverse();
+  return {path, g:path.map(k=>g[k])};
+}
+/* lissage « tout angle » : raccourci en ligne droite accepté seulement s'il ne coûte pas plus que le chemin trouvé
+   (pas de coupe dans la bande des eaux étrangères ni dans la marge côtière quand le chemin les évitait) */
+function autoLisser(G,R){
+  const {cout}=G, path=R.path, gc=R.g;
+  const cLigne=(a,b)=>{ const pa=G.ll(a), pb=G.ll(b), n=Math.ceil(Math.max(Math.abs(pa.lon-pb.lon),Math.abs(pa.lat-pb.lat))/G.res*2)+1;
+    const L=Math.hypot((pb.lon-pa.lon)*60*Math.cos((pa.lat+pb.lat)/2*Math.PI/180),(pb.lat-pa.lat)*60); let c=0;
+    for (let t=0;t<=n;t++){ const k=G.cell(pa.lat+(pb.lat-pa.lat)*t/n, pa.lon+(pb.lon-pa.lon)*t/n); if (k<0||!isFinite(cout[k])) return Infinity; c+=cout[k]*((t===0||t===n)?0.5:1); }
+    return c*L/n; };
+  const out=[path[0]]; let ancre=0;
+  for (let k=2;k<path.length;k++){
+    if (cLigne(path[ancre],path[k]) > (gc[k]-gc[ancre])*1.002+0.05){ out.push(path[k-1]); ancre=k-1; } }
+  out.push(path[path.length-1]);
+  /* seconde passe : suppression des points tournants devenus inutiles */
+  let pts=out.filter((k,i)=>i===0||k!==out[i-1]), chg=true;
+  const gi=new Map(path.map((k,i)=>[k,gc[i]]));
+  while (chg && pts.length>2){ chg=false;
+    for (let i=1;i<pts.length-1;i++){ const avant=cLigne(pts[i-1],pts[i])+cLigne(pts[i],pts[i+1]);
+      if (cLigne(pts[i-1],pts[i+1])<=avant*1.0005){ pts.splice(i,1); chg=true; break; } } }
+  return pts;
+}
+/* relie A et B dans une grille ; A ou B hors de la zone navigable principale : rattachés au plus près */
+function autoRelier(A,B,b,res,opt){
+  const G=autoGrille(b,res,opt), {lab,taille}=autoComposantes(G);
+  let ka=G.cell(A.lat,A.lon), kb=G.cell(B.lat,B.lon); if (ka<0||kb<0) return {echec:"hors"};
+  /* étendue d'eau principale : la plus grande ; A ou B n'y sont rattachés que s'ils sont à terre ou dans un petit bassin
+     (port, rade fermée à cette maille), et à moins de 15 Nq. Deux grandes étendues distinctes : il faut agrandir la zone. */
+  const gros=Math.max(...taille), petit=c=>c<0 || taille[c]<Math.max(400,gros*0.01);
+  let cible = lab[ka]>=0 && lab[ka]===lab[kb] ? lab[ka] : taille.indexOf(gros);
+  if (cible<0) return {echec:"mer"};
+  const okA=lab[ka]===cible, okB=lab[kb]===cible;
+  if ((!okA && !petit(lab[ka])) || (!okB && !petit(lab[kb]))) return {echec:"separe"};
+  const sa=okA?ka:autoProche(G,lab,cible,ka), sb=okB?kb:autoProche(G,lab,cible,kb);
+  if (sa<0||sb<0) return {echec:"separe"};
+  const dNq=(k,P)=>{ const q=G.ll(k); return rhumb(P,q).dist; };
+  if ((!okA && dNq(sa,A)>15) || (!okB && dNq(sb,B)>15)) return {echec:"separe"};
+  const R0=autoAstar(G,sa,sb); if (!R0) return {echec:"chemin"};
+  const pts=autoLisser(G,R0).map(k=>G.ll(k));
+  if (okA) pts[0]={lat:A.lat,lon:A.lon}; if (okB) pts[pts.length-1]={lat:B.lat,lon:B.lon};
+  return {G,pts,okA,okB};
+}
+async function autoCalculer(){
+  const note=$("aNote"); autoLire();
+  const A=AUTO.A, B=AUTO.B;
+  if (!A||!B){ note.textContent="Indiquez A et B (clic sur la carte ou coordonnées)."; return; }
+  if (!coast.rings){ note.textContent="Trait de côte pas encore chargé : réessayez dans un instant."; return; }
+  const opt={marge:Math.max(0,parseFloat(String($("aMarge").value).replace(",","."))||0), eaux:$("aEaux").value, evit:[]};
+  $("aGo").disabled=true; note.textContent="Calcul de la route…";
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    if (opt.eaux!=="non"){ opt.E=await chargerEaux(); if (!opt.E){ note.textContent="Limites des eaux étrangères pas encore publiées (action « Eaux étrangères » sur GitHub) : calcul sans en tenir compte."; opt.eaux="non"; } }
+    if ($("aZonex").value!=="non"){ await chargerZonex(); for (const z of (ZX.liste||[])) if ($("aZonex").value==="tout" || ZX_TIR.has(z.c)) for (const r of z.rings) opt.evit.push(r.map(([x,y])=>[y,x])); }
+    if ($("aFormes").checked) for (const f of F.liste) if (f.type!=="ligne") opt.evit.push(ptsForme(f));
+    /* emprise : A, B et une marge ; agrandie tant qu'aucun passage n'est trouvé (contourner une péninsule, un continent) */
+    const span=Math.max(Math.abs(A.lat-B.lat),Math.abs(A.lon-B.lon)*Math.cos((A.lat+B.lat)/2*Math.PI/180),0.5);
+    let pad=Math.max(1,span*0.35), r=null, b=null, essais=0;
+    while (!r && essais<4){
+      b={s:Math.max(-80,Math.min(A.lat,B.lat)-pad), n:Math.min(84,Math.max(A.lat,B.lat)+pad), o:Math.min(A.lon,B.lon)-pad/Math.cos(Math.min(70,Math.abs((A.lat+B.lat)/2))*Math.PI/180), e:0};
+      b.e=Math.max(A.lon,B.lon)+(Math.min(A.lon,B.lon)-b.o);
+      const res=Math.min(0.08,Math.max(0.006,Math.sqrt((b.n-b.s)*(b.e-b.o)/450000)));
+      note.textContent=`Calcul de la route… (maille ${fmt(res*60,1)} Nq)`; await new Promise(x=>setTimeout(x,20));
+      r=autoRelier(A,B,b,res,opt); essais++; pad*=2.2;
+      if (r && r.echec){ if (r.echec==="hors") throw new Error("A ou B hors de la zone de calcul"); r=null; }
+    }
+    if (!r) throw new Error("aucun passage maritime trouvé entre A et B (zone de recherche élargie 4 fois)");
+    let pts=r.pts;
+    /* départ / arrivée dans un port ou une rade fermée à cette maille : raccord fin (≈ 0,2 Nq) */
+    const fin=(P,Q)=>{ const bb={s:Math.min(P.lat,Q.lat)-0.15, n:Math.max(P.lat,Q.lat)+0.15, o:Math.min(P.lon,Q.lon)-0.2, e:Math.max(P.lon,Q.lon)+0.2};
+      const x=autoRelier(P,Q,bb,0.003,Object.assign({},opt,{marge:Math.min(opt.marge,0.3)}));
+      if (!x || x.echec) throw new Error("impossible de relier "+(P===A?"le départ A":"l'arrivée B")+" à la mer (point à terre ou dans un bassin fermé ?)");
+      return x.pts; };
+    if (!r.okA) pts=fin(A,pts[0]).concat(pts.slice(1));
+    if (!r.okB) pts=pts.slice(0,-1).concat(fin(pts[pts.length-1],B));
+    /* points alignés (écart < 0,1 Nq à la droite des voisins) ou confondus : supprimés */
+    { let chg=true; while (chg && pts.length>2){ chg=false;
+      for (let i=1;i<pts.length-1;i++){ const a=pts[i-1], q=pts[i], c=pts[i+1], cl=Math.cos(q.lat*Math.PI/180);
+        const ax=(c.lon-a.lon)*60*cl, ay=(c.lat-a.lat)*60, bx=(q.lon-a.lon)*60*cl, by=(q.lat-a.lat)*60, L=Math.hypot(ax,ay);
+        const dev = L<1e-6 ? Math.hypot(bx,by) : Math.abs(ax*by-ay*bx)/L, t = L<1e-6 ? 0 : (ax*bx+ay*by)/(L*L);
+        if ((dev<0.1 && t>=0 && t<=1) || Math.hypot(bx,by)<0.05){ pts.splice(i,1); chg=true; break; } } } }
+    /* bilan : distance totale et distance dans les eaux étrangères (échantillonnée tous les ~0,5 Nq) */
+    let tot=0, etr=0;
+    for (let i=0;i<pts.length-1;i++){ const d=rhumb(pts[i],pts[i+1]).dist; tot+=d; const n=Math.max(1,Math.ceil(d/0.5));
+      for (let t=0;t<n;t++){ const q=rhumbAt(pts[i],pts[i+1],(t+0.5)/n), k=r.G.cell(q.lat,q.lon); if (k>=0 && r.G.etranger[k]) etr+=d/n; } }
+    R.wps=pts.map(p=>({lat:+p.lat.toFixed(5), lon:+p.lon.toFixed(5)}));
+    R.speeds=new Array(R.wps.length-1).fill(+$("tSpeed").value||8);
+    if (!$("rName").value) $("rName").value="Route automatique";
+    routeChanged(true);
+    map.fitBounds([[Math.min(...pts.map(p=>p.lat)),Math.min(...pts.map(p=>p.lon))],[Math.max(...pts.map(p=>p.lat)),Math.max(...pts.map(p=>p.lon))]],{padding:[40,40]});
+    note.textContent=`Route calculée : ${R.wps.length} points (dont ${R.wps.length-2} points tournants), ${fmt(tot,0)} Nq`+
+      (opt.eaux!=="non" ? ` · dans les eaux étrangères : ${fmt(etr,0)} Nq${etr>0.5?" (départ, arrivée ou passage inévitable)":""}` : "")+
+      `. Les points se déplacent à la souris. Vérifiez la route sur une carte marine (profondeurs, DST).`;
+  } catch(err){ note.textContent="Échec du tracé : "+err.message; }
+  finally{ $("aGo").disabled=false; }
+}
+$("aGo").addEventListener("click",autoCalculer);
+
 /* ---------- Azimut / distance ---------- */
 var MS={pts:[], actif:false, mode:"suite"};
 const R_NQ = 10800/Math.PI;       /* rayon tel que 1 minute d'arc = 1 Nq (convention de navigation) */
@@ -3485,6 +3744,7 @@ function mesureClick(e){
   MS.pts.push({lat:e.latlng.lat, lon:e.latlng.lng}); mesureMaj(); return true;
 }
 function drawMesure(ctx){
+  drawAutoAB(ctx);
   if (!MS || !MS.pts.length) return;
   const P=MS.pts.map(p=>map.latLngToContainerPoint([p.lat,p.lon]));
   ctx.save(); ctx.lineCap="round";
