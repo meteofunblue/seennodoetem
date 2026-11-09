@@ -520,6 +520,10 @@ footer a{color:var(--accent)}
     </div>
     <div id="seuilsPanel" class="seuils" hidden>
       <div id="seuilsGrid" class="sgrid"></div>
+      <div class="scroisee" style="grid-column:1/-1">Mer croisée : écart ≥ <input type="number" id="cAng" min="10" max="180" step="5" style="width:4.2em">°
+        · chaque système ≥ <input type="number" id="cHmin" min="0" step="0.1" style="width:4.2em"> m
+        · le plus faible ≥ <input type="number" id="cRat" min="0" max="100" step="5" style="width:4.2em"> % du plus fort
+        <span class="note">(rouge « marquée » : écart ≥ 60° et hauteurs proches, ≥ 70 %)</span></div>
       <button id="sClear" type="button">Effacer</button>
       <span class="note">Case vide = pas de seuil. Les heures où le seuil est atteint sont ombrées en orange ou en rouge.</span>
     </div>
@@ -539,7 +543,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 21:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 22:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -638,6 +642,8 @@ const vL = () => vU()==="kmh" ? "km/h" : "kt";
 const vW = arr => !arr || vF()===1 ? arr : arr.map(v=>v==null?null:v*KMH);
 const SEUIL_NUAGE = 3;   /* octas : un étage est compté présent à partir de cette couverture */
 const SC = {
+  /* mer croisée : 0 non, 1 mer croisée, 2 marquée */
+  croisee: classes([[0,"#7fc98f","non",0.35],[1,"#f59e0b","mer croisée",0.85],[2,"#dc2626","marquée",0.9]], 3),
   /* vent et rafales : une couleur par tranche de 5 nœuds */
   wind: classes([[0,"#e8f4fb",""],[5,"#b9def0",""],[10,"#7cc4e4",""],[15,"#4daf7c",""],[20,"#f3e04b",""],[25,"#f68a3c",""],
                  [30,"#e8532f",""],[35,"#c9252b",""],[40,"#9b1532",""],[45,"#6e0f4f",""],[50,"#4a0a6b",""],[55,"#33075a",""],[60,"#1e0440",""]], 80),
@@ -697,6 +703,7 @@ const PARAMS = {
   sw2:{label:"Houle secondaire · hauteur (WW3)", unit:"m", src:"m", key:"secondary_swell_height", dir:["secondary_swell_direction"], glyph:"arrow", scale:SC.wave, dec:1},
   sw2p:{label:"Houle secondaire · période (WW3)", unit:"s", src:"m", key:"secondary_swell_period", dir:["secondary_swell_direction"], glyph:"arrow", scale:SC.period, dec:0},
   /* courant : direction VERS laquelle il porte (convention océanographique) */
+  croisee:{label:"Mer croisée (indicateur)", unit:"", src:"m", key:"wind_wave_height", scale:SC.croisee, cat:true, dec:0, novals:true, calc:i=>croiseeGrille(i)},
   cur:{label:"Courant de surface (marée incluse)", unit:"kt", src:"c", key:"current_speed", dir:["current_direction"], dirTo:true, glyph:"arrow", scale:SC.cur, dec:1}
 };
 const C_VARS = ["current_speed","current_direction"];
@@ -1364,6 +1371,7 @@ function gustDesc(){
   return gustMode()==="heure" && g.prov.kind==="mf" ? txt+" (seule valeur fournie par Météo-France)" : txt;
 }
 function fieldVals(P,i){
+  if (P.calc) return P.calc(i);
   const g=gridOf(P); if (!g) return null;
   const a=g.get(keyOf(P,g)); if (!a) return null;
   const ti=tiOf(g,i); if (ti<0) return {g, vals:null};
@@ -1544,6 +1552,60 @@ function drawField(){
   drawZonex(ctx);
   drawMesure(ctx);
 }
+/* ---------- Mer croisée : deux systèmes de vagues significatifs, de hauteurs comparables, de directions différentes ---------- */
+function croiseeOpts(){ return {ang:+store.get("croisee_angle",45)||45, hmin:+store.get("croisee_hmin",0.5)||0.5, ratio:(+store.get("croisee_ratio",40)||40)/100}; }
+function angEcart(a,b){ return Math.abs(((a-b)%360+540)%360-180); }
+/* sys : [{h, d, nom}] ; renvoie null si non calculable, sinon {niv:0|1|2, ang, A, B} (couple le plus marqué) */
+function croiseeNiveau(sys,o){
+  const ok=sys.filter(x=>x && x.h!=null && x.d!=null && !isNaN(x.h) && !isNaN(x.d));
+  if (ok.length<2) return null;
+  let best={niv:0};
+  for (let x=0;x<ok.length;x++) for (let y=x+1;y<ok.length;y++){ const A=ok[x], B=ok[y];
+    if (A.h<o.hmin||B.h<o.hmin) continue;
+    const r=Math.min(A.h,B.h)/Math.max(A.h,B.h), ang=angEcart(A.d,B.d);
+    if (ang<o.ang||r<o.ratio) continue;
+    const niv = ang>=Math.max(60,o.ang) && r>=0.7 ? 2 : 1;
+    if (niv>best.niv || (niv===best.niv && ang>(best.ang||0))) best={niv,ang,A,B}; }
+  return best;
+}
+/* séries (point, route) : mer du vent + houle totale, ou houles primaire et secondaire (WW3) ;
+   sans mer du vent fournie : estimée par √(Hs² − Hhoule²) dans la direction du vent */
+function croiseeAt(m,a,j){
+  const v=(o,k)=>o&&o[k]&&o[k][j]!=null?o[k][j]:null;
+  let ww={h:v(m,"wind_wave_height"), d:v(m,"wind_wave_direction"), nom:"mer du vent"};
+  const ww3=v(m,"primary_swell_height")!=null;
+  const sw = ww3 ? [{h:v(m,"primary_swell_height"),d:v(m,"primary_swell_direction"),nom:"houle prim."},{h:v(m,"secondary_swell_height"),d:v(m,"secondary_swell_direction"),nom:"houle sec."}]
+                 : [{h:v(m,"swell_wave_height"),d:v(m,"swell_wave_direction"),nom:"houle"}];
+  let estime=false;
+  if (ww.h==null || ww.d==null){ const hs=v(m,"wave_height"), hsw=sw[0].h, wd=v(a,"wind_direction_10m");
+    if (hs!=null && hsw!=null && wd!=null){ ww={h:Math.sqrt(Math.max(0,hs*hs-hsw*hsw)), d:wd, nom:"mer du vent (estimée, dir. du vent)"}; estime=true; } }
+  const r=croiseeNiveau([ww,...sw],croiseeOpts()); if (r) r.estime=estime; return r;
+}
+function croiseeTexte(r,long){
+  if (!r.niv) return "non";
+  const sys=x=>`${x.nom} ${fmt(x.h,1)} m ${dir16(x.d)}`;
+  return `${r.niv===2?"⚠ marquée":"oui"} · ${Math.round(r.ang)}°`+(long?` (${dir16(r.A.d)} / ${dir16(r.B.d)})`:` (${sys(r.A)} / ${sys(r.B)})`);
+}
+/* carte : indicateur maille par maille sur la grille du modèle de vagues */
+function croiseeGrille(i){
+  const g=st.gm; if (!g) return null; const ti=tiOf(g,i); if (ti<0) return {g,vals:null};
+  const N=g.ny*g.nx, get=k=>{ const x=g.get(k); return x?x.subarray(ti*N,(ti+1)*N):null; };
+  const wh=get("wind_wave_height"), wd=get("wind_wave_direction"), ww3=!!get("primary_swell_height");
+  const s1h=get(ww3?"primary_swell_height":"swell_wave_height"), s1d=get(ww3?"primary_swell_direction":"swell_wave_direction");
+  const s2h=ww3?get("secondary_swell_height"):null, s2d=ww3?get("secondary_swell_direction"):null;
+  if (!wh || !wd || !s1h || !s1d) return {g,vals:null};
+  const o=croiseeOpts(), out=new Float32Array(N);
+  for (let n=0;n<N;n++){
+    if (isNaN(wh[n]) && isNaN(s1h[n])){ out[n]=NaN; continue; }
+    const sys=[{h:wh[n],d:wd[n]},{h:s1h[n],d:s1d[n]}]; if (s2h) sys.push({h:s2h[n],d:s2d?s2d[n]:NaN});
+    const r=croiseeNiveau(sys,o); out[n]=r?r.niv:NaN; }
+  return {g,vals:out};
+}
+for (const [id,cle,def] of [["cAng","croisee_angle",45],["cHmin","croisee_hmin",0.5],["cRat","croisee_ratio",40]]){
+  $(id).value=store.get(cle,def);
+  $(id).addEventListener("input",()=>{ const v=parseFloat(String($(id).value).replace(",",".")); if (v>=0){ store.set(cle,v); drawMG(); renderReadout(); drawField(); } });
+}
+
 /* ---------- Couches figées : une couche garde son échéance pendant que la frise fait défiler les autres ---------- */
 function idxCouche(k){
   const t=st.fige&&st.fige[k]; if (!t) return st.tIdx;
@@ -1648,7 +1710,7 @@ function drawZonex(ctx){
 function drawSymbols(ctx,i,P,g,vals,surTerre,ik){
   const sk=symP(), S=sk?PARAMS[SYM[sk].p]:null;
   const rs=S?fieldVals(S,i):null, gs=rs&&rs.vals?rs.g:null;
-  const showVals=$("vals").checked && g && vals && !P.layers && $("param").value!==ik;
+  const showVals=$("vals").checked && g && vals && !P.layers && !P.novals && $("param").value!==ik;
   if (!gs && !showVals) return;
   const dens=+$("dens").value||40, target=showVals?Math.max(dens,38):dens;
   const base=gs||g, cp=cellPx(base);
@@ -1717,7 +1779,7 @@ function drawLegend(){
   const P=PARAMS[$("param").value], cv=$("legend"), dpr=window.devicePixelRatio||1;
   if (!P){ $("legendTitle").textContent="Pas de palette de couleurs"; const c2=cv.getContext("2d"); c2.clearRect(0,0,cv.width,cv.height); cv.style.visibility="hidden"; return; }
   cv.style.visibility="";
-  $("legendTitle").textContent = `${P.label}${P.key==="wind_gusts_10m"?" · "+gustDesc():""} (${P.unit})`+(st.fige&&st.fige.c?` · figée à ${tLabel(st.fige.c)}`:"");
+  $("legendTitle").textContent = `${P.label}${P.key==="wind_gusts_10m"?" · "+gustDesc():""}${P.unit?` (${P.unit})`:""}`+(st.fige&&st.fige.c?` · figée à ${tLabel(st.fige.c)}`:"");
   const W=cv.clientWidth||300, H=34; cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   if (P.layers && !P.scale){
@@ -2195,6 +2257,7 @@ function renderReadout(){
     rows.push(["Houle primaire", `${fmt(g(m,"primary_swell_height"),1)} m ${dir16(g(m,"primary_swell_direction"))} · ${fmt(g(m,"primary_swell_period"),0)} s`]);
     rows.push(["Houle secondaire", `${fmt(g(m,"secondary_swell_height"),1)} m ${dir16(g(m,"secondary_swell_direction"))} · ${fmt(g(m,"secondary_swell_period"),0)} s`]);
   } else rows.push(["Houle totale", `${fmt(g(m,"swell_wave_height"),1)} m ${dir16(g(m,"swell_wave_direction"))} · ${fmt(g(m,"swell_wave_period"),0)} s`]);
+  if (hasData(m.wave_height)){ const r=croiseeAt(m,a,j); rows.push(["Mer croisée", r?croiseeTexte(r,true):"non calculable"]); }
   const c=D.c||{};
   if (c.current_speed && c.current_speed.some(v=>v!=null)){
     const cs=g(c,"current_speed"), cd=g(c,"current_direction");
@@ -2403,7 +2466,7 @@ function drawMGto(cv,SOLO){
   }
   /* 2. État de la mer */
   if (show("mer")){ const z0=y;
-  const seaLeg=[["mer totale",C.hs],["mer du vent",C.wws]].concat(ww3?[["houle prim.",C.sw],["houle sec.",C.sw2,[4,3]]]:[["houle totale",C.sw]]);
+  const seaLeg=[["mer totale",C.hs],["mer du vent",C.wws]].concat(ww3?[["houle prim.",C.sw],["houle sec.",C.sw2,[4,3]]]:[["houle totale",C.sw]]).concat([["mer croisée","#f59e0b"]]);
   title("État de la mer",seaLeg,"mer");
   if (hasData(m.wave_height)){
     waveGap(y,hM,true);
@@ -2411,6 +2474,12 @@ function drawMGto(cv,SOLO){
     yaxis(y,hM,0,mx,"l","m"); vgrid(y,hM);
     seuil(m.wave_height,y,hM,0,mx,SE.hs,"Hs","m");
     line(m.wave_height,y,hM,0,mx,C.hs,{w:2.4,fill:.12});
+    /* mer croisée : bandeau en haut du graphique (orange : mer croisée, rouge : marquée) */
+    { const cr=D.times.map((_,i)=>croiseeAt(m,a,i));
+      for (let i=0;i<n;i++){ const r=cr[i]; if (!r || !r.niv) continue;
+        ctx.fillStyle=r.niv===2?"rgba(220,38,38,.9)":"rgba(245,158,11,.9)";
+        const x0=Math.max(L0,X(i)-halfL(i)), x1=Math.min(L0+pw,X(i)+halfR(i)); ctx.fillRect(x0,y+1,x1-x0+0.5,7);
+        ctx.fillStyle=r.niv===2?"rgba(220,38,38,.10)":"rgba(245,158,11,.08)"; ctx.fillRect(x0,y+8,x1-x0+0.5,hM-8); } }
     line(m.wind_wave_height,y,hM,0,mx,C.wws);
     if (ww3){ line(m.primary_swell_height,y,hM,0,mx,C.sw); line(m.secondary_swell_height,y,hM,0,mx,C.sw2,{dash:[4,3]}); }
     else line(m.swell_wave_height,y,hM,0,mx,C.sw);
@@ -2561,7 +2630,8 @@ function bulleLignes(k,D,j,C){
     add("mer du vent",C.wws,v(m,"wind_wave_height"),"m",1," "+dir16(v(m,"wind_wave_direction")));
     if (ww3){ add("houle primaire",C.sw,v(m,"primary_swell_height"),"m",1," "+dir16(v(m,"primary_swell_direction"))); add("houle secondaire",C.sw2,v(m,"secondary_swell_height"),"m",1," "+dir16(v(m,"secondary_swell_direction"))); }
     else add("houle totale",C.sw,v(m,"swell_wave_height"),"m",1," "+dir16(v(m,"swell_wave_direction")));
-    if (v(m,"wave_height")!=null) out.push({nom:"état de la mer",col:null,t:etatMer(v(m,"wave_height")),ecart:true}); }
+    if (v(m,"wave_height")!=null) out.push({nom:"état de la mer",col:null,t:etatMer(v(m,"wave_height")),ecart:true});
+    { const r=croiseeAt(m,a,j); if (r) out.push({nom:"mer croisée",col:r.niv===2?"#dc2626":r.niv?"#f59e0b":null,t:r.niv?`${r.niv===2?"marquée":"oui"} · ${Math.round(r.ang)}°`:"non",ecart:true}); } }
   if (k==="houle"){ if (ww3){ add("période houle prim.",C.sw,v(m,"primary_swell_period"),"s",0," "+dir16(v(m,"primary_swell_direction"))); add("période houle sec.",C.sw2,v(m,"secondary_swell_period"),"s",0," "+dir16(v(m,"secondary_swell_direction"))); }
     else add("période houle",C.sw,v(m,"swell_wave_period"),"s",0," "+dir16(v(m,"swell_wave_direction")));
     add("période mer du vent",C.wws,v(m,"wind_wave_period"),"s",0); }
@@ -4052,7 +4122,7 @@ function showHover(e){
     const {lat,lng}=e.latlng, A=(n)=>gridVal(st.ga,n,lat,lng), M=(n)=>gridVal(st.gm,n,lat,lng);
     const lines=[`<span class="pos">${dm(lat,true)} ${dm(lng,false)}</span>`];
     const P=PARAMS[$("param").value];
-    if (P && !P.layers && !["wind","gust","gusti","pmer","hs","t2","td","hu"].includes($("param").value)){
+    if (P && !P.layers && !P.calc && !["wind","gust","gusti","pmer","hs","t2","td","hu"].includes($("param").value)){
       const g=gridOf(P), v=g?gridVal(g,keyOf(P,g),lat,lng):null;
       lines.push(`${P.label} : <b>${v==null?"—":fmt(P.conv?P.conv(v):v,P.dec)} ${P.unit}</b>`);
     }
@@ -4069,6 +4139,8 @@ function showHover(e){
       if (p1!=null){ lines.push(`Houle 1 <b>${fmt(p1,1)} m ${dir16(M("primary_swell_direction"))} ${fmt(M("primary_swell_period"),0)} s</b>`);
         const p2=M("secondary_swell_height"); if (p2!=null && p2>=0.1) lines.push(`Houle 2 <b>${fmt(p2,1)} m ${dir16(M("secondary_swell_direction"))} ${fmt(M("secondary_swell_period"),0)} s</b>`); }
       else { const sw=M("swell_wave_height"); if (sw!=null) lines.push(`Houle <b>${fmt(sw,1)} m ${dir16(M("swell_wave_direction"))} ${fmt(M("swell_wave_period"),0)} s</b>`); }
+      { const m1={}; for (const k of ["wave_height","wind_wave_height","wind_wave_direction","swell_wave_height","swell_wave_direction","primary_swell_height","primary_swell_direction","secondary_swell_height","secondary_swell_direction"]) m1[k]=[M(k)];
+        const r=croiseeAt(m1,{wind_direction_10m:[wd]},0); if (r) lines.push(`Mer croisée <b>${croiseeTexte(r)}</b>`); }
     } else if (st.gm && ws!=null) lines.push(`<span class="pos">pas de vagues ici</span>`);
     const cs=gridVal(st.gc,"current_speed",lat,lng);
     if (cs!=null) lines.push(`Courant <b>${fmt(cs,1)} kt vers ${dir16(gridVal(st.gc,"current_direction",lat,lng))}</b>`);
