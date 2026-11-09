@@ -42,6 +42,9 @@ header.bar{padding-block:10px;display:flex;flex-wrap:wrap;align-items:end;gap:10
 .brand span{font-size:12px;color:var(--muted)}
 .ctl{display:flex;flex-direction:column;gap:3px;min-width:0}
 .ctl label{font:600 11px/1 var(--f-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+button.fige{all:unset;cursor:pointer;font-size:11px;line-height:1;padding:0 3px;border-radius:4px;letter-spacing:0;text-transform:none}
+button.fige.on{background:#ffd23f;color:#0d1b2a;font-weight:700;padding:1px 5px}
+button.fige:focus-visible{outline:2px solid var(--accent)}
 select,button,input[type=text],input[type=number],input[type=datetime-local]{font:500 14px var(--f-body);color:var(--ink);background:var(--bg);
   border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-height:34px;max-width:100%}
 select{max-width:min(320px,100%)}
@@ -320,9 +323,9 @@ footer a{color:var(--accent)}
 <body>
 <header class="bar">
   <div class="brand"><h1>Modèles marine</h1><span id="sub">Météo-France · AROME / ARPEGE · MFWAM / WW3 · IFS via Open-Meteo · heures UTC</span></div>
-  <div class="ctl ctlp"><label for="param">① Couleurs</label><select id="param"></select></div>
-  <div class="ctl ctlp"><label for="isoParam">② Isolignes</label><select id="isoParam"></select></div>
-  <div class="ctl ctlp"><label for="symParam">③ Symboles</label><select id="symParam"></select></div>
+  <div class="ctl ctlp"><label for="param">① Couleurs <button type="button" class="fige" data-k="c" title="Figer cette couche à l&#39;échéance affichée : la frise ne fait plus défiler que les autres couches">🔓</button></label><select id="param"></select></div>
+  <div class="ctl ctlp"><label for="isoParam">② Isolignes <button type="button" class="fige" data-k="i" title="Figer cette couche à l&#39;échéance affichée : la frise ne fait plus défiler que les autres couches">🔓</button></label><select id="isoParam"></select></div>
+  <div class="ctl ctlp"><label for="symParam">③ Symboles <button type="button" class="fige" data-k="s" title="Figer cette couche à l&#39;échéance affichée : la frise ne fait plus défiler que les autres couches">🔓</button></label><select id="symParam"></select></div>
   <div class="ctl ctlm"><label for="model">Atmosphère</label><select id="model"></select></div>
   <div class="ctl" id="ctlRun" hidden><label for="run">Run</label><select id="run"></select></div>
   <div class="ctl ctlm"><label for="wmodel">État de mer</label><select id="wmodel"></select></div>
@@ -472,9 +475,9 @@ footer a{color:var(--accent)}
     <div id="map" aria-label="Carte du champ prévu"></div>
     <button id="mapBig" class="glassbtn" type="button" title="Agrandir la carte (Échap pour revenir)" aria-label="Agrandir la carte">⤢</button>
     <div id="dock" class="dock glass" hidden aria-label="Choix rapides">
-      <label class="lp"><span>① Couleurs</span><select id="mParam" data-src="param"></select></label>
-      <label class="lp"><span>② Isolignes</span><select id="mIso" data-src="isoParam"></select></label>
-      <label class="lp"><span>③ Symboles</span><select id="mSym" data-src="symParam"></select></label>
+      <label class="lp"><span>① Couleurs <button type="button" class="fige" data-k="c" title="Figer cette couche à l&#39;échéance affichée : la frise ne fait plus défiler que les autres couches">🔓</button></span><select id="mParam" data-src="param"></select></label>
+      <label class="lp"><span>② Isolignes <button type="button" class="fige" data-k="i" title="Figer cette couche à l&#39;échéance affichée : la frise ne fait plus défiler que les autres couches">🔓</button></span><select id="mIso" data-src="isoParam"></select></label>
+      <label class="lp"><span>③ Symboles <button type="button" class="fige" data-k="s" title="Figer cette couche à l&#39;échéance affichée : la frise ne fait plus défiler que les autres couches">🔓</button></span><select id="mSym" data-src="symParam"></select></label>
       <label class="lm"><span>Atmosphère</span><select id="mModel" data-src="model"></select></label>
       <label class="lm"><span>Mer</span><select id="mWmodel" data-src="wmodel"></select></label>
       <label class="lm"><span>Courant</span><select id="mCmodel" data-src="cmodel"></select></label>
@@ -536,7 +539,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 21:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 21:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1511,7 +1514,7 @@ function drawField(){
   const ctx=c.getContext("2d"), dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,c.width,c.height);
   if (!st.ga && !st.gm){ drawCoast(ctx); drawZonex(ctx); drawMesure(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
-  const P=PARAMS[$("param").value], i=st.tIdx, op=+$("opac").value;
+  const P=PARAMS[$("param").value], i=idxCouche("c"), op=+$("opac").value;
   let any=false, g=null, vals=null;
   if (P && P.layers){
     /* combinaison des étages : une couleur par cas (B, M, H, B+M, …) ; un étage compte à partir de SEUIL_NUAGE octas */
@@ -1535,12 +1538,37 @@ function drawField(){
   const surTerre=(px,py)=>{ if (!alpha) return false; const x=Math.round(px*dpr), y=Math.round(py*dpr);
     if (x<0||y<0||x>=alpha.width||y>=alpha.height) return false; return alpha.data[(y*alpha.width+x)*4+3]===0; };
   drawCoast(ctx);
-  const ik=isoP(); if (ik) drawIsolines(ctx,i,ik);
+  const ik=isoP(); if (ik) drawIsolines(ctx,idxCouche("i"),ik);
   updateMissing();
-  drawSymbols(ctx,i,P,g,vals,surTerre,ik);
+  drawSymbols(ctx,idxCouche("s"),P,g,vals,surTerre,ik);
   drawZonex(ctx);
   drawMesure(ctx);
 }
+/* ---------- Couches figées : une couche garde son échéance pendant que la frise fait défiler les autres ---------- */
+function idxCouche(k){
+  const t=st.fige&&st.fige[k]; if (!t) return st.tIdx;
+  const j=st.times.indexOf(t); if (j>=0) return j;
+  /* échéance plus disponible (autre modèle, autre run) : la couche suit de nouveau la frise */
+  st.fige[k]=null; setTimeout(()=>{ majFige(); toast("fige","info",`Échéance figée ${tLabel(t)} absente des données : la couche suit de nouveau la frise.`); },0);
+  return st.tIdx;
+}
+function majFige(){
+  if (!st.fige) st.fige={c:null,i:null,s:null};
+  const noms={c:"① Couleurs",i:"② Isolignes",s:"③ Symboles"};
+  document.querySelectorAll("button.fige").forEach(b=>{ const t=st.fige[b.dataset.k]; b.classList.toggle("on",!!t);
+    b.textContent = t ? "🔒 "+tLabel(t).replace(" · "," ") : "🔓";
+    b.title = t ? `${noms[b.dataset.k]} figée à ${tLabel(t)} : cliquer pour la libérer` : "Figer cette couche à l'échéance affichée : la frise ne fera plus défiler que les autres couches"; });
+  if (typeof legendPlus==="function") legendPlus(); drawLegend();
+}
+document.querySelectorAll("button.fige").forEach(b=>b.addEventListener("click",e=>{
+  e.preventDefault(); e.stopPropagation();
+  if (!st.fige) st.fige={c:null,i:null,s:null};
+  const k=b.dataset.k;
+  st.fige[k] = st.fige[k] ? null : st.times[st.tIdx]||null;
+  majFige(); drawField();
+  if (st.fige[k]) toast("fige","info",`${{c:"Couleurs",i:"Isolignes",s:"Symboles"}[k]} figées à ${tLabel(st.fige[k])} : faites défiler la frise pour les autres couches. Cliquez 🔒 pour libérer.`,[],6000);
+}));
+
 /* ---------- Zones d'exercices et de tir (Shom, cartes ZONEX) : calque à la demande ---------- */
 var ZX={liste:null, charge:false};
 var ZX_TIR=new Set([4,6]);
@@ -1689,7 +1717,7 @@ function drawLegend(){
   const P=PARAMS[$("param").value], cv=$("legend"), dpr=window.devicePixelRatio||1;
   if (!P){ $("legendTitle").textContent="Pas de palette de couleurs"; const c2=cv.getContext("2d"); c2.clearRect(0,0,cv.width,cv.height); cv.style.visibility="hidden"; return; }
   cv.style.visibility="";
-  $("legendTitle").textContent = `${P.label}${P.key==="wind_gusts_10m"?" · "+gustDesc():""} (${P.unit})`;
+  $("legendTitle").textContent = `${P.label}${P.key==="wind_gusts_10m"?" · "+gustDesc():""} (${P.unit})`+(st.fige&&st.fige.c?` · figée à ${tLabel(st.fige.c)}`:"");
   const W=cv.clientWidth||300, H=34; cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   if (P.layers && !P.scale){
@@ -3891,8 +3919,9 @@ function majIsoStep(){
 }
 function legendPlus(){
   const ik=isoP(), sk=symP(), parts=[];
-  if (ik) parts.push(`Isolignes <b>${ISO[ik].label}</b> · ${$("isoStep").selectedOptions[0]?$("isoStep").selectedOptions[0].text:""}`);
-  if (sk) parts.push(`Symboles <b>${SYM[sk].label.split(" · ")[0]}</b>${PARAMS[SYM[sk].p].glyph==="barb"?" (kt)":""}`);
+  const fg=k=>st.fige&&st.fige[k]?` <span style="background:#ffd23f;color:#0d1b2a;border-radius:3px;padding:0 3px">🔒 ${tLabel(st.fige[k])}</span>`:"";
+  if (ik) parts.push(`Isolignes <b>${ISO[ik].label}</b> · ${$("isoStep").selectedOptions[0]?$("isoStep").selectedOptions[0].text:""}${fg("i")}`);
+  if (sk) parts.push(`Symboles <b>${SYM[sk].label.split(" · ")[0]}</b>${PARAMS[SYM[sk].p].glyph==="barb"?" (kt)":""}${fg("s")}`);
   if ($("zonex").value!=="non" && ZX.liste) parts.push(`<b>ZONEX</b> <span style="color:#d62828">tir</span> / <span style="color:#1d4ed8">exercice</span>`);
   $("legendPlus").innerHTML=parts.join(" &nbsp;|&nbsp; ");
 }
