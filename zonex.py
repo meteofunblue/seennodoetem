@@ -15,6 +15,7 @@ import argparse
 import io
 import json
 import math
+import re
 import os
 import sys
 import tempfile
@@ -173,6 +174,27 @@ def coder(ring, echelle):
     return out
 
 
+def sans_accents(t):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", t.lower()) if unicodedata.category(c) != "Mn")
+
+
+def categorie_texte(txt):
+    """Pas de champ CATMPA dans le WFS : type déduit du texte descriptif (« Secteur d'exercices », « Zone de tir »…)."""
+    t = sans_accents(txt or "")
+    if re.search(r"armes? legeres?|petit calibre", t):
+        return 6
+    if re.search(r"\btirs?\b|firing|artillerie|missile", t):
+        return 4
+    if "sous-marin" in t or "sous marin" in t or "submarine" in t:
+        return 3
+    if "torpill" in t:
+        return 2
+    if re.search(r"\bmines?\b|mouillage", t):
+        return 5
+    return None
+
+
 def categorie(txt):
     for morceau in str(txt).replace(";", ",").split(","):
         try:
@@ -206,7 +228,7 @@ def main():
         print("  exemple :", {k: v for k, v in p.items() if v not in (None, "")})
 
     echelle = 10000
-    zones, par_cat = [], {}
+    zones, par_cat, textes = [], {}, {}
     for props, geom in objets:
         polys = vers_lonlat(anneaux(geom))
         rings = []
@@ -217,13 +239,19 @@ def main():
                     rings.append(coder(r, echelle))
         if not rings:
             continue
-        cat = categorie(premier(props, CHAMPS_CAT) or 1)
+        info = premier(props, CHAMPS_INFO)
+        brut = premier(props, CHAMPS_CAT)
+        cat = categorie(brut) if brut else (categorie_texte(info) or categorie_texte(premier(props, CHAMPS_NOM)) or 1)
+        textes[info] = textes.get(info, 0) + 1
         par_cat[cat] = par_cat.get(cat, 0) + 1
-        zones.append({"n": premier(props, CHAMPS_NOM), "c": cat, "i": premier(props, CHAMPS_INFO)[:300], "r": rings})
+        zones.append({"n": premier(props, CHAMPS_NOM), "c": cat, "i": info[:300], "r": rings})
     zones.sort(key=lambda z: z["n"])
     print(f"{len(zones)} zones retenues ; par catégorie : " +
           ", ".join(f"{CATEGORIES.get(k, k)} {v}" for k, v in sorted(par_cat.items())))
     print(f"Sans nom : {sum(1 for z in zones if not z['n'])}")
+    print("Textes descriptifs rencontrés :")
+    for t, n in sorted(textes.items(), key=lambda x: -x[1]):
+        print(f"  {n:4d} × {t or '(vide)'}  ->  {CATEGORIES.get(categorie_texte(t) or 1)}")
 
     sortie = {"source": f"Shom, zones d'exercices (cartes ZONEX), Licence Ouverte 2.0 ({source})",
               "genere": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "echelle": echelle,
