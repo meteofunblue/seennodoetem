@@ -55,12 +55,19 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 #opac{width:100px;accent-color:var(--accent);min-height:34px}
 .zpanel,.tpanel{padding-block:8px 10px;display:flex;flex-wrap:wrap;align-items:end;gap:8px 14px}
 /* Transit et Enregistrer : fenêtres flottantes (une seule à la fois), déplaçables par leur titre ; la carte reste utilisable */
-#formPanel,#transitPanel,#savePanel{position:fixed;z-index:950;top:86px;left:24px;width:min(600px,calc(100vw - 32px));max-height:calc(100vh - 110px);overflow:auto;
+#formPanel,#transitPanel,#savePanel,#mesurePanel{position:fixed;z-index:950;top:86px;left:24px;width:min(600px,calc(100vw - 32px));max-height:calc(100vh - 110px);overflow:auto;
   padding:0 14px 12px;border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:14px;
   background:rgba(255,255,255,.93);background:color-mix(in srgb,var(--panel) 92%,transparent);
   -webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 14px 44px rgba(13,27,42,.28);animation:dockIn .2s ease-out}
-#formPanel[hidden],#transitPanel[hidden],#savePanel[hidden]{display:none!important}
+#formPanel[hidden],#transitPanel[hidden],#savePanel[hidden],#mesurePanel[hidden]{display:none!important}
 #formPanel{width:min(440px,calc(100vw - 32px))}
+#mesurePanel{width:min(460px,calc(100vw - 32px))}
+.mtab{width:100%;border-collapse:collapse;font:12.5px var(--f-mono);margin-top:4px}
+.mtab td,.mtab th{padding:3px 6px 3px 0;border-bottom:1px solid var(--grid);text-align:left;vertical-align:top}
+.mtab th{font:600 11px var(--f-display,sans-serif);text-transform:uppercase;color:var(--muted)}
+.mtab tr.tot td{font-weight:700;color:var(--accent)}
+.mcoord{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 8px;align-items:center;width:100%}
+.mcoord input{width:100%}
 .fsep{width:100%;height:0;border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
 .fcoord summary{cursor:pointer;font-size:13px;color:var(--accent);margin:2px 0 6px}
 .fcoord textarea{width:100%;font:12px var(--f-mono,monospace);padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);margin-bottom:6px}
@@ -69,7 +76,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 .fligne span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fligne button{min-height:26px;padding:2px 8px;font-size:12px}
 .forme-lbl{font:700 12px var(--f-display,sans-serif);white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;pointer-events:none}
-body.mapfull .tpanel:not(#transitPanel):not(#savePanel):not(#formPanel){display:none!important}
+body.mapfull .tpanel:not(#transitPanel):not(#savePanel):not(#formPanel):not(#mesurePanel){display:none!important}
 .fentete{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;width:calc(100% + 28px);margin:0 -14px 2px;padding:10px 14px;
   cursor:move;user-select:none;touch-action:none;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);
   background:color-mix(in srgb,var(--panel) 80%,transparent);border-radius:14px 14px 0 0}
@@ -196,7 +203,7 @@ body.drwR .gripR{opacity:1;background:linear-gradient(90deg,transparent 3px,var(
 body.drwR .gripR:not(:hover):not(.on){background:linear-gradient(90deg,transparent 3px,color-mix(in srgb,var(--line) 80%,transparent) 3px,color-mix(in srgb,var(--line) 80%,transparent) 5px,transparent 5px)}
 body.drwL .drwtabL, body.drwR .drwtabR{opacity:0;pointer-events:none}
 @keyframes dockIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-body.mapfull header.bar, body.mapfull .zpanel, body.mapfull .tpanel:not(#transitPanel):not(#savePanel):not(#formPanel), body.mapfull .offline, body.mapfull .split,
+body.mapfull header.bar, body.mapfull .zpanel, body.mapfull .tpanel:not(#transitPanel):not(#savePanel):not(#formPanel):not(#mesurePanel), body.mapfull .offline, body.mapfull .split,
 body.mapfull aside.mgcol, body.mapfull footer{display:none!important}
 .drwversion{flex:none;padding:6px 12px 8px;font:500 11px var(--f-mono,monospace);color:var(--muted);border-top:1px solid var(--line,rgba(0,0,0,.1))}
 body.mapfull main.layout{position:fixed;inset:0;z-index:50;grid-template-columns:1fr;background:var(--bg)}
@@ -246,6 +253,21 @@ aside.mgcol{display:flex;flex-direction:column;min-width:0;min-height:0;overflow
 .coords.warn{color:var(--warn)}
 #readout{margin:4px 16px 8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px 12px;
   font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.cmp{margin:2px 16px 4px;font-size:12.5px}
+.cmprow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-bottom:4px}
+.cmpk{font:600 11px var(--f-display,sans-serif);text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.cmp select{min-height:28px;padding:2px 6px}
+.tabs.mini button{padding:3px 9px;font-size:12px;min-height:26px}
+.cmpg{display:flex;flex-wrap:wrap;align-items:center;gap:3px 10px;padding:3px 0;border-top:1px solid var(--grid)}
+.cmpg > .cmpk{width:86px;flex:none}
+.cmpg label{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
+.cmpg label.na{opacity:.45}
+.cmpg label .sw{width:16px;height:4px;border-radius:2px;display:inline-block}
+.cmpg label .etat{font-size:11px;color:var(--muted)}
+#readout .cmpt{grid-column:1/-1;width:100%;border-collapse:collapse;font:12px var(--f-mono)}
+#readout .cmpt td{padding:2px 8px 2px 0;border-bottom:1px solid var(--grid);vertical-align:top}
+#readout .cmpt td:first-child{font-family:var(--f-display,sans-serif);font-weight:600;width:38%}
+#readout .cmpt tr.ecart td{color:var(--accent);font-weight:600}
 #readout .t{grid-column:1/-1;font:600 13px var(--f-mono);color:var(--accent)}
 #readout b{font:600 13px var(--f-mono);font-variant-numeric:tabular-nums}
 #readout span{color:var(--muted)}
@@ -322,6 +344,7 @@ footer a{color:var(--accent)}
   <div class="grp">
     <button id="btnTransit" aria-expanded="false">Transit</button>
     <button id="btnFormes" aria-expanded="false" title="Tracer des zones (exercice, interdiction…) affichées sur les données prévues">Formes / zones</button>
+    <button id="btnMesure" aria-expanded="false" title="Azimut (vrai) et distance entre deux points ou depuis un point de référence">Azimut / distance</button>
     <button id="btnSave" title="Enregistrer un ou plusieurs modèles de la zone dans un fichier, pour les rouvrir sans réseau">Enregistrer un jeu de données météorologiques…</button>
     <button id="btnOpen" title="Ouvrir un fichier .meteo enregistré">Ouvrir un jeu de données météorologiques…</button>
     <a class="lienHL btnlien" href="hors-ligne.html" download="modeles-marine-hors-ligne.html" title="Télécharger l'appli en un seul fichier, pour l'utiliser sans Internet (à bord)">⬇ Télécharger la version hors ligne</a>
@@ -342,6 +365,28 @@ footer a{color:var(--accent)}
   <button id="zDel" type="button" hidden>Supprimer</button>
   <button id="zGo" type="button" class="primary">Charger</button>
   <p class="note" id="zEst">Saisissez les limites (47.75, 47,75 ou 47°45' N) ou tracez la zone sur la carte (deux clics : deux coins opposés).</p>
+</section>
+
+<section class="tpanel" id="mesurePanel" hidden aria-label="Azimut et distance">
+  <div class="ctl"><label for="mMode">Mesure</label><select id="mMode">
+    <option value="suite">Segments successifs (A → B → C…)</option>
+    <option value="ref">Depuis un point de référence (relèvements)</option></select></div>
+  <div class="ctl"><label for="mVit">Vitesse (kt)</label><input type="number" id="mVit" min="0" step="0.5" placeholder="option" style="width:6em"></div>
+  <div class="fsep"></div>
+  <button id="mCliquer" class="primary" type="button">Cliquer sur la carte</button>
+  <button id="mRetour" type="button">Retirer le dernier point</button>
+  <button id="mEffacer" type="button">Effacer</button>
+  <span class="note" id="mAide">Cliquez les points sur la carte (le survol affiche l'azimut et la distance depuis le dernier point).</span>
+  <details class="fcoord" style="width:100%"><summary>Ou saisir les coordonnées</summary>
+    <div class="mcoord">
+      <b>A</b><input type="text" id="mALat" placeholder="48°21,5' N"><input type="text" id="mALon" placeholder="004°46,2' W">
+      <b>B</b><input type="text" id="mBLat" placeholder="47°58' N"><input type="text" id="mBLon" placeholder="005°10' W">
+    </div>
+    <button id="mCalc" type="button" style="margin-top:6px">Calculer A → B</button>
+  </details>
+  <div id="mRes" style="width:100%"></div>
+  <p class="note">Azimuts vrais (par rapport au nord géographique, sans déclinaison magnétique) ; distances en Nq (1 Nq = 1 852 m).
+    Loxodromie = route à cap constant ; orthodromie = plus court chemin (cap initial).</p>
 </section>
 
 <section class="tpanel" id="formPanel" hidden aria-label="Formes et zones">
@@ -436,6 +481,7 @@ footer a{color:var(--accent)}
       <div class="tabs" role="tablist">
         <button id="tabPoint" class="on" role="tab" aria-selected="true">Point</button>
         <button id="tabRoute" role="tab" aria-selected="false" disabled>Route</button>
+        <button id="tabMulti" role="tab" aria-selected="false" title="Comparer plusieurs modèles au même point (ou sur la route)">Comparer</button>
       </div>
       <button id="btnSeuils" title="Seuils de vent, rafales, mer et précipitations">Seuils</button>
       <button id="mgWide" title="Élargir le panneau des graphiques">Agrandir</button>
@@ -449,12 +495,22 @@ footer a{color:var(--accent)}
       <span class="note">Case vide = pas de seuil. Les heures où le seuil est atteint sont ombrées en orange ou en rouge.</span>
     </div>
     <div class="coords" id="seuilsTxt"></div>
+    <div id="cmpPanel" class="cmp" hidden>
+      <div class="cmprow">
+        <span class="cmpk">Sur</span>
+        <div class="tabs mini"><button id="cmpPoint" class="on" type="button">Point</button><button id="cmpRoute" type="button" disabled title="Calculez d'abord une route (Transit)">Route</button></div>
+        <span class="cmpk">Horizon</span>
+        <select id="cmpHor"><option value="48">48 h</option><option value="96" selected>4 jours</option><option value="168">7 jours</option><option value="999">tout</option></select>
+        <label class="chk"><input type="checkbox" id="cmpEnv" checked> Écart entre modèles (bande grise)</label>
+      </div>
+      <div id="cmpListe"></div>
+    </div>
     <div id="readout"></div>
     <div id="mgwrap"><canvas id="mg"></canvas></div>
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 17:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 18:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -472,6 +528,7 @@ footer a{color:var(--accent)}
 <div id="drawRhead" class="drwhead drwheadR" hidden><b>Graphiques</b>
   <button id="gRoute" type="button" class="drwact" title="Créer ou modifier une route (transit)">⛵ Route</button>
   <button id="gFormes" type="button" class="drwact" title="Tracer des zones sur la carte">✏ Zones</button>
+  <button id="gMesure" type="button" class="drwact" title="Azimut et distance">📐 Azimut / distance</button>
   <button id="gSave" type="button" class="drwact" title="Enregistrer un jeu de données météorologiques (utilisation hors ligne)">⤓ Enregistrer les données</button>
   <span style="flex:1"></span>
   <button class="drwpin" data-side="R" type="button" title="Garder le volet ouvert">📌</button>
@@ -1110,6 +1167,7 @@ const field = new FieldLayer();
 field.addTo(map);
 const ptMarker = L.circleMarker([st.pt.lat,st.pt.lon],{radius:7,weight:3,color:"#d1495b",fillColor:"#fff",fillOpacity:1}).addTo(map);
 map.on("click", e => {
+  if (mesureClick(e)) return;        /* clic utilisé pour la mesure azimut / distance */
   if (formeClick(e)) return;         /* clic utilisé pour tracer une forme */
   if (zoneDrawClick(e)) return;      /* clic utilisé pour tracer une zone */
   if (routeAddClick(e)) return;      /* clic utilisé pour poser un point tournant */
@@ -1425,7 +1483,7 @@ function drawField(){
   const c=field._c; if (!c) return;
   const ctx=c.getContext("2d"), dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,c.width,c.height);
-  if (!st.ga && !st.gm){ drawCoast(ctx); drawZonex(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
+  if (!st.ga && !st.gm){ drawCoast(ctx); drawZonex(ctx); drawMesure(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
   const P=PARAMS[$("param").value], i=st.tIdx, op=+$("opac").value;
   let any=false, g=null, vals=null;
   if (P && P.layers){
@@ -1454,6 +1512,7 @@ function drawField(){
   updateMissing();
   drawSymbols(ctx,i,P,g,vals,surTerre,ik);
   drawZonex(ctx);
+  drawMesure(ctx);
 }
 /* ---------- Zones d'exercices et de tir (Shom, cartes ZONEX) : calque à la demande ---------- */
 var ZX={liste:null, charge:false};
@@ -2009,22 +2068,26 @@ async function loadPoint(){
     let txt=`Demandé ${dm(lat,true)} ${dm(lon,false)} · maille atmo ${dm(a.glat,true)} ${dm(a.glon,false)}`;
     txt += m ? ` · maille vagues ${dm(m.glat,true)} ${dm(m.glon,false)}` : " · vagues indisponibles ici";
     $("coords").textContent=txt;
-    if (!st.times.length) setTimes(a.times); else { drawMG(); renderReadout(); }
+    if (!st.times.length) setTimes(a.times); else if (st.mgMode!=="multi"){ drawMG(); renderReadout(); }
+    if (st.mgMode==="multi" && CMP.sur==="point"){ cmpListe(); cmpCharger(); }
   } catch(err){
     if (seq===ptSeq) $("coords").textContent="Échec du chargement du point : "+err.message;
   }
 }
-const mgData = () => st.mgMode==="route" ? st.route : st.point;
+const mgData = () => st.mgMode==="route" ? st.route : st.mgMode==="multi" ? st.multi : st.point;
 function pIdx(i){ const D=mgData(); if (!D) return -1; return D.times.indexOf(st.times[i]); }
 function showTab(m){
   if (m==="route" && !st.route) m="point";
   st.mgMode=m; st.hover=null;
-  $("tabPoint").classList.toggle("on",m==="point"); $("tabRoute").classList.toggle("on",m==="route");
-  $("tabPoint").setAttribute("aria-selected",m==="point"); $("tabRoute").setAttribute("aria-selected",m==="route");
-  $("mgTitle").textContent = m==="route" ? "Météo sur la route" : "Météogramme";
+  for (const [id,k] of [["tabPoint","point"],["tabRoute","route"],["tabMulti","multi"]]){ $(id).classList.toggle("on",m===k); $(id).setAttribute("aria-selected",m===k); }
+  $("cmpPanel").hidden = m!=="multi";
+  $("mgTitle").textContent = m==="route" ? "Météo sur la route" : m==="multi" ? "Comparaison de modèles" : "Météogramme";
   $("hint").textContent = m==="route"
     ? "Valeurs aux positions successives du bateau. Survolez pour lire, cliquez pour caler la carte sur cette heure (le bateau jaune s'y place)."
+    : m==="multi"
+    ? "Une courbe par modèle (couleurs ci-dessus). Bande grise : écart entre les modèles cochés. Colonnes orange / rouge : seuils atteints (teinte plus forte quand plus de modèles les atteignent)."
     : "Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.";
+  if (m==="multi"){ cmpListe(); cmpCharger(); return; }
   if (m==="route" && st.route) $("coords").textContent=st.route.note;
   else if (st.point) $("coords").textContent=`Point ${dm(st.pt.lat,true)} ${dm(st.pt.lon,false)} · maille atmo ${dm(st.point.glat,true)} ${dm(st.point.glon,false)}`+(st.point.mlat!=null?` · maille vagues ${dm(st.point.mlat,true)} ${dm(st.point.mlon,false)}`:" · vagues indisponibles ici");
   $("coords").classList.toggle("warn", m==="route" && st.route && st.route.warn);
@@ -2032,6 +2095,7 @@ function showTab(m){
 }
 $("tabPoint").addEventListener("click",()=>showTab("point"));
 $("tabRoute").addEventListener("click",()=>showTab("route"));
+$("tabMulti").addEventListener("click",()=>showTab("multi"));
 
 const relAngle = (from,cap) => { if (from==null||cap==null) return null; let r=((from-cap)%360+540)%360-180; return r; };   /* >0 : tribord */
 function allure(rel){
@@ -2052,6 +2116,7 @@ const side = rel => rel==null?"":Math.abs(rel)<5||Math.abs(rel)>175?"":rel>0?" t
 function renderReadout(){
   if (typeof seuilsResume==="function") try{ seuilsResume(); }catch(e){}
   const D=mgData(), el=$("readout"); if (!D){ el.innerHTML=""; return; }
+  if (D.kind==="multi") return cmpReadout(D,el);
   let j = st.hover!=null ? st.hover : pIdx(st.tIdx); if (j<0) j=0;
   const a=D.a||{}, m=D.m||{}, g=(o,k)=>o&&o[k]?near(o[k],j):null;
   const nn=g(a,"cloud_cover"), has=k=>m[k]&&m[k].some(v=>v!=null);
@@ -2113,12 +2178,12 @@ function drawMGto(cv,SOLO){
   const D=mgData(), dpr=window.devicePixelRatio||1, show=k=>!SOLO||SOLO===k;
   const W=(cv.parentElement.clientWidth-16) || 400;
   const L0=44, R0=44, pw=W-L0-R0;
-  const isRoute = D && D.kind==="route", band0 = isRoute && !SOLO;
+  const isRoute = D && D.kind==="route", band0 = isRoute && !SOLO, MULTI = D && D.kind==="multi", WPS = isRoute || (MULTI && D.wpTimes);
   /* hauteur de chaque graphique = hauteur de base × facteur choisi par l'utilisateur (boutons − / + de chaque titre) */
   const Z=k=>1;
   let hV=Math.round(120*Z("vent")), hM=Math.round(110*Z("mer")), hH=Math.round(70*Z("houle")),
         hR=Math.round(90*Z("precip")), rN=Math.round(22*Z("nuages")), hN=3*rN, hP=Math.round(80*Z("pmer")), hT=Math.round(100*Z("temp")), hC=Math.round(80*Z("cour"));
-  const TITLE=18, GAP=10, AX=isRoute?44:30;
+  const TITLE=18, GAP=10, AX=WPS?44:30;
   if (SOLO){ const hs=Math.max(120,(cv.parentElement.clientHeight||500)-AX-TITLE-GAP-30), tops={vent:26,houle:22,cour:22};
     const hh=hs-(tops[SOLO]||0);
     if (SOLO==="vent") hV=hh; if (SOLO==="mer") hM=hh; if (SOLO==="houle") hH=hh; if (SOLO==="precip") hR=hh;
@@ -2126,12 +2191,14 @@ function drawMGto(cv,SOLO){
   const cc=(D&&D.c)||{}, hasCur=hasData(cc.current_speed);
   const K=["","vent","mer","houle","cour","precip","nuages","pmer","temp"];
   const panels=[{h:band0?52:0, top:0},{h:hV,top:26},{h:hM},{h:hH,top:22},{h:hasCur?hC:0,top:22},{h:hR},{h:hN},{h:hP},{h:hT}].filter((p,i)=>i===0||show(K[i]));     /* route : une ligne de plus pour les passages aux points tournants */
-  let H=AX; for (const p of panels) if (p.h) H+=TITLE+(p.top||0)+p.h+GAP;
+  const CP = MULTI ? cmpPanneaux(D).filter(p=>show(p.k)) : null;
+  if (CP && SOLO){ const hs=Math.max(120,(cv.parentElement.clientHeight||500)-AX-TITLE-GAP-30); CP.forEach(p=>p.h=hs); }
+  let H=AX; if (CP) for (const p of CP) H+=TITLE+p.h+GAP; else for (const p of panels) if (p.h) H+=TITLE+(p.top||0)+p.h+GAP;
   cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+"px";
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   const C={ink:css("--ink"),muted:css("--muted"),grid:css("--grid"),line:css("--line"),cursor:css("--cursor"),
     wind:css("--c-wind"),gust:css("--c-gust"),hs:css("--c-hs"),wws:css("--c-wws"),sw:css("--c-sw"),sw2:css("--c-sw2"),rr:css("--c-rr"),nn:css("--c-nn"),t:css("--c-t"),td:css("--c-td"),hu:css("--c-hu"),cur:css("--c-cur"),route:css("--c-route")};
-  if (!D || !D.times.length){ ctx.fillStyle=C.muted; ctx.font="14px Barlow,sans-serif"; ctx.fillText(st.mgMode==="route"?"Pas de route calculée.":"Chargement du point…",L0,40); cv._geo=null; return; }
+  if (!D || !D.times.length){ ctx.fillStyle=C.muted; ctx.font="14px Barlow,sans-serif"; ctx.fillText(st.mgMode==="route"?"Pas de route calculée.":st.mgMode==="multi"?(st.multiMsg||"Chargement des modèles…"):"Chargement du point…",L0,40); cv._geo=null; return; }
   const n=D.times.length, T0=tDate(D.times[0]).getTime(), TN=tDate(D.times[n-1]).getTime(), span=Math.max(1,TN-T0);
   const XT=D.times.map(t=>L0+pw*(tDate(t).getTime()-T0)/span), X=i=>XT[Math.max(0,Math.min(n-1,i))];
   const XofT=ms=>L0+pw*(ms-T0)/span;
@@ -2237,6 +2304,8 @@ function drawMGto(cv,SOLO){
   const smax=S=>S?Math.max(S.o||0,S.r||0):0;
   const SE=seuils();
 
+  if (CP){ y=cmpDessin(ctx,D,CP,{y,gy:()=>y,sy:v=>{y=v;},L0,pw,n,X,halfL,halfR,title,yaxis,line,frame,vgrid,empty,C,SE:seuils(),GAP}); }
+  else {
   /* 0. Route : allure (vent / route) et mer / route */
   if (band0){
     title("Allure · mer / route",[]);
@@ -2383,8 +2452,9 @@ function drawMGto(cv,SOLO){
   frame(y,hT); y+=hT+GAP;
 
   }
+  }
   /* Passages aux points tournants (route) */
-  if (isRoute){
+  if (WPS){
     ctx.font="700 11px 'Barlow Condensed',sans-serif"; ctx.textAlign="center";
     D.wpTimes.forEach((ms,k)=>{ if (ms<T0-1 || ms>TN+1) return; const x=XofT(ms);
       ctx.strokeStyle=C.route; ctx.globalAlpha=.6; ctx.setLineDash([2,3]); ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x,AX); ctx.lineTo(x,H-GAP); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
@@ -2432,6 +2502,213 @@ for (const id of ["mg","mgB"]){
     const k=st.times.indexOf(D.times[i]); if (k>=0) setTime(k);
   });
 }
+/* ---------- Comparaison multi-modèles (point ou route) ---------- */
+const CMP_COUL=["#0072B2","#D55E00","#009E73","#CC79A7","#E69F00","#56B4E9","#6a3d9a","#444444","#b15928","#1b9e77"];
+var CMP={cache:new Map(), sur:"point", seq:0, etat:{}};
+const cmpExclus=()=>new Set(store.get("cmp_exclus",["om:ecmwf_ifs025"]));
+$("cmpHor").value=String(store.get("cmp_horizon",96));
+$("cmpEnv").checked=store.get("cmp_ecart",true);
+/* modèles proposés : ceux des listes (atmosphère, mer, courant) qui couvrent le point (ou le départ de la route) */
+function cmpCandidats(){
+  const p = CMP.sur==="route" && st.route ? st.route.pos[0] : st.pt, out=[];
+  for (const [sel,src] of [["model","a"],["wmodel","m"],["cmodel","c"]]){
+    let k=0;
+    for (const o of $(sel).options){ const v=o.value; if (!v || out.some(c=>c.val===v)) continue;
+      if (v.startsWith("mf:")){ const m=modelInfo(v.slice(3)); if (m && m.domaine){ const [s0,n0,w0,e0]=m.domaine, dans=q=>q.lat>=s0&&q.lat<n0&&q.lon>=w0&&q.lon<e0;
+        if (!(CMP.sur==="route" && st.route ? st.route.pos.some(dans) : dans(p))) continue; } }
+      let nom=o.textContent.split(" · ")[0];
+      if (v.startsWith("om:") && out.some(c=>c.nom===nom)) nom+=" · Open-Meteo";
+      out.push({val:v, src, nom, col:CMP_COUL[k++%CMP_COUL.length]});
+    }
+  }
+  return out;
+}
+function cmpListe(){
+  const ex=cmpExclus(), cs=cmpCandidats(), L=$("cmpListe"); L.innerHTML="";
+  CMP.cands=cs;
+  for (const [src,nom] of [["a","Atmosphère"],["m","État de mer"],["c","Courant"]]){
+    const g=cs.filter(c=>c.src===src); if (!g.length) continue;
+    const d=document.createElement("div"); d.className="cmpg"; d.innerHTML=`<span class="cmpk">${nom}</span>`;
+    for (const c of g){
+      const e=CMP.etat[c.val], lb=document.createElement("label");
+      lb.className = e && e.na ? "na" : ""; lb.title = e && e.info ? e.info : "";
+      lb.innerHTML=`<input type="checkbox" ${ex.has(c.val)?"":"checked"}><span class="sw" style="background:${c.col}"></span>${esc(c.nom)}${e&&e.na?' <span class="etat">(pas de données ici)</span>':e&&e.charge?' <span class="etat">…</span>':""}`;
+      lb.querySelector("input").addEventListener("change",ev=>{ const x=cmpExclus(); ev.target.checked?x.delete(c.val):x.add(c.val); store.set("cmp_exclus",[...x]); cmpCharger(); });
+      d.appendChild(lb);
+    }
+    L.appendChild(d);
+  }
+}
+$("cmpPoint").addEventListener("click",()=>{ CMP.sur="point"; $("cmpPoint").classList.add("on"); $("cmpRoute").classList.remove("on"); cmpListe(); cmpCharger(); });
+$("cmpRoute").addEventListener("click",()=>{ if (!st.route) return; CMP.sur="route"; $("cmpRoute").classList.add("on"); $("cmpPoint").classList.remove("on"); cmpListe(); cmpCharger(); });
+$("cmpHor").addEventListener("change",()=>{ store.set("cmp_horizon",+$("cmpHor").value); cmpCharger(); });
+$("cmpEnv").addEventListener("change",()=>{ store.set("cmp_ecart",$("cmpEnv").checked); drawMG(); });
+/* échantillons horaires le long de la route (départ -> arrivée) */
+function cmpRouteEch(){
+  const t0=depMs(), Lg=legs(), t1=Lg[Lg.length-1].t1, out=[];
+  for (let ms=Math.ceil(t0/3.6e6)*3.6e6; ms<=t1; ms+=3.6e6){ const p=posAt(ms,Lg); out.push({t:tStr(new Date(ms)), lat:p.lat, lon:p.lon}); }
+  return {samples:out, times:out.map(x=>x.t), cle:"route|"+st.route.note, wpTimes:st.route.wpTimes};
+}
+async function cmpSerie(c, ech){
+  const cle=c.val+"|"+(c.val===$("model").value?$("run").value:"")+"|"+(ech?ech.cle:st.pt.lat.toFixed(3)+","+st.pt.lon.toFixed(3));
+  if (!CMP.cache.has(cle)){
+    const pr=(async()=>{
+      const P=provider(c.val); if (!P) return null; await P.load();
+      const vars=c.src==="a"?A_VARS:c.src==="m"?M_VARS:C_VARS;
+      const r = ech ? {times:ech.times, v:await P.at(ech.samples,vars)} : await P.series(st.pt.lat,st.pt.lon,vars);
+      if (!r) return null;
+      if (c.src==="a") addHU(r.v);
+      return {times:r.times, v:r.v, run:P.meta?P.meta.run:null};
+    })();
+    CMP.cache.set(cle,pr); pr.catch(()=>CMP.cache.delete(cle));
+    if (CMP.cache.size>80) CMP.cache.delete(CMP.cache.keys().next().value);
+  }
+  return CMP.cache.get(cle);
+}
+/* trous internes de moins de 6 h comblés (modèles au pas de 3 h sur une base horaire) */
+function cmpBouche(arr,times){
+  if (!arr) return null; const o=arr.slice(), ms=times.map(t=>tDate(t).getTime()); let last=-1;
+  for (let i=0;i<o.length;i++){ if (o[i]==null) continue;
+    if (last>=0 && i-last>1 && ms[i]-ms[last]<=6*3.6e6) for (let k=last+1;k<i;k++) o[k]=o[last]+(o[i]-o[last])*(ms[k]-ms[last])/(ms[i]-ms[last]);
+    last=i; }
+  return o;
+}
+async function cmpCharger(){
+  if (hlBloque()) return;
+  const seq=++CMP.seq, ex=cmpExclus();
+  if (!CMP.cands) cmpListe();
+  if (CMP.sur==="route" && !st.route){ CMP.sur="point"; $("cmpPoint").classList.add("on"); $("cmpRoute").classList.remove("on"); }
+  const ech = CMP.sur==="route" ? cmpRouteEch() : null;
+  const on=CMP.cands.filter(c=>!ex.has(c.val));
+  if (!on.length){ st.multi=null; st.multiMsg="Cochez au moins un modèle."; drawMG(); renderReadout(); return; }
+  for (const c of on) if (!CMP.etat[c.val] || CMP.etat[c.val].cle!==(ech?ech.cle:"p")) CMP.etat[c.val]={charge:true};
+  cmpListe(); st.multiMsg="Chargement des modèles…"; if (!st.multi) drawMG();
+  const res=await Promise.allSettled(on.map(c=>cmpSerie(c,ech)));
+  if (seq!==CMP.seq) return;
+  const S=[];
+  res.forEach((r,k)=>{ const c=on[k], v=r.status==="fulfilled"?r.value:null;
+    const key0 = c.src==="a"?"wind_speed_10m":c.src==="m"?"wave_height":"current_speed";
+    const ok = v && v.v && v.v[key0] && v.v[key0].some(x=>x!=null);
+    CMP.etat[c.val]={na:!ok, cle:ech?ech.cle:"p", info: ok ? (v.run?`run ${runLabel(v.run)}`:"") : (r.status==="rejected"?String(r.reason&&r.reason.message||r.reason):"hors domaine, terre ou au-delà des échéances")};
+    if (ok) S.push(Object.assign({}, c, {run:v.run, raw:v}));
+  });
+  cmpListe();
+  if (!S.length){ st.multi=null; st.multiMsg="Aucun des modèles cochés n'a de données ici."; drawMG(); renderReadout(); return; }
+  /* heures : réunion des échéances, de 6 h avant maintenant (ou départ de la route) jusqu'à l'horizon choisi */
+  let T=[...new Set(S.flatMap(s=>s.raw.times))].sort();
+  /* début : celui de la frise de la carte (données enregistrées comprises), sinon 6 h avant maintenant */
+  if (!ech){ const t0=st.times.length?tDate(st.times[0]).getTime():Date.now()-6*3.6e6, t1=t0+(+$("cmpHor").value)*3.6e6; T=T.filter(t=>{ const m=tDate(t).getTime(); return m>=t0 && m<=t1; }); }
+  for (const s of S){ const al=align(T,s.raw), v={};
+    for (const k in al) v[k] = /direction/.test(k) ? al[k] : cmpBouche(al[k],T);
+    /* précipitations cumulées depuis la première heure affichée (comparables quel que soit le pas du modèle) */
+    if (al.precipitation){ let c=0, vu=false; v.precip_cumul=al.precipitation.map(x=>{ if (x!=null){ c+=x; vu=true; } return vu?c:null; });
+      v.precip_cumul=cmpBouche(v.precip_cumul,T); }
+    s.v=v; }
+  const p0=ech?null:st.pt;
+  st.multi={kind:"multi", sur:CMP.sur, times:T, S, wpTimes:ech?ech.wpTimes:null};
+  $("coords").textContent = ech ? `Comparaison sur la route · ${st.route.note.split(" · ").slice(0,4).join(" · ")}` : `Comparaison au point ${dm(p0.lat,true)} ${dm(p0.lon,false)} · ${S.length} modèle${S.length>1?"s":""}`;
+  st.hover=null; drawMG(); renderReadout();
+}
+/* graphiques de la comparaison : une courbe par modèle */
+function cmpPanneaux(D){
+  const a=D.S.filter(s=>s.src==="a"), m=D.S.filter(s=>s.src==="m"), c=D.S.filter(s=>s.src==="c");
+  const has=(L,k)=>L.some(s=>hasData(s.v[k]));
+  const P=[];
+  if (has(a,"wind_speed_10m")) P.push({k:"vent",t:"Vent moyen 10 m",h:110,L:a,key:"wind_speed_10m",vent:true,se:"vent",z:true});
+  if (has(a,"wind_gusts_10m")) P.push({k:"raf",t:"Rafales max sur le pas",h:100,L:a,key:"wind_gusts_10m",vent:true,se:"raf",z:true});
+  if (has(a,"wind_direction_10m")) P.push({k:"dir",t:"Direction du vent (d'où il vient)",h:72,L:a,key:"wind_direction_10m",dir:true});
+  if (has(a,"pressure_msl")) P.push({k:"pmer",t:"Pression mer (Pmer)",h:90,L:a,key:"pressure_msl",u:"hPa"});
+  if (has(a,"precip_cumul")) P.push({k:"precip",t:"Précipitations cumulées",h:80,L:a,key:"precip_cumul",u:"mm",z:true});
+  if (has(a,"temperature_2m")) P.push({k:"temp",t:"Température 2 m",h:80,L:a,key:"temperature_2m",u:"°C"});
+  if (has(a,"cloud_cover")) P.push({k:"nn",t:"Nébulosité totale",h:60,L:a,key:"cloud_cover",u:"octas",f:x=>x/12.5,fix:[0,8]});
+  if (has(m,"wave_height")) P.push({k:"mer",t:"Hauteur mer totale (Hs)",h:100,L:m,key:"wave_height",u:"m",se:"hs",z:true});
+  if (has(m,"wave_direction")) P.push({k:"merdir",t:"Direction mer totale (d'où elle vient)",h:62,L:m,key:"wave_direction",dir:true});
+  if (has(c,"current_speed")) P.push({k:"cour",t:"Courant de surface (vitesse)",h:80,L:c,key:"current_speed",u:"kt",se:"cur",z:true});
+  return P;
+}
+function cmpDessin(ctx,D,CP,G){
+  let {y}=G; const {L0,pw,n,X,halfL,halfR,yaxis,line,frame,vgrid,empty,C,SE,GAP}=G;
+  const title=(t,lg,k)=>{ G.sy(y); G.title(t,lg,k); y=G.gy(); };
+  const actif=[$("model").value,$("wmodel").value,$("cmodel").value];
+  for (const p of CP){
+    title(p.t,[],p.k);
+    const h=p.h, arrs=p.L.map(s=>{ let d=s.v[p.key]; if (!d) return null; d = p.vent ? vW(d) : p.f ? d.map(x=>x==null?null:p.f(x)) : d; return {s,d}; }).filter(Boolean);
+    vgrid(y,h);
+    if (p.dir){
+      /* directions : points (cercle trigonométrique déroulé N-E-S-O-N) */
+      ctx.font="10px 'JetBrains Mono',monospace"; ctx.fillStyle=C.muted; ctx.textAlign="right";
+      for (const [v,l] of [[0,"N"],[90,"E"],[180,"S"],[270,"O"],[360,"N"]]){ const yy=y+h-v/360*h; ctx.fillText(l,L0-5,yy+3);
+        ctx.strokeStyle=C.grid; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(L0,yy); ctx.lineTo(L0+pw,yy); ctx.stroke(); }
+      const pas=Math.max(1,Math.round(n/(pw/7)));
+      for (const {s,d} of arrs){ ctx.fillStyle=s.col; for (let i=0;i<n;i+=pas){ const v=d[i]; if (v==null) continue; ctx.beginPath(); ctx.arc(X(i),y+h-v/360*h,actif.includes(s.val)?2.6:2,0,7); ctx.fill(); } }
+      frame(y,h); y+=h+GAP; continue;
+    }
+    const tous=arrs.flatMap(o=>o.d).filter(v=>v!=null);
+    if (!tous.length){ empty(y,h,"Pas de données."); frame(y,h); y+=h+GAP; continue; }
+    const S=p.se?SE[p.se]:null, sv=v=>p.vent?v:v;
+    let mn, mx;
+    if (p.fix){ [mn,mx]=p.fix; }
+    else if (p.z){ mn=0; mx=niceMax(Math.max(...tous, S?Math.max(S.o||0,S.r||0):0)*1.1); }
+    else { mn=Math.floor(Math.min(...tous)-1); mx=Math.ceil(Math.max(...tous)+1); }
+    yaxis(y,h,mn,mx,"l",p.vent?vL():p.u);
+    const Y=v=>y+h-(Math.max(mn,Math.min(mx,v))-mn)/(mx-mn)*h;
+    /* seuils : colonne d'autant plus teintée que les modèles sont nombreux à l'atteindre */
+    if (S && (S.o||S.r)){
+      for (let i=0;i<n;i++){ const vs=arrs.map(o=>o.d[i]).filter(v=>v!=null); if (!vs.length) continue;
+        for (const [lv,rgb] of [["r","209,73,91"],["o","240,140,30"]]){ const val=S[lv]; if (!val) continue;
+          const k=vs.filter(v=>v>=val).length; if (!k) continue;
+          ctx.fillStyle=`rgba(${rgb},${(0.07+0.2*k/vs.length).toFixed(3)})`;
+          const x0=Math.max(L0,X(i)-halfL(i)), x1=Math.min(L0+pw,X(i)+halfR(i)); ctx.fillRect(x0,y,x1-x0+0.5,h); break; } }
+      for (const [lv,col] of [["o","#e8890c"],["r","#d1495b"]]){ const val=S[lv]; if (!(val>mn) || val>mx) continue;
+        ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.setLineDash([6,3]); ctx.beginPath(); ctx.moveTo(L0,Y(val)); ctx.lineTo(L0+pw,Y(val)); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle=col; ctx.font="600 10px 'JetBrains Mono',monospace"; ctx.textAlign="left"; ctx.fillText(`seuil ${String(val).replace(".",",")}`,L0+4,Y(val)-3); }
+    }
+    /* écart entre modèles : bande min – max là où au moins deux modèles répondent */
+    if ($("cmpEnv").checked && arrs.length>1){
+      ctx.fillStyle="rgba(110,120,135,.2)";
+      let i=0;
+      while (i<n){
+        const ok=k=>arrs.filter(o=>o.d[k]!=null).length>=2;
+        if (!ok(i)){ i++; continue; }
+        let j=i; while (j+1<n && ok(j+1)) j++;
+        const lo=k=>Math.min(...arrs.map(o=>o.d[k]).filter(v=>v!=null)), hi=k=>Math.max(...arrs.map(o=>o.d[k]).filter(v=>v!=null));
+        ctx.beginPath(); for (let k=i;k<=j;k++) k===i?ctx.moveTo(X(k),Y(hi(k))):ctx.lineTo(X(k),Y(hi(k)));
+        for (let k=j;k>=i;k--) ctx.lineTo(X(k),Y(lo(k))); ctx.closePath(); ctx.fill();
+        i=j+1;
+      }
+    }
+    /* courbes : le modèle choisi sur la carte en trait plus épais */
+    const ord=arrs.slice().sort((A,B)=>actif.includes(A.s.val)-actif.includes(B.s.val));
+    for (const {s,d} of ord) line(d,y,h,mn,mx,s.col,{w:actif.includes(s.val)?2.8:1.8});
+    frame(y,h); y+=h+GAP;
+  }
+  return y;
+}
+function cmpReadout(D,el){
+  let j = st.hover!=null ? st.hover : pIdx(st.tIdx); if (j<0) j=0;
+  const g=(s,k)=>s.v[k]?near(s.v[k],j):null, rows=[];
+  const span=(L,f,u,dec)=>{ const vs=L.map(f).filter(v=>v!=null); return vs.length>1 ? `${fmt(Math.min(...vs),dec)} à ${fmt(Math.max(...vs),dec)} ${u} (écart ${fmt(Math.max(...vs)-Math.min(...vs),dec)})` : ""; };
+  const A=D.S.filter(s=>s.src==="a"), M=D.S.filter(s=>s.src==="m"), Cc=D.S.filter(s=>s.src==="c");
+  const nomc=s=>`<span style="color:${s.col}">■</span> ${esc(s.nom)}`;
+  const vk=s=>{ const v=g(s,"wind_speed_10m"); return v==null?null:v*vF(); }, rk=s=>{ const v=g(s,"wind_gusts_10m"); return v==null?null:v*vF(); };
+  for (const s of A) rows.push(`<tr><td>${nomc(s)}</td><td>${vk(s)==null?"—":`${fmt(vk(s),0)} ${vL()} ${dir16(g(s,"wind_direction_10m"))} · raf. ${fmt(rk(s),0)} · ${fmt(g(s,"pressure_msl"),1)} hPa · ${fmt(g(s,"temperature_2m"),1)} °C · ${fmt(g(s,"precip_cumul"),1)} mm cumulés`}</td></tr>`);
+  if (A.length>1){ const e1=span(A,vk,vL(),0), e2=span(A,s=>g(s,"pressure_msl"),"hPa",1); if (e1||e2) rows.push(`<tr class="ecart"><td>Écart atmosphère</td><td>vent ${e1}${e2?" · Pmer "+e2:""}</td></tr>`); }
+  for (const s of M) rows.push(`<tr><td>${nomc(s)}</td><td>Hs ${fmt(g(s,"wave_height"),1)} m ${dir16(g(s,"wave_direction"))}${g(s,"wave_height")!=null?" · "+etatMer(g(s,"wave_height")):""}</td></tr>`);
+  if (M.length>1){ const e=span(M,s=>g(s,"wave_height"),"m",1); if (e) rows.push(`<tr class="ecart"><td>Écart mer</td><td>Hs ${e}</td></tr>`); }
+  for (const s of Cc) rows.push(`<tr><td>${nomc(s)}</td><td>${fmt(g(s,"current_speed"),1)} kt vers ${dir16(g(s,"current_direction"))}</td></tr>`);
+  el.innerHTML=`<div class="t">${tLabel(D.times[j])}${D.sur==="route"?" · sur la route":""}</div><table class="cmpt">${rows.join("")}</table>`;
+  el.style.minHeight="";
+}
+function cmpCsv(D){
+  const cols=[];
+  for (const s of D.S){ const n=s.nom.replace(/[^\wÀ-ÿ]+/g,"_");
+    if (s.src==="a") cols.push([n+"_vent_kt",s.v.wind_speed_10m],[n+"_dir_vent",s.v.wind_direction_10m],[n+"_rafales_kt",s.v.wind_gusts_10m],[n+"_pmer_hpa",s.v.pressure_msl],[n+"_t2m_c",s.v.temperature_2m],[n+"_precip_cumul_mm",s.v.precip_cumul]);
+    else if (s.src==="m") cols.push([n+"_hs_m",s.v.wave_height],[n+"_dir_mer",s.v.wave_direction]);
+    else cols.push([n+"_courant_kt",s.v.current_speed],[n+"_dir_courant_vers",s.v.current_direction]);
+  }
+  csvDownload(`comparaison_${D.times[0].slice(0,13).replace(":","")}.csv`, `# comparaison de modèles (${D.sur}) ; valeurs aux pas de 3 h interpolées pour les heures intermédiaires`, cols, {head:[],row:()=>[]});
+}
+
 /* ---------- Graphique en grand (fenêtre superposée, plein écran possible) ---------- */
 const BIG_NOMS={vent:"Vent 10 m",mer:"État de la mer",houle:"Houle · direction et période",cour:"Courant de surface",precip:"Précipitations et nébulosité",
   nuages:"Nuages par étage",pmer:"Pression mer",temp:"T, Td et HU à 2 m"};
@@ -2443,8 +2720,10 @@ function bigTime(){
   $("mgBigTime").textContent = i>=0 && D.times[i] ? tLabel(D.times[i]) : "";
 }
 function openBig(k){
+  { const sel=$("mgBigSel"), D=mgData(), noms = D && D.kind==="multi" ? Object.fromEntries(cmpPanneaux(D).map(p=>[p.k,p.t])) : BIG_NOMS;
+    sel.innerHTML=""; for (const [kk,v] of Object.entries(noms)) sel.add(new Option(v,kk)); }
   st.solo=k; $("mgBigSel").value=k; $("mgBig").hidden=false; document.body.classList.add("bigopen");
-  $("mgBigRoute").textContent = st.mgMode==="route" ? "Route" : "Point";
+  $("mgBigRoute").textContent = st.mgMode==="route" ? "Route" : st.mgMode==="multi" ? "Comparaison · "+(CMP.sur==="route"?"route":"point") : "Point";
   requestAnimationFrame(()=>{ drawMG(); bigTime(); });
 }
 function closeBig(){
@@ -2658,7 +2937,8 @@ async function computeRoute(){
     }
     st.route={kind:"route", times, a:ra, m:rm||{}, c:rcur||{}, provC:pc&&rcur?pc.nom:null, pos, wpTimes:[t0,...Lg.map(l=>l.t1)], provA:pa.nom, provM:pm?pm.nom:"—", runM:pm&&pm.meta?pm.meta.run:null,
       warn:warn.length>0, note:`Route ${R.wps.length} points · ${fmt(Lg.reduce((s,l)=>s+l.dist,0),0)} Nq · départ ${fmtT(t0)} · arrivée ${fmtT(t1)} UTC · ${pa.nom}${pm?" + "+pm.nom:""}`+(warn.length?" · ⚠ "+warn.join(" ; "):"")};
-    $("tabRoute").disabled=false; showTab("route");
+    $("tabRoute").disabled=false; $("cmpRoute").disabled=false; $("cmpRoute").title="";
+    if (st.mgMode==="multi" && CMP.sur==="route"){ cmpCharger(); } else showTab("route");
     note.textContent=`Météo calculée sur ${times.length} échéances le long de la route.`+(warn.length?" ⚠ "+warn.join(" ; ")+".":"");
     note.classList.toggle("warn",warn.length>0);
     if (!st.times.length || !times.every(t=>st.times.includes(t))) { if (!st.ga) setTimes(times); }
@@ -2691,6 +2971,7 @@ function csvCols(D){
 $("csv").addEventListener("click",()=>{
   const D=mgData(); if (!D) return;
   if (D.kind==="route") return $("tCsv").click();
+  if (D.kind==="multi") return cmpCsv(D);
   csvDownload(`meteogramme_${D.glat.toFixed(2)}_${D.glon.toFixed(2)}_${D.times[0].slice(0,10)}.csv`,
     `# ${D.provA} + ${D.provM} ; point ${D.glat.toFixed(3)} ${D.glon.toFixed(3)}`, csvCols(D), {head:[],row:()=>[]});
 });
@@ -2779,7 +3060,8 @@ function placerFenetre(P){
 }
 /* en-têtes des fenêtres flottantes : titre, fermeture, déplacement */
 for (const [id,titre,fermer] of [["formPanel","✏ Formes et zones (exercice…)",()=>$("btnFormes").click()],["transitPanel","⛵ Transit · gestion des routes",()=>$("btnTransit").click()],
-                                 ["savePanel","⤓ Enregistrer un jeu de données météorologiques",()=>$("saveCancel").click()]]){
+                                 ["savePanel","⤓ Enregistrer un jeu de données météorologiques",()=>$("saveCancel").click()],
+                                 ["mesurePanel","📐 Azimut et distance",()=>$("btnMesure").click()]]){
   const P=$(id), h=document.createElement("div"); h.className="fentete";
   h.innerHTML=`<b>${titre}</b><button type="button" title="Fermer (Échap)" aria-label="Fermer">✕</button>`;
   P.prepend(h); h.querySelector("button").addEventListener("click",fermer);
@@ -3076,6 +3358,104 @@ function ouvrirOutil(btn, panel){ if ($(panel).hidden) $(btn).click(); }
 $("gRoute").addEventListener("click",()=>ouvrirOutil("btnTransit","transitPanel"));
 $("gSave").addEventListener("click",()=>ouvrirOutil("btnSave","savePanel"));
 $("gFormes").addEventListener("click",()=>ouvrirOutil("btnFormes","formPanel"));
+$("gMesure").addEventListener("click",()=>ouvrirOutil("btnMesure","mesurePanel"));
+
+/* ---------- Azimut / distance ---------- */
+var MS={pts:[], actif:false, mode:"suite"};
+const R_NQ = 10800/Math.PI;       /* rayon tel que 1 minute d'arc = 1 Nq (convention de navigation) */
+const az3 = a => String(Math.round(((a%360)+360)%360)%360).padStart(3,"0")+"°";
+/* loxodromie (cap constant) : azimut vrai et distance */
+function loxo(A,B){
+  const r=Math.PI/180, f1=A.lat*r, f2=B.lat*r; let dl=(B.lon-A.lon)*r;
+  if (Math.abs(dl)>Math.PI) dl = dl>0 ? -(2*Math.PI-dl) : 2*Math.PI+dl;
+  const dPsi=Math.log(Math.tan(Math.PI/4+f2/2)/Math.tan(Math.PI/4+f1/2)), df=f2-f1;
+  const q=Math.abs(dPsi)>1e-12 ? df/dPsi : Math.cos(f1);
+  return {az:(Math.atan2(dl,dPsi)/r+360)%360, d:Math.sqrt(df*df+q*q*dl*dl)*R_NQ};
+}
+/* orthodromie : distance et cap initial */
+function ortho(A,B){
+  const r=Math.PI/180, f1=A.lat*r, f2=B.lat*r, dl=(B.lon-A.lon)*r;
+  const h=Math.sin((f2-f1)/2)**2+Math.cos(f1)*Math.cos(f2)*Math.sin(dl/2)**2;
+  const d=2*Math.asin(Math.min(1,Math.sqrt(h)))*R_NQ;
+  const az=(Math.atan2(Math.sin(dl)*Math.cos(f2),Math.cos(f1)*Math.sin(f2)-Math.sin(f1)*Math.cos(f2)*Math.cos(dl))/r+360)%360;
+  return {az,d};
+}
+const duree = d => { const v=parseFloat(String($("mVit").value).replace(",",".")); if (!(v>0)) return ""; const m=Math.round(d/v*60); return `${Math.floor(m/60)} h ${String(m%60).padStart(2,"0")}`; };
+function mesureSegments(){
+  const P=MS.pts; if (P.length<2) return [];
+  return MS.mode==="ref" ? P.slice(1).map((b,i)=>[P[0],b,i+1]) : P.slice(1).map((b,i)=>[P[i],b,i+1]);
+}
+const lettre = k => k<26 ? String.fromCharCode(65+k) : "P"+(k+1);
+function mesureMaj(){
+  const segs=mesureSegments(), el=$("mRes"), V=$("mVit").value>0;
+  if (!MS.pts.length){ el.innerHTML=""; drawField(); return; }
+  let h=`<table class="mtab"><tr><th>${MS.mode==="ref"?"Vers":"Segment"}</th><th>Azimut</th><th>Distance</th><th>Orthodromie</th>${V?"<th>Durée</th>":""}</tr>`, tot=0;
+  for (const [A,B,k] of segs){
+    const l=loxo(A,B), o=ortho(A,B); tot+=l.d;
+    h+=`<tr><td>${MS.mode==="ref"?"A → "+lettre(k):lettre(k-1)+" → "+lettre(k)}</td><td><b>${az3(l.az)}</b><br><span class="pos">inverse ${az3(l.az+180)}</span></td>
+      <td><b>${fmt(l.d,l.d<10?2:1)} Nq</b><br><span class="pos">${fmt(l.d*1.852,1)} km</span></td>
+      <td>${fmt(o.d,o.d<10?2:1)} Nq<br><span class="pos">cap initial ${az3(o.az)}</span></td>${V?`<td>${duree(l.d)}</td>`:""}</tr>`;
+  }
+  if (MS.mode!=="ref" && segs.length>1) h+=`<tr class="tot"><td>Total</td><td></td><td>${fmt(tot,1)} Nq</td><td></td>${V?`<td>${duree(tot)}</td>`:""}</tr>`;
+  h+="</table>";
+  h+=`<p class="note">${MS.pts.map((p,k)=>`<b>${lettre(k)}</b> ${dm(p.lat,true)} ${dm(p.lon,false)}`).join(" · ")}</p>`;
+  el.innerHTML=h; drawField();
+}
+function mesureActif(on){
+  MS.actif=on; $("mCliquer").classList.toggle("on",on); $("mCliquer").textContent=on?"Terminer":"Cliquer sur la carte";
+  $("map").classList.toggle("drawing",on);
+}
+function mesureClick(e){
+  if (!MS.actif) return false;
+  MS.pts.push({lat:e.latlng.lat, lon:e.latlng.lng}); mesureMaj(); return true;
+}
+function drawMesure(ctx){
+  if (!MS || !MS.pts.length) return;
+  const P=MS.pts.map(p=>map.latLngToContainerPoint([p.lat,p.lon]));
+  ctx.save(); ctx.lineCap="round";
+  for (const [A,B] of mesureSegments()){
+    const a=map.latLngToContainerPoint([A.lat,A.lon]), b=map.latLngToContainerPoint([B.lat,B.lon]);
+    ctx.setLineDash([]); ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=4.5; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    ctx.setLineDash([9,5]); ctx.strokeStyle="#0d1b2a"; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]);
+    /* étiquette au milieu du segment */
+    const l=loxo(A,B), t=`${az3(l.az)} · ${fmt(l.d,l.d<10?2:1)} Nq`, mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    ctx.font="700 12px 'JetBrains Mono',monospace"; const w=ctx.measureText(t).width+12;
+    ctx.fillStyle="rgba(255,236,150,.96)"; ctx.strokeStyle="#0d1b2a"; ctx.lineWidth=1.2;
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(mx-w/2,my-10,w,20,10); else ctx.rect(mx-w/2,my-10,w,20); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#0d1b2a"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(t,mx,my+0.5);
+  }
+  P.forEach((q,k)=>{
+    ctx.fillStyle=k===0&&MS.mode==="ref"?"#d1495b":"#ffd23f"; ctx.strokeStyle="#0d1b2a"; ctx.lineWidth=1.6;
+    ctx.beginPath(); ctx.arc(q.x,q.y,6,0,7); ctx.fill(); ctx.stroke();
+    ctx.font="700 12px 'Barlow Condensed',sans-serif"; ctx.textAlign="left"; ctx.textBaseline="middle";
+    ctx.lineWidth=3; ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.strokeText(lettre(k),q.x+9,q.y-9); ctx.fillStyle="#0d1b2a"; ctx.fillText(lettre(k),q.x+9,q.y-9);
+  });
+  ctx.restore();
+}
+$("btnMesure").addEventListener("click",()=>{
+  const p=$("mesurePanel"); p.hidden=!p.hidden; $("btnMesure").classList.toggle("on",!p.hidden); $("btnMesure").setAttribute("aria-expanded",!p.hidden);
+  if (!p.hidden){
+    if (!$("transitPanel").hidden) $("btnTransit").click(); if (!$("savePanel").hidden) $("saveCancel").click(); if (!$("formPanel").hidden) $("btnFormes").click();
+    placerFenetre(p); mesureActif(true);
+  } else { mesureActif(false); }
+});
+/* une seule fenêtre d'outil à la fois */
+for (const [b,pn] of [["btnTransit","transitPanel"],["btnSave","savePanel"],["btnFormes","formPanel"]])
+  $(b).addEventListener("click",()=>{ if (!$(pn).hidden && !$("mesurePanel").hidden) $("btnMesure").click(); });
+$("mCliquer").addEventListener("click",()=>mesureActif(!MS.actif));
+$("mRetour").addEventListener("click",()=>{ MS.pts.pop(); mesureMaj(); });
+$("mEffacer").addEventListener("click",()=>{ MS.pts=[]; mesureMaj(); });
+$("mMode").value=store.get("mesure_mode","suite"); MS.mode=$("mMode").value;
+$("mMode").addEventListener("change",()=>{ MS.mode=$("mMode").value; store.set("mesure_mode",MS.mode);
+  $("mAide").textContent = MS.mode==="ref" ? "Premier clic : point de référence (sémaphore…), puis chaque clic donne le relèvement et la distance depuis ce point." : "Cliquez les points sur la carte (le survol affiche l'azimut et la distance depuis le dernier point).";
+  mesureMaj(); });
+$("mVit").addEventListener("input",mesureMaj);
+$("mCalc").addEventListener("click",()=>{
+  const a={lat:parseCoord($("mALat").value,true), lon:parseCoord($("mALon").value,false)}, b={lat:parseCoord($("mBLat").value,true), lon:parseCoord($("mBLon").value,false)};
+  if ([a.lat,a.lon,b.lat,b.lon].some(v=>v==null||isNaN(v))){ toast("mesure","err","Coordonnées incomplètes ou illisibles (ex. 48°21,5' N et 004°46,2' W)."); return; }
+  MS.pts=[a,b]; mesureMaj();
+  map.fitBounds([[Math.min(a.lat,b.lat),Math.min(a.lon,b.lon)],[Math.max(a.lat,b.lat),Math.max(a.lon,b.lon)]],{padding:[60,60],maxZoom:11});
+});
 document.querySelectorAll(".drwpin").forEach(b=>b.addEventListener("click",()=>{ const s=b.dataset.side; DRW.pin[s]=!DRW.pin[s];
   document.querySelectorAll(`.drwpin[data-side="${s}"]`).forEach(x=>x.classList.toggle("on",DRW.pin[s])); }));
 document.querySelectorAll(".drwx").forEach(b=>b.addEventListener("click",()=>{ const s=b.dataset.side; DRW.pin[s]=false;
@@ -3233,6 +3613,8 @@ document.addEventListener("keydown",e=>{
   if (e.key==="ArrowLeft") setTime(st.tIdx-1);
   if (e.key==="Escape" && !$("mgBig").hidden){ closeBig(); return; }
   if (e.key==="Escape" && F.trace){ finTrace(false); return; }
+  if (e.key==="Escape" && MS.actif){ mesureActif(false); return; }
+  if (e.key==="Escape" && !$("mesurePanel").hidden){ $("btnMesure").click(); return; }
   if (e.key==="Escape" && !$("formPanel").hidden){ $("btnFormes").click(); return; }
   if (e.key==="Escape" && !$("savePanel").hidden){ $("saveCancel").click(); return; }
   if (e.key==="Escape" && !$("transitPanel").hidden && !R.adding){ $("btnTransit").click(); return; }
@@ -3251,7 +3633,7 @@ function seuils(){
   return o;
 }
 function seuilsResume(){
-  const D=mgData(), SE=seuils(), el=$("seuilsTxt"); if (!D || !Object.keys(SE).length){ el.innerHTML=""; return; }
+  const D=mgData(), SE=seuils(), el=$("seuilsTxt"); if (!D || D.kind==="multi" || !Object.keys(SE).length){ el.innerHTML=""; return; }
   const a=D.a||{}, m=D.m||{}, arrs={vent:vW(a.wind_speed_10m), raf:vW(gustArr(a)), hs:m.wave_height, rr:a.precipitation, hu:a.relative_humidity_2m, cur:(D.c||{}).current_speed};
   const periodes=(arr,val)=>{ const per=[]; let d=-1;
     for (let i=0;i<=D.times.length;i++){ const ok=i<D.times.length && arr[i]!=null && arr[i]>=val;
@@ -3295,7 +3677,7 @@ let hoverRaf=0;
 function showHover(e){
   if (hoverRaf) return;
   hoverRaf=requestAnimationFrame(()=>{ hoverRaf=0;
-    if (!st.ga && !st.gm && !st.gc){ hoverEl.hidden=true; return; }
+    if (!st.ga && !st.gm && !st.gc && !(MS && MS.actif && MS.pts.length)){ hoverEl.hidden=true; return; }
     const {lat,lng}=e.latlng, A=(n)=>gridVal(st.ga,n,lat,lng), M=(n)=>gridVal(st.gm,n,lat,lng);
     const lines=[`<span class="pos">${dm(lat,true)} ${dm(lng,false)}</span>`];
     const P=PARAMS[$("param").value];
@@ -3320,6 +3702,8 @@ function showHover(e){
     const cs=gridVal(st.gc,"current_speed",lat,lng);
     if (cs!=null) lines.push(`Courant <b>${fmt(cs,1)} kt vers ${dir16(gridVal(st.gc,"current_direction",lat,lng))}</b>`);
     if (lines.length===1){ hoverEl.hidden=true; return; }
+    if (MS && MS.actif && MS.pts.length){ const o=MS.mode==="ref"?MS.pts[0]:MS.pts[MS.pts.length-1], r=loxo(o,{lat,lon:lng});
+      lines.splice(1,0,`📐 <b>${az3(r.az)}</b> · <b>${fmt(r.d,r.d<10?2:1)} Nq</b> depuis ${MS.mode==="ref"?"la référence":"le dernier point"}`); }
     for (const z of zonexA(lat,lng).slice(0,3))
       lines.push(`<span style="color:${zxCouleur(z.c)}">■</span> Zone <b>${esc(z.n||"sans nom")}</b> · ${esc(z.i ? z.i.slice(0,120) : ((ZX.cats||{})[z.c]||"zone d'exercice"))}`);
     hoverEl.innerHTML=lines.join("<br>"); hoverEl.hidden=false;
