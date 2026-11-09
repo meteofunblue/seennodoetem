@@ -101,7 +101,16 @@ body.mapfull .tpanel:not(#transitPanel):not(#savePanel):not(#formPanel):not(#mes
   background:color-mix(in srgb,var(--panel) 80%,transparent);border-radius:14px 14px 0 0}
 .fentete b{font:700 13px var(--f-display,sans-serif);text-transform:uppercase;letter-spacing:.08em;flex:1}
 .fentete button{min-height:28px;width:30px;padding:0;border-radius:8px;cursor:pointer}
-@media (max-width:700px){ #transitPanel,#savePanel{left:8px!important;right:8px;top:70px!important;width:auto} }
+@media (max-width:700px){
+  /* téléphone : fenêtres d'outils en pleine largeur, en haut de l'écran, au-dessus de la barre flottante */
+  #formPanel,#transitPanel,#savePanel,#mesurePanel,#bulletinPanel{left:6px!important;right:6px;top:6px!important;width:auto!important;
+    max-height:calc(100dvh - 12px)!important;z-index:1200}
+  .bultexte{max-height:45dvh}
+  body.mapfull #legendPlus{display:none}
+  body.mapfull .legendrow{padding-block:2px 6px}
+  body.mapfull .timebar{padding-block:4px 0}
+  #legendTitle{font-size:11px}
+}
 .zpanel input[type=text]{font-family:var(--f-mono);width:9.5em}
 input.bad{border-color:var(--cursor);outline:1px solid var(--cursor)}
 #zName,#rName{font-family:var(--f-body)!important;width:12em}
@@ -577,7 +586,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 23:45</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 00:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1843,8 +1852,8 @@ function updateMissing(){
 }
 function drawLegend(){
   const P=PARAMS[$("param").value], cv=$("legend"), dpr=window.devicePixelRatio||1;
-  if (!P){ $("legendTitle").textContent="Pas de palette de couleurs"; const c2=cv.getContext("2d"); c2.clearRect(0,0,cv.width,cv.height); cv.style.visibility="hidden"; return; }
-  cv.style.visibility="";
+  if (!P){ $("legendTitle").textContent="Pas de palette de couleurs"; const c2=cv.getContext("2d"); c2.clearRect(0,0,cv.width,cv.height); cv.style.display="none"; return; }
+  cv.style.display="";
   $("legendTitle").textContent = `${P.label}${P.key==="wind_gusts_10m"?" · "+gustDesc():""}${P.unit?` (${P.unit})`:""}`+(st.fige&&st.fige.c?` · figée à ${tLabel(st.fige.c)}`:"");
   const W=cv.clientWidth||300, H=34; cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
@@ -3319,6 +3328,7 @@ $("saveRoute").addEventListener("change",fillSavePanel);
 /* position d'ouverture : sous la barre de commandes (affichage normal) ou sous la barre flottante (carte agrandie),
    sauf si l'utilisateur a déjà déplacé la fenêtre */
 function placerFenetre(P){
+  if (matchMedia("(max-width:700px)").matches){ P.style.top=""; P.style.left=""; P.style.maxHeight=""; return; }   /* téléphone : géré par le CSS */
   if (P.dataset.deplace) return;
   const hb=document.querySelector("header.bar"), dock=$("dock");
   let top=86;
@@ -3594,6 +3604,7 @@ function setDrw(px,save=true){
 function mapFull(on, memoriser=true){
   if (memoriser) store.set("carte_agrandie", on);
   document.body.classList.toggle("mapfull",on); $("dock").hidden=!on;
+  if (on && matchMedia("(max-width:700px)").matches) $("dock").classList.add("compact");   /* téléphone : barre repliée (« ⋯ » pour le reste) */
   for (const id of ["edgeL","edgeR","tabL","tabR","drawL","drawRhead","gripR"]) $(id).hidden=!on;
   moveTools(on);
   if (!on){ document.body.classList.remove("drwL","drwR"); DRW.pin={L:false,R:false}; document.querySelectorAll(".drwpin").forEach(b=>b.classList.remove("on")); }
@@ -4042,7 +4053,7 @@ async function exporterPNG(){
     ctx.textAlign="left"; ctx.textBaseline="top";
     ctx.font=`700 ${f(14)}px 'Barlow Condensed',sans-serif`; ctx.fillStyle="#0d1b2a";
     const t=st.times[st.tIdx]; ctx.fillText(`${$("legendTitle").textContent}  ·  ${t?tLabel(t):""}`,10,H+6);
-    const lg=$("legend"); if (lg && lg.style.visibility!=="hidden" && lg.width){ const lw=Math.min(W*0.45, lg.clientWidth||300); ctx.drawImage(lg,10,H+f(26),lw,lw*(lg.height/lg.width)); }
+    const lg=$("legend"); if (lg && lg.style.display!=="none" && lg.width){ const lw=Math.min(W*0.45, lg.clientWidth||300); ctx.drawImage(lg,10,H+f(26),lw,lw*(lg.height/lg.width)); }
     ctx.font=`500 ${f(11)}px Barlow,sans-serif`; ctx.fillStyle="#334";
     const lp=$("legendPlus").textContent.trim(); if (lp) ctx.fillText(lp, Math.min(W*0.47+10,W-10), H+f(26), W*0.5);
     const mod=$("models").textContent.replace(/\s+/g," ").trim(); ctx.fillText(mod, Math.min(W*0.47+10,W-10), H+f(42), W*0.5);
