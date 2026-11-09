@@ -1,0 +1,37 @@
+name: Eaux étrangères
+
+# Limites des eaux territoriales étrangères (Marine Regions) et terres étrangères (Natural Earth) -> app/eaux.json,
+# utilisé par le tracé automatique des transits. Lancement à la main, puis deux fois par an.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 5 7 1,7 *"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  eaux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - name: Construire les limites
+        run: python eaux.py --sortie app/eaux.json
+      - name: Enregistrer dans le dépôt
+        id: git
+        run: |
+          git config user.name "robot"
+          git config user.email "robot@users.noreply.github.com"
+          git add app/eaux.json
+          if git commit -m "eaux étrangères"; then git push; echo "change=oui" >> "$GITHUB_OUTPUT"; else echo "Pas de changement."; fi
+      - name: Republier le site
+        if: steps.git.outputs.change == 'oui'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run modeles.yml -f modeles=arome -f forcer=true
