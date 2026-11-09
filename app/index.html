@@ -574,7 +574,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 23:15</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 23:20</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -3876,8 +3876,8 @@ async function bulCharger(force){
   $("bulTexte").textContent="Chargement du bulletin…"; $("bulInfo").textContent="";
   let d=null, src="";
   if (!HORS_LIGNE || window.HL_RESEAU){
-    for (const [u,nom] of [[BUL_URL,"OMM (direct)"],[`${BASE}metarea2.json`,"copie du site"]]){
-      try{ const r=await fetch(u+(u.includes("?")?"&":"?")+"t="+Date.now(),{cache:"no-store"}); if (r.ok){ const x=await r.json(); if (x && x.bulletin){ d=x; src=nom; break; } } }catch(e){}
+    for (const [u,nom] of [[`${BASE}metarea2.json`,"copie du site"],[BUL_URL,"OMM (direct)"]]){
+      try{ const r=await fetch(u.startsWith(BASE)?u+"?t="+Date.now():u,{cache:"no-store"}); if (r.ok){ const x=await r.json(); if (x && x.bulletin){ d=x; src=nom; break; } } }catch(e){}
     }
   }
   if (!d && BUL.d){ bulAfficher(); toast("bul","info","Pas de nouveau bulletin accessible : affichage du dernier bulletin disponible."); return; }
