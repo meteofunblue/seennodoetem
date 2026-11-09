@@ -171,7 +171,7 @@ a.btnlien:hover{border-color:var(--accent)}
 #drawLbody .affgrp.ferme > :not(.afftitre){display:none!important}
 /* volet Outils : les choix déjà présents dans la barre flottante (modèles, paramètre, zone) n'y sont pas répétés */
 #drawLbody .ctl:has(> #model), #drawLbody .ctl:has(> #wmodel), #drawLbody .ctl:has(> #cmodel),
-#drawLbody .ctl:has(> #param), #drawLbody .ctl:has(#zone){display:none!important}
+#drawLbody .ctl.ctlp, #drawLbody .ctl.ctlm, #drawLbody .ctl:has(#zone){display:none!important}
 #drawLbody header.bar{display:flex!important;flex-direction:column;align-items:stretch;gap:10px;background:transparent;border:0;padding:12px}
 #drawLbody header.bar .brand{display:none}
 #drawLbody header.bar .ctl{width:100%;max-width:none}
@@ -198,6 +198,7 @@ body.drwL .drwtabL, body.drwR .drwtabR{opacity:0;pointer-events:none}
 @keyframes dockIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 body.mapfull header.bar, body.mapfull .zpanel, body.mapfull .tpanel:not(#transitPanel):not(#savePanel):not(#formPanel), body.mapfull .offline, body.mapfull .split,
 body.mapfull aside.mgcol, body.mapfull footer{display:none!important}
+.drwversion{flex:none;padding:6px 12px 8px;font:500 11px var(--f-mono,monospace);color:var(--muted);border-top:1px solid var(--line,rgba(0,0,0,.1))}
 body.mapfull main.layout{position:fixed;inset:0;z-index:50;grid-template-columns:1fr;background:var(--bg)}
 body.mapfull .mapcol{border:0}
 body.mapfull #map{min-height:0;height:auto;flex:1}
@@ -453,7 +454,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli">v. 09/11/2026 16:00</span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 17:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -466,6 +467,7 @@ footer a{color:var(--accent)}
     <button class="drwpin" data-side="L" type="button" title="Garder le volet ouvert">📌</button>
     <button class="drwx" data-side="L" type="button" title="Fermer">✕</button></div>
   <div id="drawLbody"></div>
+  <div id="versionOutils" class="drwversion"></div>
 </aside>
 <div id="drawRhead" class="drwhead drwheadR" hidden><b>Graphiques</b>
   <button id="gRoute" type="button" class="drwact" title="Créer ou modifier une route (transit)">⛵ Route</button>
@@ -514,7 +516,8 @@ const OM_A = {
   ecmwf_ifs:{nom:"IFS HRES 9 km (CEP)", pas:"3 h puis 6 h"},
   ecmwf_ifs025:{nom:"IFS 0,25° (CEP)", pas:"3 h puis 6 h"}
 };
-const OM_M = { meteofrance_wave:{nom:"MFWAM global Copernicus (vent IFS)"} };
+const OM_M = { meteofrance_wave:{nom:"MFWAM global Copernicus (vent IFS)"},
+  ecmwf_wam025:{nom:"WAM 0,25° mondial (CEP, vent IFS)"} };
 /* courant mondial (Copernicus global SMOC 1/12°, marée incluse) via Open-Meteo : repli hors des zones du dépôt */
 const OM_C = { smoc:{nom:"Courant global Copernicus (Open-Meteo, ≈ 8 km)"} };
 const omTab = k => k==="a"?OM_A:k==="c"?OM_C:OM_M;
@@ -996,6 +999,8 @@ class OM {
       r.forEach((x,ix)=>{ sl[ix].h=this.prep(x.hourly); });
     }
     const key=this.key0;
+    /* variables réellement fournies par ce modèle (WAM : parfois mer totale seule) -> liste des paramètres ajustée */
+    if (this.k==="m") omTab("m")[this.model].fournies=VARS_M.filter(v=>pts.some(p=>p.h[v] && p.h[v].some(x=>x!=null)));
     let nT=0; for (const p of pts) nT=Math.max(nT,lastValid(p.h,key));
     const times=pts[0].h.time.slice(0,nT);
     return makeGrid({prov:this, lat0:b.s+dlat/2, lon0:b.o+dlon/2, dlat, dlon, ny:n, nx:n, times, pts,
@@ -1750,7 +1755,8 @@ function pointDansZone(b){
 function chooseWave(){
   const a=$("model").value, ws=$("wmodel"), opts=[...ws.options].map(o=>o.value);
   let pick=null;
-  if (a.startsWith("om:")) pick = opts.includes("om:meteofrance_wave") ? "om:meteofrance_wave" : null;
+  if (a.startsWith("om:")) pick = ws.value.startsWith("om:") && opts.includes(ws.value) ? ws.value      /* WAM ou MFWAM global déjà choisi : gardé */
+    : opts.includes("om:meteofrance_wave") ? "om:meteofrance_wave" : null;
   else {
     const m=modelInfo(a.slice(3)), b=currentBounds(), cy=b?(b.s+b.n)/2:48, cx=b?(b.o+b.e)/2:-5;
     for (const id of (m&&m.vagues)||[]){
@@ -1768,7 +1774,7 @@ function chooseWave(){
 function coherence(){
   const a=$("model").value, w=$("wmodel").value;
   if (!w) return "";
-  if (a.startsWith("om:")) return w==="om:meteofrance_wave" ? "couple cohérent (vent IFS)" : "⚠ vagues Météo-France forcées par AROME/ARPEGE, atmosphère IFS";
+  if (a.startsWith("om:")) return (w==="om:meteofrance_wave"||w==="om:ecmwf_wam025") ? "couple cohérent (vent IFS)" : "⚠ vagues Météo-France forcées par AROME/ARPEGE, atmosphère IFS";
   if (w.startsWith("om:")) return "⚠ vagues forcées par IFS, atmosphère Météo-France";
   const wi=modelInfo(w.slice(3)), aid=a.slice(3);
   if (!wi) return "";
@@ -1780,7 +1786,7 @@ function coherence(){
 function varsOf(val){
   if (!val) return [];
   const [kind,id]=val.split(":");
-  if (kind==="om") return OM_A[id]?VARS_A.concat(["wind_gusts_10m_inst"]):OM_C[id]?C_VARS:VARS_M;
+  if (kind==="om") return OM_A[id]?VARS_A.concat(["wind_gusts_10m_inst"]):OM_C[id]?C_VARS:(OM_M[id]&&OM_M[id].fournies)||VARS_M;
   const m=modelInfo(id); return m && m.variables ? m.variables : null;
 }
 /* liste « Paramètre carte » : seuls les paramètres fournis par les modèles choisis sont proposés */
@@ -3170,6 +3176,8 @@ function legendPlus(){
 }
 $("isoParam").addEventListener("change",()=>{ store.set("couche_iso",$("isoParam").value); majIsoStep(); legendPlus(); drawField(); });
 $("symParam").addEventListener("change",()=>{ store.set("couche_symboles",$("symParam").value); legendPlus(); drawField(); });
+{ const v=$("versionApp").textContent+(window.HORS_LIGNE?" · version hors ligne":""); $("versionOutils").textContent="Version de l'appli : "+v;
+  const fc=$("mClose"); if (fc) fc.title=(fc.title||"Quitter la carte agrandie")+" · "+v; }
 $("zonex").value=store.get("zonex","non");
 $("zonex").addEventListener("change",()=>{ store.set("zonex",$("zonex").value); if (zxMode()!=="non") chargerZonex(); legendPlus(); drawField(); });
 majIsoStep(); legendPlus();
@@ -3369,13 +3377,13 @@ async function chargerEnLigne(){
   fillZones(); fillRoutes(); drawLegend(); drawMG(); loadCoast(); loadCoastFine();
   if (HORS_LIGNE){
     fillModels(); fillRuns(); syncModelUI();
-    if (store.get("carte_agrandie", true)) mapFull(true, false);
+    if (!store.get("ouvrir_normal", false)) mapFull(true, false);
     setStatus("Version hors ligne : ouvrez une situation enregistrée (.meteo) avec « Ouvrir un jeu de données météorologiques… ». Rien n'est téléchargé sans votre accord.", false);
     $("bvEnLigne").hidden=false; $("bienvenue").hidden=false; return;
   }
   await chargerEnLigne();
-  /* ouverture en carte agrandie par défaut (ou selon le dernier choix de l'utilisateur) */
-  if (store.get("carte_agrandie", true)) mapFull(true, false);
+  /* ouverture toujours en carte agrandie (« ouvrir_normal » : réglage interne, utilisé pour les essais) */
+  if (!store.get("ouvrir_normal", false)) mapFull(true, false);
   /* sans réseau : rien à télécharger, on propose d'ouvrir une situation enregistrée */
   if (!st.index && (HORS_LIGNE || !navigator.onLine)){
     setStatus("Hors ligne : ouvrez une situation enregistrée (.meteo) avec « Ouvrir un jeu de données météorologiques… ».", true);
