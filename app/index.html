@@ -340,6 +340,9 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="opac">Opacité</label><input type="range" id="opac" min="0.2" max="1" step="0.05" value="0.6"></div>
   <label class="chk"><input type="checkbox" id="smooth" checked> Lissage</label>
   <div class="ctl"><label for="isoStep">Écart des isolignes</label><select id="isoStep"></select></div>
+  <div class="ctl"><label for="grat">Graticule</label><select id="grat">
+    <option value="0">Aucun</option><option value="auto">Auto (selon le zoom)</option><option value="20">20°</option><option value="10">10°</option>
+    <option value="5">5°</option><option value="2">2°</option><option value="1">1°</option></select></div>
   <div class="ctl"><label for="zonex">Zones d'exercices (ZONEX)</label><select id="zonex">
     <option value="non">Non affichées</option><option value="tout">Exercices et tir</option><option value="tir">Zones de tir seules</option></select></div>
   <label class="chk"><input type="checkbox" id="coast" checked> Côte</label>
@@ -543,7 +546,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 22:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 09/11/2026 22:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1521,7 +1524,7 @@ function drawField(){
   const c=field._c; if (!c) return;
   const ctx=c.getContext("2d"), dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,c.width,c.height);
-  if (!st.ga && !st.gm){ drawCoast(ctx); drawZonex(ctx); drawMesure(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
+  if (!st.ga && !st.gm){ drawCoast(ctx); drawGraticule(ctx); drawZonex(ctx); drawMesure(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
   const P=PARAMS[$("param").value], i=idxCouche("c"), op=+$("opac").value;
   let any=false, g=null, vals=null;
   if (P && P.layers){
@@ -1546,6 +1549,7 @@ function drawField(){
   const surTerre=(px,py)=>{ if (!alpha) return false; const x=Math.round(px*dpr), y=Math.round(py*dpr);
     if (x<0||y<0||x>=alpha.width||y>=alpha.height) return false; return alpha.data[(y*alpha.width+x)*4+3]===0; };
   drawCoast(ctx);
+  drawGraticule(ctx);
   const ik=isoP(); if (ik) drawIsolines(ctx,idxCouche("i"),ik);
   updateMissing();
   drawSymbols(ctx,idxCouche("s"),P,g,vals,surTerre,ik);
@@ -1605,6 +1609,32 @@ for (const [id,cle,def] of [["cAng","croisee_angle",45],["cHmin","croisee_hmin",
   $(id).value=store.get(cle,def);
   $(id).addEventListener("input",()=>{ const v=parseFloat(String($(id).value).replace(",",".")); if (v>=0){ store.set(cle,v); drawMG(); renderReadout(); drawField(); } });
 }
+
+/* ---------- Graticule : méridiens et parallèles, cotés sur les bords de la carte ---------- */
+function drawGraticule(ctx){
+  const sel=$("grat"); if (!sel || sel.value==="0") return;
+  const bb=map.getBounds(), W=bb.getWest(), E=bb.getEast(), S=Math.max(-85,bb.getSouth()), N=Math.min(85,bb.getNorth()), sz=map.getSize();
+  let pas=+sel.value;
+  if (sel.value==="auto"){ const span=Math.max(E-W,(N-S)*1.4); pas=[20,10,5,2,1,0.5,0.25,1/6,1/12].find(p=>span/p>=4 && span/p<=10) || (span/20>10?20:1/12); }
+  if ((E-W)/pas>150 || (N-S)/pas>150) return;                   /* trop de lignes à ce zoom */
+  const lbl=(v,lat)=>{ const a=Math.abs(v), d=Math.floor(a+1e-9), m=Math.round((a-d)*60), h=lat?(v>=0?"N":"S"):(v>=0?"E":"W");
+    const dd=lat?String(d).padStart(2,"0"):String(d).padStart(3,"0"); return m? `${dd}°${String(m).padStart(2,"0")}' ${h}` : `${dd}° ${h}`; };
+  ctx.save(); ctx.lineWidth=1; ctx.strokeStyle="rgba(13,27,42,.45)"; ctx.setLineDash([4,4]);
+  ctx.font="600 10.5px 'JetBrains Mono',monospace";
+  const etiq=(t,x,y,al,bl)=>{ ctx.textAlign=al; ctx.textBaseline=bl; ctx.lineWidth=3; ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.setLineDash([]); ctx.strokeText(t,x,y); ctx.fillStyle="#0d1b2a"; ctx.fillText(t,x,y); };
+  const meridiens=[], paralleles=[];
+  for (let k=Math.ceil(W/pas-1e-9); k*pas<=E+1e-9; k++){ const lon=+(k*pas).toFixed(6), x=map.latLngToContainerPoint([(S+N)/2,lon]).x;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,sz.y); ctx.stroke(); meridiens.push([x,((lon+540)%360)-180]); }
+  for (let k=Math.ceil(S/pas-1e-9); k*pas<=N+1e-9; k++){ const lat=+(k*pas).toFixed(6), y=map.latLngToContainerPoint([lat,(W+E)/2]).y;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(sz.x,y); ctx.stroke(); paralleles.push([y,lat]); }
+  /* cotes : longitudes en bas, latitudes à gauche (au-dessus de la frise et de la barre flottante) */
+  const bas = document.body.classList.contains("mapfull") ? sz.y-112 : sz.y-6;
+  for (const [x,lon] of meridiens) if (x>40 && x<sz.x-40) etiq(lbl(lon,false),x+3,bas,"left","bottom");
+  for (const [y,lat] of paralleles) if (y>20 && y<sz.y-20) etiq(lbl(lat,true),6,y-3,"left","bottom");
+  ctx.restore();
+}
+$("grat").value=store.get("graticule","0");
+$("grat").addEventListener("change",()=>{ store.set("graticule",$("grat").value); drawField(); });
 
 /* ---------- Couches figées : une couche garde son échéance pendant que la frise fait défiler les autres ---------- */
 function idxCouche(k){
