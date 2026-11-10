@@ -593,7 +593,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 07:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 09:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -2020,8 +2020,15 @@ function chooseCurrent(){
 function autoZone(){
   const a=$("model").value; if (!a.startsWith("mf:")) return;
   const b=currentBounds(); if (!b || domOk(a.slice(3),b)) return;
-  const k=Object.keys(zones).find(k=>domOk(a.slice(3),zones[k]));
-  if (k){ $("zone").value=k; onZoneChange(true); }
+  /* la zone choisie est gardée : le modèle s'affiche là où il a des données ; la bascule n'est que proposée */
+  const m=modelInfo(a.slice(3)); if (!m || !m.domaine) return;
+  const [s0,n0,o0,e0]=m.domaine, touche = b.n>s0 && b.s<n0 && b.e>o0 && b.o<e0;
+  const aire=z=>(z.n-z.s)*(z.e-z.o);
+  const k=Object.keys(zones).filter(k=>domOk(a.slice(3),zones[k])).sort((x,y)=>aire(zones[y])-aire(zones[x]))[0];
+  const act = k ? [[`Aller sur « ${zones[k].nom} »`,()=>{ $("zone").value=k; store.set("zone_choisie",k); onZoneChange(true); loadGrid(); }]] : [];
+  toast("domaine","info", touche
+    ? `${m.nom||a.slice(4)} ne couvre qu'une partie de la zone : les données s'affichent là où le modèle existe (zoomez dessus).`
+    : `${m.nom||a.slice(4)} ne couvre pas cette zone : rien à afficher ici.`, act, 9000);
 }
 /* point du météogramme hors de la zone affichée (changement d'océan…) : ramené au centre de la zone */
 function pointDansZone(b){
@@ -2164,15 +2171,19 @@ function zoneEstimate(){
 function setInputs(b){ $("zN").value=dm(b.n,true); $("zS").value=dm(b.s,true); $("zW").value=dm(b.o,false); $("zE").value=dm(b.e,false); zoneEstimate(); }
 function zoneDrawClick(e){
   if (!drawState) return false;
-  if (!drawState.a){ drawState.a=e.latlng; setStatus("Cliquez le coin opposé de la zone."); return true; }
+  if (!drawState.a){ drawState.a=e.latlng; setStatus("Cliquez le coin opposé de la zone."); toast("ztrace","info","Cliquez maintenant le coin opposé.",[],8000); return true; }
   const a=drawState.a, b=e.latlng; drawState=null; $("zDraw").classList.remove("on"); $("map").classList.remove("drawing");
   setInputs({s:Math.min(a.lat,b.lat),n:Math.max(a.lat,b.lat),o:Math.min(a.lng,b.lng),e:Math.max(a.lng,b.lng)});
   setStatus("Zone tracée : « Charger » ou « Enregistrer la zone » pour afficher les données.");
+  toastFermer("ztrace"); marquerACharger(true);
+  if (document.body.classList.contains("mapfull")) setTimeout(()=>{ drawer("L",true); setTimeout(()=>$("zonePanel").scrollIntoView({block:"nearest",behavior:"smooth"}),300); },150);
   return true;
 }
 $("zDraw").addEventListener("click",()=>{
   if (drawState){ drawState=null; $("zDraw").classList.remove("on"); $("map").classList.remove("drawing"); return; }
   stopRouteAdd(); drawState={}; $("zDraw").classList.add("on"); $("map").classList.add("drawing"); setStatus("Cliquez un premier coin de la zone sur la carte.");
+  if (document.body.classList.contains("mapfull") && !DRW.pin.L) drawer("L",false);       /* la carte libre pour tracer */
+  toast("ztrace","info","Cliquez un premier coin de la zone sur la carte, puis le coin opposé.",[],8000);
 });
 $("zView").addEventListener("click",()=>{ const b=map.getBounds(); setInputs({s:b.getSouth(),n:b.getNorth(),o:b.getWest(),e:b.getEast()}); });
 ["zN","zS","zW","zE"].forEach(id=>$(id).addEventListener("input",zoneEstimate));
@@ -2193,6 +2204,8 @@ function onZoneChange(sansCharger){
   const v=$("zone").value, custom = v==="custom" || v.startsWith("mine:");
   $("zonePanel").hidden=!custom; $("zDel").hidden=!v.startsWith("mine:");
   if (v.startsWith("mine:")){ const z=myZones()[v.slice(5)]; if (z){ $("zName").value=z.nom; setInputs(z); } }
+  /* carte agrandie : le panneau de la zone personnalisée est dans le volet Outils, qu'on ouvre */
+  if (custom && document.body.classList.contains("mapfull")){ drawer("L",true); setTimeout(()=>$("zonePanel").scrollIntoView({block:"nearest",behavior:"smooth"}),300); }
   if (!custom) showZoneRect(null);
   if (v==="custom"){ zoneEstimate(); return; }
   if (sansCharger===true || v==="vue" && !$("autoZone").checked){ if (v==="vue") marquerACharger(true); return; }
@@ -3620,7 +3633,7 @@ const DOCK=[...document.querySelectorAll("#dock select")];
 function syncDock(){
   for (const sel of DOCK){
     const src=$(sel.dataset.src), html=src.innerHTML;
-    if (sel._html!==html){ sel.innerHTML=html; sel._html=html; sel.querySelectorAll('option[value="custom"]').forEach(o=>o.remove()); }
+    if (sel._html!==html){ sel.innerHTML=html; sel._html=html; }
     if (sel.value!==src.value && [...sel.options].some(o=>o.value===src.value)) sel.value=src.value;
   }
 }
