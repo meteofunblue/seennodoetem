@@ -593,7 +593,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 09:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 11:10</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1995,6 +1995,7 @@ function domOk(id,b){
    (AROME métropole, AROME outre-mer, puis ARPEGE) */
 function autoAtmo(){
   const ms=$("model"), a=ms.value, b=currentBounds(); if (!b) return false;
+  if (st.aManual) return false;          /* modèle choisi par l'utilisateur : jamais remplacé, même s'il ne couvre qu'une partie de la zone */
   if (a.startsWith("mf:") ? domOk(a.slice(3),b) : !st.autoOM) return false;   /* IFS choisi à la main : on n'y touche pas */
   const vals=[...ms.options].map(o=>o.value);
   /* aucun modèle du dépôt ne couvre la zone : IFS via Open-Meteo (mondial) */
@@ -2018,17 +2019,13 @@ function chooseCurrent(){
 }
 /* modèle choisi qui ne couvre pas la zone : on passe à la première zone prédéfinie de son domaine */
 function autoZone(){
+  /* la zone choisie est toujours gardée : le modèle s'affiche là où il a des données.
+     Seul cas signalé (sans rien proposer) : un modèle qui ne couvre rien de la zone. */
+  toastFermer("domaine");
   const a=$("model").value; if (!a.startsWith("mf:")) return;
-  const b=currentBounds(); if (!b || domOk(a.slice(3),b)) return;
-  /* la zone choisie est gardée : le modèle s'affiche là où il a des données ; la bascule n'est que proposée */
-  const m=modelInfo(a.slice(3)); if (!m || !m.domaine) return;
-  const [s0,n0,o0,e0]=m.domaine, touche = b.n>s0 && b.s<n0 && b.e>o0 && b.o<e0;
-  const aire=z=>(z.n-z.s)*(z.e-z.o);
-  const k=Object.keys(zones).filter(k=>domOk(a.slice(3),zones[k])).sort((x,y)=>aire(zones[y])-aire(zones[x]))[0];
-  const act = k ? [[`Aller sur « ${zones[k].nom} »`,()=>{ $("zone").value=k; store.set("zone_choisie",k); onZoneChange(true); loadGrid(); }]] : [];
-  toast("domaine","info", touche
-    ? `${m.nom||a.slice(4)} ne couvre qu'une partie de la zone : les données s'affichent là où le modèle existe (zoomez dessus).`
-    : `${m.nom||a.slice(4)} ne couvre pas cette zone : rien à afficher ici.`, act, 9000);
+  const b=currentBounds(), m=modelInfo(a.slice(3)); if (!b || !m || !m.domaine) return;
+  const [s0,n0,o0,e0]=m.domaine;
+  if (!(b.n>s0 && b.s<n0 && b.e>o0 && b.o<e0)) toast("domaine","info",`${m.nom||a.slice(3)} ne couvre pas cette zone : rien à afficher ici pour l'atmosphère.`,[],6000);
 }
 /* point du météogramme hors de la zone affichée (changement d'océan…) : ramené au centre de la zone */
 function pointDansZone(b){
@@ -4358,7 +4355,7 @@ $("vunit").addEventListener("change",()=>{
 });
 { const o=store.get("opacite",null); if (o!==null && o>=0.2 && o<=1) $("opac").value=String(o); }
 $("opac").addEventListener("input",()=>{ store.set("opacite",+$("opac").value); drawField(); });
-$("model").addEventListener("change",()=>{ st.autoOM=false; fillRuns(); autoZone(); chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
+$("model").addEventListener("change",()=>{ st.autoOM=false; st.aManual=true; fillRuns(); autoZone(); chooseWave(); syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("run").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("cmodel").addEventListener("change",()=>{ st.cNone=!$("cmodel").value; st.cManual=$("cmodel").value||null; loadGrid(); loadPoint(); if (st.route) routeChanged(); });
 $("wmodel").addEventListener("change",()=>{ syncModelUI(); loadGrid(); loadPoint(); if (st.route) routeChanged(); });
