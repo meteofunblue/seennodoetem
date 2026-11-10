@@ -109,13 +109,14 @@
   ],
   "tuiles": {
    "domaine": [
-    35,
+    28,
     66,
-    -30,
-    15
+    -32,
+    36
    ],
    "res": 0.1
-  }
+  },
+  "runs_gardes": 2
  },
  "mfwam_fr": {
   "nom": "MFWAM France (vent AROME)",
