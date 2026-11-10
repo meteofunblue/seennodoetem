@@ -46,6 +46,12 @@ body.projo #legendTitle{font-size:16px}
 body.projo #legendPlus{font-size:14px;max-width:50%}
 body.projo .leaflet-container .wp-icon,body.projo .tick-lbl,body.projo .forme-lbl{font-size:15px!important}
 body.projo #hover{font-size:15px}
+.zonerow{display:flex;gap:4px;align-items:stretch}
+.zonerow select{flex:1 1 auto;min-width:0}
+button.charger{flex:none;padding:0 10px;font-weight:600}
+button.charger.pret{background:var(--accent);color:#fff;border-color:var(--accent);animation:pulseCh 1.6s ease-in-out infinite}
+@keyframes pulseCh{0%,100%{box-shadow:0 0 0 0 rgba(31,111,209,.45)}50%{box-shadow:0 0 0 5px rgba(31,111,209,0)}}
+@media (prefers-reduced-motion:reduce){button.charger.pret{animation:none}}
 .ctl label{font:600 11px/1 var(--f-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 button.fige{all:unset;cursor:pointer;font-size:11px;line-height:1;padding:0 3px;border-radius:4px;letter-spacing:0;text-transform:none}
 button.fige.on{background:#ffd23f;color:#0d1b2a;font-weight:700;padding:1px 5px}
@@ -352,7 +358,7 @@ footer a{color:var(--accent)}
   <div class="ctl" id="ctlRun" hidden><label for="run">Run</label><select id="run"></select></div>
   <div class="ctl ctlm"><label for="wmodel">État de mer</label><select id="wmodel"></select></div>
   <div class="ctl ctlm"><label for="cmodel">Courant</label><select id="cmodel"></select></div>
-  <div class="ctl"><label for="zone">Zone</label><div class="zonerow"><select id="zone"></select></div></div>
+  <div class="ctl"><label for="zone">Zone</label><div class="zonerow"><select id="zone"></select><button type="button" class="charger" title="Charger les données des modèles pour la zone choisie">Charger</button></div></div>
   <div class="ctl" id="ctlRes"><label for="res">Maillage IFS</label>
     <select id="res"><option value="auto" selected>Auto (selon la zone)</option><option value="10">10 × 10</option><option value="14">14 × 14</option><option value="18">18 × 18</option><option value="24">24 × 24</option><option value="30">30 × 30</option></select></div>
 
@@ -362,6 +368,7 @@ footer a{color:var(--accent)}
   <div class="ctl"><label for="opac">Opacité</label><input type="range" id="opac" min="0.2" max="1" step="0.05" value="0.6"></div>
   <label class="chk"><input type="checkbox" id="smooth" checked> Lissage</label>
   <div class="ctl"><label for="isoStep">Écart des isolignes</label><select id="isoStep"></select></div>
+  <label class="chk" title="Sinon, choisir la zone puis cliquer « Charger »"><input type="checkbox" id="autoZone"> Chargement automatique (changement de zone, déplacement de la carte)</label>
   <label class="chk" title="Traits, chiffres et textes de la carte plus épais et plus gros, pour la projection en salle"><input type="checkbox" id="projo"> Mode vidéoprojecteur</label>
   <div class="ctl"><label for="grat">Graticule</label><select id="grat">
     <option value="0">Aucun</option><option value="auto">Auto (selon le zoom)</option><option value="20">20°</option><option value="10">10°</option>
@@ -524,7 +531,7 @@ footer a{color:var(--accent)}
       <label class="lm"><span>Atmosphère</span><select id="mModel" data-src="model"></select></label>
       <label class="lm"><span>Mer</span><select id="mWmodel" data-src="wmodel"></select></label>
       <label class="lm"><span>Courant</span><select id="mCmodel" data-src="cmodel"></select></label>
-      <label><span>Zone</span><span class="zonerow"><select id="mZone" data-src="zone"></select></span></label>
+      <label><span>Zone</span><span class="zonerow"><select id="mZone" data-src="zone"></select><button type="button" class="charger" title="Charger les données des modèles pour la zone choisie">Charger</button></span></label>
       <div class="dockbtns">
         <button id="mMore" type="button" class="glassbtn" title="Afficher / masquer les autres choix">⋯</button>
         <button id="mFs" type="button" class="glassbtn" title="Plein écran">⛶</button>
@@ -586,7 +593,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 00:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 07:00</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -2188,8 +2195,23 @@ function onZoneChange(sansCharger){
   if (v.startsWith("mine:")){ const z=myZones()[v.slice(5)]; if (z){ $("zName").value=z.nom; setInputs(z); } }
   if (!custom) showZoneRect(null);
   if (v==="custom"){ zoneEstimate(); return; }
-  if (v!=="vue" && sansCharger!==true) loadGrid();
+  if (sansCharger===true || v==="vue" && !$("autoZone").checked){ if (v==="vue") marquerACharger(true); return; }
+  if ($("autoZone").checked){ if (v!=="vue") loadGrid(); return; }
+  /* chargement manuel : la carte se cale sur la zone, le bouton « Charger » s'allume */
+  const b=currentBounds(); if (b) map.fitBounds([[b.s,b.o],[b.n,b.e]]);
+  marquerACharger(true);
 }
+/* bouton « Charger » : allumé quand la zone (ou la vue) a changé depuis le dernier chargement */
+function marquerACharger(on){
+  st.aCharger=on;
+  document.querySelectorAll("button.charger").forEach(b=>{ b.classList.toggle("pret",on); b.textContent=on?"Charger ●":"Charger";
+    b.title=on?"La zone a changé : cliquer pour charger les données des modèles":"Recharger les données des modèles pour la zone choisie"; });
+  if (on) toast("charger","info","Zone choisie : cliquez « Charger » pour afficher les données des modèles.",[["Charger",()=>loadGrid()]],6000);
+  else toastFermer("charger");
+}
+document.querySelectorAll("button.charger").forEach(b=>b.addEventListener("click",e=>{ e.preventDefault(); loadGrid(); }));
+$("autoZone").checked=store.get("auto_zone",false);
+$("autoZone").addEventListener("change",()=>{ store.set("auto_zone",$("autoZone").checked); if ($("autoZone").checked && st.aCharger) loadGrid(); });
 
 /* ---------- Chargement de la carte ---------- */
 let loadSeq=0;
@@ -2203,7 +2225,7 @@ async function loadGrid(){
   const cleZone=$("zone").value+"|"+[b.s,b.n,b.o,b.e].join(",");
   if ($("zone").value!=="vue" && st.zoneCadree!==cleZone) map.fitBounds([[b.s,b.o],[b.n,b.e]]);
   st.zoneCadree=cleZone;
-  toastFermer("vue");
+  toastFermer("vue"); if (st.aCharger) marquerACharger(false);
   autoAtmo(); chooseCurrent(); pointDansZone(b);
   const seq=++loadSeq;
   /* modèle de vagues du dépôt qui ne couvre pas le centre de la zone : on reprend le choix automatique */
@@ -4336,6 +4358,7 @@ $("time").addEventListener("input",e=>setTime(+e.target.value));
 let moveT=0;
 map.on("moveend",()=>{
   if ($("zone").value!=="vue" || st.offline) return;
+  if (!$("autoZone").checked){ if (!st.aCharger) marquerACharger(true); return; }
   const om=[st.provA,st.provM,st.provC].some(p=>p && p.kind==="om");
   clearTimeout(moveT);
   if (om){ toast("vue","info","Carte déplacée : les données IFS / Open-Meteo sont chargées à la demande (quota partagé).",[["Mettre à jour pour cette vue",()=>loadGrid()]]); return; }
