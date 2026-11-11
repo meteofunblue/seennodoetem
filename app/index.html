@@ -168,6 +168,13 @@ main.layout{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 8px var(--mg
 .dock label.lm{flex:0 1 112px;max-width:140px}
 .dock label.lm select{font-size:12px;padding-inline:6px}
 header.bar .ctlm select{max-width:150px;font-size:13px}
+#hover .hsep{display:block;height:1px;margin:3px 0;background:var(--line)}
+#hover .hc{display:inline-block;min-width:1.3em;color:var(--accent);font-weight:700}
+#legendCat{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center;font:500 11.5px var(--f-display,sans-serif);color:var(--ink);min-width:0}
+#legendCat:empty{display:none}
+#legendCat .lc{white-space:nowrap}
+#legendCat .lc i{display:inline-block;width:13px;height:11px;border-radius:2px;margin-right:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.18)}
+body.projo #legendCat{font-size:15px}
 #legendPlus{font:500 11px var(--f-display,sans-serif);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%}
 #legendPlus b{color:var(--ink,inherit);font-weight:600}
 #legendPlus:empty{display:none}
@@ -547,6 +554,7 @@ footer a{color:var(--accent)}
     <div class="legendrow">
       <span id="legendTitle">—</span>
       <canvas id="legend"></canvas>
+      <span id="legendCat"></span>
       <span id="legendPlus"></span>
       <div id="status">Chargement…</div>
     </div>
@@ -593,7 +601,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 10/11/2026 11:10</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 11/11/2026 13:40</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1582,6 +1590,7 @@ function drawField(){
   const ctx=c.getContext("2d"), dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,c.width,c.height);
   if (!st.ga && !st.gm){ drawCoast(ctx); drawGraticule(ctx); drawZonesBul(ctx); drawZonex(ctx); drawMesure(ctx); return; }     /* rien de chargé (et appel possible pendant l'initialisation) */
+  if (_calcCache) _calcCache.clear();
   const P=PARAMS[$("param").value], i=idxCouche("c"), op=+$("opac").value;
   let any=false, g=null, vals=null;
   if (P && P.layers){
@@ -1705,6 +1714,40 @@ function drawGraticule(ctx){
 }
 $("grat").value=store.get("graticule","0");
 $("grat").addEventListener("change",()=>{ store.set("graticule",$("grat").value); drawField(); });
+
+/* ---------- Bulle de survol : valeurs des couches réellement affichées (①, ②, ③), à leur échéance (figée ou non) ---------- */
+var _calcCache=new Map();
+function valeursCouche(P,i){
+  if (!P.calc) return fieldVals(P,i);
+  const k=$("param").value+"|"+i+"|"+(st.gc?st.gc.id||"":"")+"|"+(st.gm?st.gm.id||"":"")+"|"+(st.ga?st.ga.id||"":"")+"|"+JSON.stringify(croiseeOpts());
+  if (!_calcCache.has(k)){ if (_calcCache.size>6) _calcCache.clear(); _calcCache.set(k,P.calc(i)); }
+  return _calcCache.get(k);
+}
+function valPoint(r,lat,lon){
+  if (!r || !r.vals || !r.g) return null; const g=r.g;
+  const x=Math.round((lon-g.lon0)/g.dlon), y=Math.round((lat-g.lat0)/g.dlat);
+  if (x<0||y<0||x>=g.nx||y>=g.ny) return null; const v=r.vals[y*g.nx+x]; return v==null||isNaN(v)?null:v;
+}
+function classeDe(P,v){ const C=P.scale&&P.scale.classes; if (!C) return null; let c=C[0]; for (const q of C) if (v>=q.min-1e-9) c=q; return c; }
+function survolCouches(lat,lon){
+  const out=[], fg=k=>st.fige&&st.fige[k]?` <span class="pos">🔒 ${tLabel(st.fige[k])}</span>`:"";
+  const P=PARAMS[$("param").value];
+  if (P){ const i=idxCouche("c");
+    if (P.layers){ const t=["nlow","nmid","nhigh"].map(k=>valPoint(fieldVals(PARAMS[k],i),lat,lon));
+      if (t.some(v=>v!=null)) out.push(`<span class="hc">①</span>Nuages bas / moyens / hauts <b>${t.map(v=>v==null?"—":fmt(v/12.5,0)).join(" / ")}</b> octas${fg("c")}`); }
+    else { const v=valPoint(valeursCouche(P,i),lat,lon);
+      if (v!=null){ const c=P.cat?classeDe(P,v):null;
+        out.push(`<span class="hc">①</span>${P.label} : <b>${c?esc(c.nom):fmt(v,P.dec)+(P.unit?" "+P.unit:"")}</b>${fg("c")}`); } } }
+  const ik=isoP();
+  if (ik){ const Q=PARAMS[ik], v=valPoint(fieldVals(Q,idxCouche("i")),lat,lon);
+    if (v!=null) out.push(`<span class="hc">②</span>${ISO[ik].label} : <b>${fmt(v,Q.dec)} ${ISO[ik].u||vL()}</b>${fg("i")}`); }
+  const sk=symP();
+  if (sk){ const S=PARAMS[SYM[sk].p], i=idxCouche("s"), r=fieldVals(S,i), v=valPoint(r,lat,lon);
+    if (v!=null){ const dv=r&&r.g?dirVals(S,r.g,i):null, d=dv?valPoint({g:r.g,vals:dv},lat,lon):null;
+      const txt = S.glyph==="barb" ? `${d!=null?dir16(d)+" ":""}${fmt(v,0)} ${vL()}` : S.dirTo ? `${fmt(v,1)} ${S.unit} vers ${dir16(d)}` : `${fmt(v,1)} ${S.unit}${d!=null?" "+dir16(d):""}`;
+      out.push(`<span class="hc">③</span>${SYM[sk].label.split(" · ")[0]} : <b>${txt}</b>${fg("s")}`); } }
+  return out;
+}
 
 /* ---------- Couches figées : une couche garde son échéance pendant que la frise fait défiler les autres ---------- */
 function idxCouche(k){
@@ -1877,6 +1920,14 @@ function updateMissing(){
 }
 function drawLegend(){
   const P=PARAMS[$("param").value], cv=$("legend"), dpr=window.devicePixelRatio||1;
+  $("legendCat").innerHTML="";
+  /* catégories (nuages par étage, mer croisée, CAPE…) : légende en pastilles nommées, lisible même étroite */
+  if (P && P.cat && P.scale && P.scale.classes){
+    $("legendTitle").textContent = `${P.label}${P.unit?` (${P.unit})`:""}`+(st.fige&&st.fige.c?` · figée à ${tLabel(st.fige.c)}`:"");
+    cv.style.display="none";
+    $("legendCat").innerHTML = P.scale.classes.filter(c=>!c.vide).map(c=>`<span class="lc"><i style="background:${c.col}"></i>${esc(c.nom)}</span>`).join("");
+    return;
+  }
   if (!P){ $("legendTitle").textContent="Pas de palette de couleurs"; const c2=cv.getContext("2d"); c2.clearRect(0,0,cv.width,cv.height); cv.style.display="none"; return; }
   cv.style.display="";
   $("legendTitle").textContent = `${P.label}${P.key==="wind_gusts_10m"?" · "+gustDesc():""}${P.unit?` (${P.unit})`:""}`+(st.fige&&st.fige.c?` · figée à ${tLabel(st.fige.c)}`:"");
@@ -4113,6 +4164,11 @@ async function exporterPNG(){
     ctx.textAlign="left"; ctx.textBaseline="top";
     ctx.font=`700 ${f(14)}px 'Barlow Condensed',sans-serif`; ctx.fillStyle="#0d1b2a";
     const t=st.times[st.tIdx]; ctx.fillText(`${$("legendTitle").textContent}  ·  ${t?tLabel(t):""}`,10,H+6);
+    { const Pc=PARAMS[$("param").value];
+      if (Pc && Pc.cat && Pc.scale && Pc.scale.classes){ let xx=10, yy=H+f(28); ctx.font=`500 ${f(11)}px Barlow,sans-serif`; ctx.textBaseline="middle";
+        for (const c of Pc.scale.classes){ if (c.vide) continue; const tw=ctx.measureText(c.nom).width+f(24); if (xx+tw>W*0.46){ xx=10; yy+=f(15); }
+          ctx.fillStyle=c.col; ctx.fillRect(xx,yy-f(5),f(13),f(10)); ctx.fillStyle="#0d1b2a"; ctx.fillText(c.nom,xx+f(17),yy); xx+=tw; }
+        ctx.textBaseline="top"; } }
     const lg=$("legend"); if (lg && lg.style.display!=="none" && lg.width){ const lw=Math.min(W*0.45, lg.clientWidth||300); ctx.drawImage(lg,10,H+f(26),lw,lw*(lg.height/lg.width)); }
     ctx.font=`500 ${f(11)}px Barlow,sans-serif`; ctx.fillStyle="#334";
     const lp=$("legendPlus").textContent.trim(); if (lp) ctx.fillText(lp, Math.min(W*0.47+10,W-10), H+f(26), W*0.5);
@@ -4455,14 +4511,10 @@ function showHover(e){
     if (!st.ga && !st.gm && !st.gc && !(MS && MS.actif && MS.pts.length)){ hoverEl.hidden=true; return; }
     const {lat,lng}=e.latlng, A=(n)=>gridVal(st.ga,n,lat,lng), M=(n)=>gridVal(st.gm,n,lat,lng);
     const lines=[`<span class="pos">${dm(lat,true)} ${dm(lng,false)}</span>`];
-    const P=PARAMS[$("param").value];
-    if (P && !P.layers && !P.calc && !["wind","gust","gusti","pmer","hs","t2","td","hu"].includes($("param").value)){
-      const g=gridOf(P), v=g?gridVal(g,keyOf(P,g),lat,lng):null;
-      lines.push(`${P.label} : <b>${v==null?"—":fmt(P.conv?P.conv(v):v,P.dec)} ${P.unit}</b>`);
-    }
+    const couches=survolCouches(lat,lng);
+    if (couches.length) lines.push(...couches, '<span class="hsep"></span>');
     const ws=A("wind_speed_10m"), wd=A("wind_direction_10m"), gu=st.ga?gridVal(st.ga,keyOf(PARAMS.gust,st.ga),lat,lng):null;
     if (ws!=null) lines.push(`Vent <b>${dir16(wd)} ${fmt(ws*vF(),0)} ${vL()}</b>${gu!=null?` · raf. <b>${fmt(gu*vF(),0)}</b>`:""}`);
-    const pm=A("pressure_msl"); if (pm!=null) lines.push(`Pmer <b>${fmt(pm,1)} hPa</b>`);
     const t2=A("temperature_2m"), td=A("dew_point_2m"), hu=A("relative_humidity_2m");
     if (t2!=null) lines.push(`T <b>${fmt(t2,1)} °C</b>${td!=null?` · Td <b>${fmt(td,1)} °C</b>`:""}${hu!=null?` · HU <b>${fmt(hu,0)} %</b>`:""}`);
     const hs=M("wave_height");
@@ -4473,13 +4525,10 @@ function showHover(e){
       if (p1!=null){ lines.push(`Houle 1 <b>${fmt(p1,1)} m ${dir16(M("primary_swell_direction"))} ${fmt(M("primary_swell_period"),0)} s</b>`);
         const p2=M("secondary_swell_height"); if (p2!=null && p2>=0.1) lines.push(`Houle 2 <b>${fmt(p2,1)} m ${dir16(M("secondary_swell_direction"))} ${fmt(M("secondary_swell_period"),0)} s</b>`); }
       else { const sw=M("swell_wave_height"); if (sw!=null) lines.push(`Houle <b>${fmt(sw,1)} m ${dir16(M("swell_wave_direction"))} ${fmt(M("swell_wave_period"),0)} s</b>`); }
-      { const m1={}; for (const k of ["wave_height","wind_wave_height","wind_wave_direction","swell_wave_height","swell_wave_direction","primary_swell_height","primary_swell_direction","secondary_swell_height","secondary_swell_direction"]) m1[k]=[M(k)];
-        const r=croiseeAt(m1,{wind_direction_10m:[wd]},0); if (r) lines.push(`Mer croisée <b>${croiseeTexte(r)}</b>`); }
     } else if (st.gm && ws!=null) lines.push(`<span class="pos">pas de vagues ici</span>`);
-    const cs=gridVal(st.gc,"current_speed",lat,lng);
-    if (cs!=null) lines.push(`Courant <b>${fmt(cs,1)} kt vers ${dir16(gridVal(st.gc,"current_direction",lat,lng))}</b>`);
     { const sm=st.gc?gridVal(st.gc,"sea_surface_temperature",lat,lng):null; if (sm!=null && !isNaN(sm)){ const t=st.ga?gridVal(st.ga,"temperature_2m",lat,lng):null;
       lines.push(`T mer <b>${fmt(sm,1)} °C</b>${t!=null&&!isNaN(t)?` · air − mer <b>${t-sm>0?"+":""}${fmt(t-sm,1)} °C</b>`:""}`); } }
+    if (lines[lines.length-1]==='<span class="hsep"></span>') lines.pop();
     if (lines.length===1){ hoverEl.hidden=true; return; }
     if (MS && MS.actif && MS.pts.length){ const o=MS.mode==="ref"?MS.pts[0]:MS.pts[MS.pts.length-1], r=loxo(o,{lat,lon:lng});
       lines.splice(1,0,`📐 <b>${az3(r.az)}</b> · <b>${fmt(r.d,r.d<10?2:1)} Nq</b> depuis ${MS.mode==="ref"?"la référence":"le dernier point"}`); }
@@ -4487,7 +4536,7 @@ function showHover(e){
       lines.push(`<span style="color:${zbCoul(f)||"#1f4e8c"}">■</span> Zone grand large <b>${esc(zb.n)}</b>${f?` · avis : <b>${zbMot(f)} ${f}</b>`:ZB.avis?" · pas d'avis":""}${zb.approx?' <span class="pos">(limites approximatives)</span>':""}`); } }
     for (const z of zonexA(lat,lng).slice(0,3))
       lines.push(`<span style="color:${zxCouleur(z.c)}">■</span> Zone <b>${esc(z.n||"sans nom")}</b> · ${esc(z.i ? z.i.slice(0,120) : ((ZX.cats||{})[z.c]||"zone d'exercice"))}`);
-    hoverEl.innerHTML=lines.join("<br>"); hoverEl.hidden=false;
+    hoverEl.innerHTML=lines.join("<br>").replace(/<br><span class="hsep"><\/span><br>/,'<span class="hsep"></span>'); hoverEl.hidden=false;
     const sz=map.getSize(), p=e.containerPoint, w=hoverEl.offsetWidth, h=hoverEl.offsetHeight;
     hoverEl.style.left=Math.min(p.x+14, sz.x-w-4)+"px"; hoverEl.style.top=(p.y+h+18>sz.y ? p.y-h-10 : p.y+14)+"px";
   });
