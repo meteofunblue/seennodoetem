@@ -604,7 +604,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 11/11/2026 14:20</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 11/11/2026 14:30</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1736,8 +1736,12 @@ function survolCouches(lat,lon){
   const out=[], fg=k=>st.fige&&st.fige[k]?` <span class="pos">🔒 ${tLabel(st.fige[k])}</span>`:"";
   const P=PARAMS[$("param").value];
   if (P){ const i=idxCouche("c");
-    if (P.layers){ const t=["nlow","nmid","nhigh"].map(k=>valPoint(fieldVals(PARAMS[k],i),lat,lon));
-      if (t.some(v=>v!=null)) out.push(`<span class="hc">①</span>Nuages bas / moyens / hauts <b>${t.map(v=>v==null?"—":fmt(v/12.5,0)).join(" / ")}</b> octas${fg("c")}`); }
+    if (P.layers){ const t=["nlow","nmid","nhigh"].map(k=>valPoint(fieldVals(PARAMS[k],i),lat,lon));   /* déjà en octas */
+      if (t.some(v=>v!=null)){
+        /* catégorie de la carte : étages couverts à SEUIL_NUAGE octas ou plus */
+        const noms=["bas","moyens","élevés"], pres=t.map(v=>v!=null && v>=SEUIL_NUAGE-1e-6);
+        const cat=pres.some(Boolean) ? ["B","M","H"].filter((_,k)=>pres[k]).join("+").replace(/^B$/,"Bas").replace(/^M$/,"Moyens").replace(/^H$/,"Élevés") : `aucun étage ≥ ${SEUIL_NUAGE} octas`;
+        out.push(`<span class="hc">①</span>Nuages par étage : <b>${cat}</b>${fg("c")}<br><span class="pos">&nbsp;&nbsp;&nbsp;&nbsp;${t.map((v,k)=>`${noms[k]} ${v==null?"—":fmt(v,0)}`).join(" · ")} octas</span>`); } }
     else { const v=valPoint(valeursCouche(P,i),lat,lon);
       if (v!=null){ const c=P.cat?classeDe(P,v):null;
         out.push(`<span class="hc">①</span>${P.label} : <b>${c?esc(c.nom):fmt(v,P.dec)+(P.unit?" "+P.unit:"")}</b>${fg("c")}`); } } }
