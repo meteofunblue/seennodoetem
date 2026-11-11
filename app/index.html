@@ -389,8 +389,6 @@ footer a{color:var(--accent)}
     <option value="non">Non affichées</option><option value="tout">Exercices et tir</option><option value="tir">Zones de tir seules</option></select></div>
   <label class="chk"><input type="checkbox" id="coast" checked> Côte</label>
   <label class="chk"><input type="checkbox" id="vals" checked> Valeurs</label>
-  <select id="dens" aria-label="Densité des barbules et flèches" title="Densité des barbules, flèches et valeurs" style="min-height:30px;padding:3px 6px">
-    <option value="30">Barbules serrées</option><option value="45" selected>Barbules normales</option><option value="70">Barbules espacées</option></select>
   </div>
   <div class="grp">
     <button id="btnTransit" aria-expanded="false">Transit</button>
@@ -606,7 +604,7 @@ footer a{color:var(--accent)}
     <p class="hint" id="hint">Cliquez sur la carte pour choisir un point. Survolez le météogramme pour lire les valeurs, cliquez dessus pour caler la carte sur cette heure.</p>
   </aside>
 </main>
-<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 11/11/2026 13:55</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
+<footer>Données Météo-France (AROME, AROME-IFS, ARPEGE, MFWAM, WW3 · licence Etalab) ; IFS et WAM du CEP en données ouvertes © ECMWF (CC BY 4.0) ; IFS 9 km et MFWAM global Copernicus via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Trait de côte Natural Earth et © contributeurs OpenStreetMap. Zones d'exercices © Shom (Licence Ouverte 2.0). Limites des eaux territoriales : Flanders Marine Institute, Marine Regions (CC BY 4.0). Outil pédagogique : ne remplace pas les bulletins officiels. <span title="Version de l'appli"><span id="versionApp">v. 11/11/2026 14:20</span></span>. <span class="lienHL"><a href="hors-ligne.html" download="modeles-marine-hors-ligne.html">Version hors ligne</a>.</span></footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
@@ -1320,8 +1318,8 @@ function drawArrow(ctx,x,y,dir,len){
 /* mode vidéoprojecteur : traits et textes de la carte plus épais et plus gros */
 function PJ(){ return document.body.classList.contains("projo") ? 1.6 : 1; }
 function strokeTwice(ctx, fn){
-  ctx.save(); ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.fillStyle="rgba(255,255,255,.9)"; ctx.lineWidth=3.2*PJ(); fn(); ctx.restore();
-  ctx.save(); ctx.strokeStyle="#0d1b2a"; ctx.fillStyle="#0d1b2a"; ctx.lineWidth=1.3*PJ(); fn(); ctx.restore();
+  ctx.save(); ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.fillStyle="rgba(255,255,255,.95)"; ctx.lineWidth=4.2*PJ(); fn(); ctx.restore();
+  ctx.save(); ctx.strokeStyle="#0d1b2a"; ctx.fillStyle="#0d1b2a"; ctx.lineWidth=1.9*PJ(); fn(); ctx.restore();
 }
 
 /* Trait de côte Natural Earth 1:10 M (world-atlas), dessiné au-dessus du champ */
@@ -1860,7 +1858,8 @@ function drawSymbols(ctx,i,P,g,vals,surTerre,ik){
   const rs=S?fieldVals(S,i):null, gs=rs&&rs.vals?rs.g:null;
   const showVals=$("vals").checked && g && vals && !P.layers && !P.novals && $("param").value!==ik;
   if (!gs && !showVals) return;
-  const dens=(+$("dens").value||40)*PJ(), target=showVals?Math.max(dens,38*PJ()):dens;
+  /* espacement visé ~45 px ; jamais plus serré que la maille du modèle (valeurs aux points de grille, sans interpolation) */
+  const dens=45*PJ(), target=showVals?Math.max(dens,40*PJ()):dens;
   const base=gs||g, cp=cellPx(base);
   /* symboles : intensité (nœuds pour les barbules) et direction décomposée pour l'interpolation */
   let sv=null, du=null, dvv=null;
@@ -1882,8 +1881,8 @@ function drawSymbols(ctx,i,P,g,vals,surTerre,ik){
     const withText = !isNaN(v) && (symOk ? cell>=34 : cell>=24);
     const gy = withText && symOk ? py-Math.min(cell,60)*0.14 : py;
     if (symOk){
-      if (S.glyph==="barb"){ const len=Math.min(cell*0.42,22*PJ()); strokeTwice(ctx,()=>drawBarb(ctx,px,gy,d,k,len)); }
-      else if (k>0.001){ const len=Math.min(cell*0.55,22*PJ()), dd=S.dirTo?(d+180)%360:d; strokeTwice(ctx,()=>drawArrow(ctx,px,gy,dd,len)); }
+      if (S.glyph==="barb"){ const len=Math.min(cell*0.5,26*PJ()); strokeTwice(ctx,()=>drawBarb(ctx,px,gy,d,k,len)); }
+      else if (k>0.001){ const len=Math.min(cell*0.6,26*PJ()), dd=S.dirTo?(d+180)%360:d; strokeTwice(ctx,()=>drawArrow(ctx,px,gy,dd,len)); }
     }
     if (withText){
       const ty = symOk ? py+Math.min(cell,60)*0.3 : py+4;
@@ -1892,13 +1891,6 @@ function drawSymbols(ctx,i,P,g,vals,surTerre,ik){
       ctx.fillStyle="#0d1b2a"; ctx.fillText(fmt(v,P.dec),px,ty);
     }
   };
-  if (cp > target*1.3){
-    const sz=map.getSize();
-    for (let py=target/2; py<sz.y; py+=target) for (let px=target/2; px<sz.x; px+=target){
-      const ll=map.containerPointToLatLng([px,py]); point(px,py,ll.lat,ll.lng,target);
-    }
-    return;
-  }
   const strd=Math.max(1,Math.ceil(target/cp)), W=viewWindow(base,0), cell=cp*strd;
   const i0=Math.ceil(W.i0/strd)*strd, j0=Math.ceil(W.j0/strd)*strd;
   for (let y=i0;y<=W.i1;y+=strd) for (let x=j0;x<=W.j1;x+=strd){
@@ -4423,8 +4415,7 @@ $("param").addEventListener("change",()=>{ store.set("couche_couleurs",$("param"
 /* réglages d'affichage mémorisés dans le navigateur */
 ["vals","coast","smooth"].forEach(id=>{ const v=store.get("aff_"+id,null); if (v!==null) $(id).checked=!!v;
   $(id).addEventListener("change",()=>{ store.set("aff_"+id,$(id).checked); drawField(); }); });
-$("dens").value=String(store.get("barbules_densite",45));
-$("dens").addEventListener("change",()=>{ store.set("barbules_densite",+$("dens").value); drawField(); });
+
 if (store.get("iso_pas_pmer",null)===null && store.get("isobares_pas",null)!==null){ store.set("iso_pas_pmer",store.get("isobares_pas",5)); majIsoStep(); }
 $("isoStep").addEventListener("change",()=>{ const k=isoP(); if (k) store.set("iso_pas_"+k+(ISO[k].pasKmh?"_"+vU():""),+$("isoStep").value); legendPlus(); drawField(); });
 $("vunit").value=vU();
